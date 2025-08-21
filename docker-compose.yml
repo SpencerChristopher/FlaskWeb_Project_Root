@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: flask_web_app
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - mongo
+    command: poetry run gunicorn --bind 0.0.0.0:5000 app:wsgi_app
+
+  mongo:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+
+volumes:
+  mongo_data:

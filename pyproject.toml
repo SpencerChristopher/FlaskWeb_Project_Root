@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "rpi-webserver"
+version = "0.1.0"
+description = "Lightweight web server running on Raspberry Pi"
+authors = ["Your Name <you@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.0"
+flask-bcrypt = "^1.0"
+flask-login = "^0.6"
+requests = "^2.31"
+pymongo = "^4.7"
+gunicorn = "^21.2"
+python-dotenv = "^1.0"
+python-slugify = "^8.0"
+
+[tool.poetry.dev-dependencies]
+black = "^24.3"
+flake8 = "^7.0"
+pytest = "^8.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
