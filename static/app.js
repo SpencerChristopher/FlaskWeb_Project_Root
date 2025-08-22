@@ -32,165 +32,184 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- TEMPLATES (now returning only inner content for #main-content) ---
+    // --- TEMPLATES ---
     const templates = {
         home: (data) => `
-            <div class="container px-4 px-lg-5 h-100">
-                <div class="row gx-4 gx-lg-5 h-100 align-items-center justify-content-center text-center">
-                    <div class="col-lg-8 align-self-end">
-                        <h1 class="text-white font-weight-bold">Home Page</h1>
-                        <hr class="divider" />
-                        <h2 class="text-white-75 mb-5">${data.title}</h2>
-                    </div>
-                    <div class="col-lg-8 align-self-baseline">
-                        <p class="text-white-75 mb-5">${data.tagline}</p>
-                        <p class="text-white-75 mb-5">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.</p>
-                        <a class="btn btn-primary btn-xl" href="${data.button_link}">Find Out More</a>
+            <header class="masthead">
+                <div class="container px-4 px-lg-5 h-100">
+                    <div class="row gx-4 gx-lg-5 h-100 align-items-center justify-content-center text-center">
+                        <div class="col-lg-8 align-self-end">
+                            <h1 class="text-white font-weight-bold">${data.title}</h1>
+                            <hr class="divider" />
+                        </div>
+                        <div class="col-lg-8 align-self-baseline">
+                            <p class="text-white-75 mb-5">${data.tagline}</p>
+                            <a class="btn btn-primary btn-xl" href="${data.button_link}">Find Out More</a>
+                        </div>
                     </div>
                 </div>
-            </div>`,
+            </header>`,
         blogList: (posts) => {
             let postHtml = posts.map(post => `
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="card h-100">
                         <div class="card-body">
                             <h4 class="card-title">${post.title}</h4>
-                            <h6 class="card-subtitle mb-2 text-muted">${post.published_date || 'Draft'}</h6>
+                            <h6 class="card-subtitle mb-2 text-muted">${new Date(post.publication_date.$date).toLocaleDateString()}</h6>
                             <p class="card-text">${post.summary}</p>
                             <a href="#blog/${post.slug}" class="btn btn-primary btn-sm">Read More</a>
                         </div>
                     </div>
                 </div>`).join('');
             return `
-                <div class="container px-4 px-lg-5">
-                    <h1 class="text-center mt-0">Blog List Page</h1>
-                    <hr class="divider" />
-                    <p class="text-center mb-4">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.</p>
-                    <div class="row gx-4 gx-lg-5 justify-content-center">
-                        ${posts.length > 0 ? postHtml : '<p class="text-center">No posts yet!</p>'}
+                <section class="page-section bg-light" id="blog">
+                    <div class="container px-4 px-lg-5">
+                        <h2 class="text-center mt-0">Our Blog</h2>
+                        <hr class="divider" />
+                        <div class="row gx-4 gx-lg-5 justify-content-center">
+                            ${posts.length > 0 ? postHtml : '<p class="text-center">No posts yet!</p>'}
+                        </div>
                     </div>
-                </div>`;
+                </section>`;
         },
         blogPost: (post) => `
-            <div class="container px-4 px-lg-5">
-                <h1 class="text-center mt-0">Blog Post: ${post.title}</h1>
-                <hr class="divider" />
-                <div class="text-muted text-center mb-4">${post.published_date || 'Draft'}</div>
-                <div class="row gx-4 gx-lg-5 justify-content-center">
-                    <div class="col-lg-8">
-                        <p><strong>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.</strong></p>
-                        <hr/>
-                        ${post.content}
-                    </div>
-                </div>
-            </div>`,
-        login: () => `
-            <div class="container px-4 px-lg-5">
-                <div class="row gx-4 gx-lg-5 justify-content-center">
-                    <div class="col-lg-6 col-md-8">
-                        <h1 class="text-center mt-0">Login Page</h1>
-                        <hr class="divider" />
-                        <p class="text-muted text-center mb-5">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero.</p>
-                        <form id="loginForm">
-                            <div id="login-error" class="text-danger mb-3 text-center" style="display:none;"></div>
-                            <div class="form-floating mb-3">
-                                <input class="form-control" id="username" type="text" placeholder="Username" required />
-                                <label for="username">Username</label>
-                            </div>
-                            <div class="form-floating mb-3">
-                                <input class="form-control" id="password" type="password" placeholder="Password" required />
-                                <label for="password">Password</label>
-                            </div>
-                            <div class="d-grid">
-                                <button class="btn btn-primary btn-xl" type="submit">Login</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div>`,
-        adminDashboard: (posts) => {
-            const postRows = posts.map(post => `
-                <tr data-post-id="${post._id.$oid}">
-                    <td>${post.title}</td>
-                    <td>${post.is_published ? '<span class="badge bg-success">Published</span>' : '<span class="badge bg-secondary">Draft</span>'}</td>
-                    <td>${new Date(post.created_at.$date).toLocaleDateString()}</td>
-                    <td>
-                        <a href="#admin/edit/${post._id.$oid}" class="btn btn-sm btn-primary">Edit</a>
-                        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
-                    </td>
-                </tr>
-            `).join('');
-            return `
+            <section class="page-section">
                 <div class="container px-4 px-lg-5">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h2 class="mt-0">Admin Dashboard</h2>
-                        <a href="#admin/new" class="btn btn-primary">Create New Post</a>
-                    </div>
+                    <h2 class="text-center mt-0">${post.title}</h2>
                     <hr class="divider" />
-                    <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.</p>
-                    <div class="table-responsive">
-                        <table class="table table-striped table-hover">
-                            <thead><tr><th>Title</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
-                            <tbody id="dashboard-tbody">
-                                ${posts.length > 0 ? postRows : '<tr><td colspan="4" class="text-center">No posts found.</td></tr>'}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>`;
-        },
-        postForm: (post = {}) => {
-            const isEditing = post && post._id;
-            const title = isEditing ? `Edit Post` : 'Create New Post';
-            const buttonText = isEditing ? 'Update Post' : 'Create Post';
-            return `
-                <div class="container px-4 px-lg-5">
-                    <h1 class="text-center mt-0">Post Editor</h1>
-                    <h2 class="text-center mt-0">${title}</h2>
-                    <hr class="divider" />
-                    <p class="text-center mb-5">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer nec odio. Praesent libero. Sed cursus ante dapibus diam.</p>
+                    <div class="text-muted text-center mb-4">Published on ${new Date(post.publication_date.$date).toLocaleDateString()}</div>
                     <div class="row gx-4 gx-lg-5 justify-content-center">
                         <div class="col-lg-8">
-                            <form id="postForm" data-post-id="${isEditing ? post._id.$oid : ''}">
-                                <div id="form-error" class="text-danger mb-3 text-center" style="display:none;"></div>
+                            ${post.content}
+                        </div>
+                    </div>
+                </div>
+            </section>`,
+        login: () => `
+            <section class="page-section">
+                <div class="container px-4 px-lg-5">
+                    <div class="row gx-4 gx-lg-5 justify-content-center">
+                        <div class="col-lg-6 col-md-8">
+                            <h2 class="text-center mt-0">Admin Login</h2>
+                            <hr class="divider" />
+                            <form id="loginForm">
+                                <div id="login-error" class="text-danger mb-3 text-center" style="display:none;"></div>
                                 <div class="form-floating mb-3">
-                                    <input class="form-control" id="title" type="text" value="${post.title || ''}" required />
-                                    <label for="title">Title</label>
+                                    <input class="form-control" id="username" type="text" placeholder="Username" required />
+                                    <label for="username">Username</label>
                                 </div>
                                 <div class="form-floating mb-3">
-                                    <textarea class="form-control" id="content" style="height: 15rem" required>${post.content || ''}</textarea>
-                                    <label for="content">Content</label>
+                                    <input class="form-control" id="password" type="password" placeholder="Password" required />
+                                    <label for="password">Password</label>
                                 </div>
-                                <div class="form-check form-switch mb-3">
-                                    <input class="form-check-input" type="checkbox" id="is_published" ${post.is_published ? 'checked' : ''}>
-                                    <label class="form-check-label" for="is_published">Publish this post</label>
-                                </div>
-                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                    <a href="#admin" class="btn btn-secondary">Cancel</a>
-                                    <button class="btn btn-primary" type="submit">${buttonText}</button>
+                                <div class="d-grid">
+                                    <button class="btn btn-primary btn-xl" type="submit">Login</button>
                                 </div>
                             </form>
                         </div>
                     </div>
-                </div>`;
+                </div>
+            </section>`,
+        adminDashboard: (posts) => {
+            const postRows = posts.map(post => `
+                <tr data-post-id="${post._id}">
+                    <td>${post.title}</td>
+                    <td>${post.is_published ? '<span class="badge bg-success">Published</span>' : '<span class="badge bg-secondary">Draft</span>'}</td>
+                    <td>${new Date(post.publication_date).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary edit-btn">Edit</button>
+                        <button class="btn btn-sm btn-danger delete-btn">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            return `
+                <section class="page-section bg-light" id="admin-dashboard">
+                    <div class="container px-4 px-lg-5">
+                        <h2 class="text-center mt-0">Admin Dashboard</h2>
+                        <hr class="divider" />
+
+                        <!-- Post Creation/Editing Form -->
+                        <div class="row gx-4 gx-lg-5 justify-content-center mb-5">
+                            <div class="col-lg-8">
+                                <h3 id="form-title" class="text-center">Create New Post</h3>
+                                <form id="postForm">
+                                    <div id="form-error" class="text-danger mb-3 text-center" style="display:none;"></div>
+                                    <div class="form-floating mb-3">
+                                        <input class="form-control" id="title" type="text" placeholder="Title" required />
+                                        <label for="title">Title</label>
+                                    </div>
+                                    <div class="form-floating mb-3">
+                                        <textarea class="form-control" id="summary" placeholder="Post summary" style="height: 5rem" required></textarea>
+                                        <label for="summary">Summary</label>
+                                    </div>
+                                    <div class="form-floating mb-3">
+                                        <textarea class="form-control" id="content" placeholder="Post content" style="height: 10rem" required></textarea>
+                                        <label for="content">Content</label>
+                                    </div>
+                                    <div class="form-check form-switch mb-3">
+                                        <input class="form-check-input" type="checkbox" id="is_published">
+                                        <label class="form-check-label" for="is_published">Publish this post</label>
+                                    </div>
+                                    <div class="d-grid" id="form-buttons">
+                                        <button class="btn btn-primary" type="submit">Create Post</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <hr class="divider" />
+
+                        <!-- Posts List -->
+                        <h3 class="text-center">Existing Posts</h3>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover">
+                                <thead><tr><th>Title</th><th>Status</th><th>Published</th><th>Actions</th></tr></thead>
+                                <tbody id="dashboard-tbody">
+                                    ${posts.length > 0 ? postRows : '<tr><td colspan="4" class="text-center">No posts found.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            `;
         },
         about: () => `
-            <div class="container px-4 px-lg-5">
-                <h1 class="text-center mt-0">About Us</h1>
-                <hr class="divider" />
-                <p class="text-center mb-5">This is the About page. More content coming soon!</p>
-            </div>`,
+            <section class="page-section">
+                <div class="container px-4 px-lg-5">
+                    <h2 class="text-center mt-0">About Us</h2>
+                    <hr class="divider" />
+                    <div class="row gx-4 gx-lg-5 justify-content-center">
+                        <div class="col-lg-8 text-center">
+                            <p class="text-muted mb-4">This is the About page. More content coming soon!</p>
+                        </div>
+                    </div>
+                </div>
+            </section>`,
         license: () => `
-            <div class="container px-4 px-lg-5">
-                <h1 class="text-center mt-0">License Information</h1>
-                <hr class="divider" />
-                <p class="text-center mb-5">This is the License page. Details about the project license will be here.</p>
-            </div>`,
+            <section class="page-section">
+                <div class="container px-4 px-lg-5">
+                    <h2 class="text-center mt-0">License Information</h2>
+                    <hr class="divider" />
+                    <div class="row gx-4 gx-lg-5 justify-content-center">
+                        <div class="col-lg-8 text-center">
+                            <p class="text-muted mb-4">This is the License page. Details about the project license will be here.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>`,
         contact: () => `
-            <div class="container px-4 px-lg-5">
-                <h1 class="text-center mt-0">Contact Us</h1>
-                <hr class="divider" />
-                <p class="text-center mb-5">This is the Contact page. You can reach us at contact@example.com.</p>
-            </div>`
+            <section class="page-section" id="contact">
+                <div class="container px-4 px-lg-5">
+                    <div class="row gx-4 gx-lg-5 justify-content-center">
+                        <div class="col-lg-8 col-xl-6 text-center">
+                            <h2 class="mt-0">Let's Get In Touch!</h2>
+                            <hr class="divider" />
+                            <p class="text-muted mb-5">Ready to start your next project with us? Send us a messages and we will get back to you as soon as possible!</p>
+                        </div>
+                    </div>
+                </div>
+            </section>`
     };
 
     // --- UI Update Functions ---
@@ -204,6 +223,17 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link" id="admin-link" href="#login">Admin</a></li>');
         }
+    }
+
+    function resetPostForm() {
+        const form = document.getElementById('postForm');
+        const formTitle = document.getElementById('form-title');
+        const formButtons = document.getElementById('form-buttons');
+
+        form.reset();
+        delete form.dataset.postId;
+        formTitle.textContent = 'Create New Post';
+        formButtons.innerHTML = '<button class="btn btn-primary" type="submit">Create Post</button>';
     }
 
     // --- Event Handlers ---
@@ -239,6 +269,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const postData = {
             title: document.getElementById('title').value,
+            summary: document.getElementById('summary').value,
             content: document.getElementById('content').value,
             is_published: document.getElementById('is_published').checked
         };
@@ -248,14 +279,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             await fetchAPI(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) });
-            window.location.hash = '#admin';
+            resetPostForm();
+            router(); // Force a reload of the admin page to show the new/updated post
         } catch (error) {
             errorDiv.textContent = error.message; errorDiv.style.display = 'block';
         }
     }
 
+    async function handleEditClick(event) {
+        const row = event.target.closest('tr');
+        const postId = row.dataset.postId;
+        try {
+            const post = await fetchAPI(`/api/admin/posts/${postId}`);
+            
+            // Populate form
+            document.getElementById('title').value = post.title;
+            document.getElementById('summary').value = post.summary;
+            document.getElementById('content').value = post.content;
+            document.getElementById('is_published').checked = post.is_published;
+            
+            // Change form to update mode
+            const form = document.getElementById('postForm');
+            form.dataset.postId = post._id; // Use the real ID from the response
+            document.getElementById('form-title').textContent = 'Edit Post';
+            
+            const formButtons = document.getElementById('form-buttons');
+            formButtons.innerHTML = `
+                <button class="btn btn-primary" type="submit">Update Post</button>
+                <button type="button" class="btn btn-secondary mt-2" id="cancel-edit-btn">Cancel</button>
+            `;
+            document.getElementById('cancel-edit-btn').addEventListener('click', resetPostForm);
+            
+            // Scroll to form
+            document.getElementById('form-title').scrollIntoView({ behavior: 'smooth' });
+
+        } catch (error) {
+            alert('Failed to fetch post for editing: ' + error.message);
+        }
+    }
+
     async function handleDeletePost(event) {
-        if (!event.target.classList.contains('delete-btn')) return;
         const row = event.target.closest('tr');
         const postId = row.dataset.postId;
 
@@ -280,20 +343,16 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const posts = await fetchAPI('/api/admin/posts');
                 mainContentElement.innerHTML = templates.adminDashboard(posts);
-                document.getElementById('dashboard-tbody').addEventListener('click', handleDeletePost);
-            } catch (error) { mainContentElement.innerHTML = `<p class="text-danger text-center">${error.message}</p>`; }
-        },
-        '#admin/new': () => {
-            if (!userState.loggedIn) { window.location.hash = '#login'; return; }
-            mainContentElement.innerHTML = templates.postForm();
-            document.getElementById('postForm').addEventListener('submit', handlePostFormSubmit);
-        },
-        '#admin/edit/:id': async (id) => {
-            if (!userState.loggedIn) { window.location.hash = '#login'; return; }
-            try {
-                const post = await fetchAPI(`/api/admin/posts/${id}`);
-                mainContentElement.innerHTML = templates.postForm(post);
                 document.getElementById('postForm').addEventListener('submit', handlePostFormSubmit);
+                
+                // Correctly delegate clicks on the table body
+                document.getElementById('dashboard-tbody').addEventListener('click', (event) => {
+                    if (event.target.classList.contains('edit-btn')) {
+                        handleEditClick(event);
+                    } else if (event.target.classList.contains('delete-btn')) {
+                        handleDeletePost(event);
+                    }
+                });
             } catch (error) { mainContentElement.innerHTML = `<p class="text-danger text-center">${error.message}</p>`; }
         },
         '#about': () => { mainContentElement.innerHTML = templates.about(); },
@@ -303,20 +362,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function router() {
         const path = window.location.hash || '#home';
-        const [route, param, id] = path.split('/'); // e.g., #admin/edit/123
+        const [route, param] = path.split('/');
 
-        let matchedRoute;
-        if (route === '#admin' && param === 'edit' && id) {
-            matchedRoute = routes['#admin/edit/:id'];
-            await matchedRoute(id);
-        } else if (route === '#admin' && param === 'new') {
-            await routes['#admin/new']();
-        } else if (routes[route + '/:slug'] && param) {
+        if (routes[route + '/:slug'] && param) {
             await routes[route + '/:slug'](param);
-        } else if (routes[route]) {
-            await routes[route]();
+        } else if (routes[path]) {
+            await routes[path]();
         } else {
-            window.location.hash = '#home';
+            // Fallback to home for any unknown hash
+            mainContentElement.innerHTML = templates.home(await fetchAPI('/api/home'));
         }
     }
 
@@ -330,18 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } finally {
             updateNavUI();
             window.addEventListener('hashchange', router);
-
-            // Add a global click handler for all SPA links
-            document.addEventListener('click', (event) => {
-                const anchor = event.target.closest('a');
-                if (anchor && anchor.getAttribute('href')?.startsWith('#')) {
-                    event.preventDefault();
-                    if (window.location.hash !== anchor.getAttribute('href')) {
-                        window.location.hash = anchor.getAttribute('href');
-                    }
-                }
-            });
-
             router(); // Initial route load
         }
     }
