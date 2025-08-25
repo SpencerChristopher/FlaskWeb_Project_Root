@@ -2,24 +2,26 @@
 
 ## Description
 
-This project is a personal website and blog built using the Flask web framework, MongoDB as the database, and a JavaScript Single Page Application (SPA) for the frontend. It features a public-facing blog, user authentication, and an administrative panel for managing blog posts.
+This project is a personal website and blog built using the Flask web framework, MongoDB as the database, and a JavaScript Single Page Application (SPA) for the frontend. It features a public-facing blog, **JWT-based user authentication with role-based access control (RBAC)**, and an administrative panel for managing blog posts. The backend incorporates an **Observer design pattern** for decoupled event handling.
 
 ## Features
 
 *   **Blog**: Display blog posts with titles, summaries, content, and publication dates.
-*   **User Authentication**: Secure login for administrators.
+*   **User Authentication**: Secure **JWT-based** login with **Role-Based Access Control (RBAC)** for administrators and other user roles.
 *   **Admin Panel**: Create, edit, and delete blog posts.
 *   **Single Page Application (SPA)**: Dynamic content loading without full page reloads, providing a smooth user experience.
 *   **Dockerized Environment**: Easy setup and deployment using Docker Compose for both the Flask application and MongoDB.
+*   **Event-Driven Architecture**: Backend utilizes an **Observer design pattern** for decoupled and extensible event handling (e.g., logging, future notifications).
 
 ## Technologies Used
 
 *   **Backend**: Flask (Python)
 *   **Database**: MongoDB
-*   **Authentication**: Flask-Login, Flask-Bcrypt
-*   **Database Driver**: PyMongo
+*   **Authentication**: Flask-JWT-Extended, Flask-Bcrypt
+*   **Database Driver**: Flask-MongoEngine
 *   **Dependency Management**: Poetry
 *   **Containerization**: Docker, Docker Compose
+*   **Event Handling**: Custom Observer Pattern Implementation
 *   **Frontend**: HTML, CSS (Bootstrap), JavaScript (Vanilla SPA)
 
 ## Setup and Installation
@@ -50,13 +52,13 @@ cp .env.template .env
 Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.**
 
 ```dotenv
-SECRET_KEY=your_flask_secret_key_here # IMPORTANT: Change this to a strong, random key
+SECRET_KEY=your_flask_secret_key_here # IMPORTANT: Change this to a strong, random key (used for Flask sessions and JWT signing)
 PORT=5000
 
 ADMIN_USERNAME=admin # Default admin username for seeding
 ADMIN_PASSWORD=admin # Default admin password for seeding
 
-MONGO_URI=mongodb://appuser:apppassword@localhost:27017/appdb # Use these credentials for seeding
+MONGO_URI=mongodb://mongo:27017/appdb # Connection string for MongoDB (used by Flask-MongoEngine)
 
 # Optional: External API keys if your project expands
 KAGGLE_API_KEY=
@@ -87,12 +89,26 @@ poetry install
 Run the seeding script to populate the MongoDB with initial data (e.g., a sample blog post and an admin user).
 
 ```bash
+# Ensure your MongoDB container is running: docker-compose up -d mongo
+
+# 1. Drop existing database (optional, but recommended for a clean start)
+poetry run python scripts/drop_db.py
+
+# 2. Create the initial admin user
+poetry run python scripts/create_admin.py
+
+# 3. Seed initial data (sample posts)
 poetry run python scripts/seed_db.py
 ```
 
 ### 6. Access the Application
 
 Once all services are up and the database is seeded, you can access the application in your web browser:
+
+```bash
+# Run the Flask application (ensure your venv is activated)
+poetry run python main.py
+```
 
 ```
 http://localhost:5000
@@ -108,18 +124,25 @@ Navigate to the home page. You should see the blog posts listed. Click on a post
 
 1.  Go to `http://localhost:5000/#login`.
 2.  Log in with the admin credentials set in your `.env` file (default: `username=admin`, `password=admin`).
-3.  After successful login, you will be redirected to the admin dashboard where you can manage posts.
+3.  Log in with the admin credentials set in your `.env` file (default: `username=admin`, `password=admin`). Upon successful login, a JWT (JSON Web Token) will be issued and managed by the frontend. You will then be redirected to the admin dashboard where you can manage posts.
 
 ## Project Structure
 
 ```
 . # Project Root
-├── app/
+├── src/                    # Main application source code
 │   ├── models/             # Database models (Post, User)
 │   ├── routes/             # Flask blueprints for API and web routes
 │   ├── utils/              # Utility functions (e.g., logger)
+│   ├── extensions/         # Centralized Flask extension instances (db, bcrypt, jwt)
+│   ├── events/             # Event definitions for Observer pattern
+│   ├── listeners/          # Event listeners for Observer pattern
 │   └── __init__.py         # Flask app creation and configuration
-├── scripts/                # Utility scripts (e.g., database seeding)
+├── scripts/                # Utility scripts
+│   ├── create_admin.py     # Script to create initial admin user
+│   ├── seed_db.py          # Script to seed initial data
+│   ├── clear_applog.py     # Script to clear application log file
+│   └── drop_db.py          # Script to drop the entire database
 ├── static/                 # Frontend static files (JS, CSS, images)
 ├── templates/              # Jinja2 templates for the base HTML structure
 ├── .env                    # Environment variables (local, sensitive)
@@ -127,6 +150,7 @@ Navigate to the home page. You should see the blog posts listed. Click on a post
 ├── docker-compose.db.yml   # Docker Compose configuration for MongoDB
 ├── docker-compose.yml      # Docker Compose configuration for the Flask app
 ├── Dockerfile              # Dockerfile for the Flask application
+├── main.py                 # Main application entry point (formerly app.py)
 ├── pyproject.toml          # Poetry project configuration
 ├── poetry.lock             # Poetry lock file for consistent dependencies
 ├── pytest.ini              # Pytest configuration
