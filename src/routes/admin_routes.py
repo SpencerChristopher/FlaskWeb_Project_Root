@@ -8,19 +8,18 @@ from functools import wraps
 from typing import Callable, Any
 
 from flask import Blueprint, request, jsonify, current_app, Response
-from flask_login import login_required, current_user
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from slugify import slugify
 
-from app.models.post import Post
+from src.models.post import Post
+from src.models.user import User
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 
 def admin_required(f: Callable) -> Callable:
     """
-    Decorator to ensure the current user is an authenticated administrator.
-
-    For this application, any authenticated user is considered an admin.
-    In a real-world scenario, this would check for a specific role or permission.
+    Decorator to ensure the current user is an authenticated administrator
+    with the 'admin' role.
 
     Args:
         f (Callable): The view function to decorate.
@@ -29,10 +28,17 @@ def admin_required(f: Callable) -> Callable:
         Callable: The decorated view function.
     """
     @wraps(f)
-    @login_required
+    @jwt_required()
     def decorated_function(*args: Any, **kwargs: Any) -> Response:
-        if not current_user.is_authenticated:
+        current_user_id = get_jwt_identity()
+        current_user_claims = get_jwt()
+        
+        if "roles" not in current_user_claims or "admin" not in current_user_claims["roles"]:
             return jsonify({'error': 'Admin access required.'}), 403
+        
+        # Optionally, fetch the user object if needed in the view function
+        # request.current_user = User.objects(id=current_user_id).first()
+        
         return f(*args, **kwargs)
     return decorated_function
 
@@ -45,7 +51,7 @@ def get_posts() -> Response:
     Returns:
         Response: A JSON array of post objects.
     """
-    posts = Post.get_all_posts(current_app.db, published_only=False)
+    posts = Post.objects()
     return jsonify([post.to_dict() for post in posts])
 
 @bp.route('/posts', methods=['POST'])
@@ -70,25 +76,25 @@ def create_post() -> Response:
     title = data['title']
     post_slug = slugify(title)
 
-    if Post.get_post_by_slug(current_app.db, post_slug):
+    if Post.objects(slug=post_slug).first():
         return jsonify({'error': 'A post with this title already exists'}), 409
 
-    new_post_id = Post.create_post(
-        db=current_app.db,
+    current_user_id = get_jwt_identity()
+    author_user = User.objects(id=current_user_id).first()
+    if not author_user:
+        return jsonify({'error': 'Author not found.'}), 404 # Should not happen if token is valid
+
+    new_post = Post(
         title=title,
         slug=post_slug,
         content=data['content'],
         summary=data['summary'],
-        author_id=current_user.get_id(),
+        author=author_user, # Assign the User object
         is_published=data.get('is_published', False)
     )
+    new_post.save()
     
-    if new_post_id:
-        created_post = Post.get_post_by_id(current_app.db, str(new_post_id))
-        if created_post:
-            return jsonify(created_post.to_dict()), 201
-    
-    return jsonify({'error': 'Failed to create post'}), 500
+    return jsonify(new_post.to_dict()), 201
 
 @bp.route('/posts/<string:post_id>', methods=['GET'])
 @admin_required
@@ -102,7 +108,7 @@ def get_post(post_id: str) -> Response:
     Returns:
         Response: The post object if found, or a 404 error.
     """
-    post = Post.get_post_by_id(current_app.db, post_id)
+    post = Post.objects(id=post_id).first()
     if not post:
         return jsonify({'error': 'Post not found'}), 404
     return jsonify(post.to_dict())
@@ -122,7 +128,7 @@ def update_post(post_id: str) -> Response:
     Returns:
         Response: The updated post object or an error message.
     """
-    post = Post.get_post_by_id(current_app.db, post_id)
+    post = Post.objects(id=post_id).first()
     if not post:
         return jsonify({'error': 'Post not found'}), 404
 
@@ -134,26 +140,18 @@ def update_post(post_id: str) -> Response:
     post_slug = slugify(title)
 
     # Check if another post with the new slug already exists
-    existing_post = Post.get_post_by_slug(current_app.db, post_slug)
-    if existing_post and str(existing_post._id) != post_id:
+    existing_post = Post.objects(slug=post_slug).first()
+    if existing_post and str(existing_post.id) != post_id:
         return jsonify({'error': 'A post with this title already exists'}), 409
 
-    modified_count = Post.update_post(
-        db=current_app.db,
-        post_id=post_id,
-        title=title,
-        slug=post_slug,
-        content=data['content'],
-        summary=data['summary'],
-        is_published=data.get('is_published', False)
-    )
+    post.title = title
+    post.slug = post_slug
+    post.content = data['content']
+    post.summary = data['summary']
+    post.is_published = data.get('is_published', False)
+    post.save()
     
-    if modified_count > 0:
-        updated_post = Post.get_post_by_id(current_app.db, post_id)
-        if updated_post:
-            return jsonify(updated_post.to_dict()), 200
-    
-    return jsonify({'error': 'Failed to update post or no changes made'}), 500
+    return jsonify(post.to_dict()), 200
 
 @bp.route('/posts/<string:post_id>', methods=['DELETE'])
 @admin_required
@@ -167,7 +165,9 @@ def delete_post(post_id: str) -> Response:
     Returns:
         Response: A success message or a 404 error if the post is not found.
     """
-    if Post.delete_post(current_app.db, post_id):
+    post = Post.objects(id=post_id).first()
+    if post:
+        post.delete()
         return jsonify({'message': 'Post deleted successfully'}), 200
     else:
         return jsonify({'error': 'Error deleting post or post not found'}), 404

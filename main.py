@@ -1,4 +1,9 @@
-from app.server import create_app
+"""
+Entry point for the Flask web application.
+
+This script initializes and runs the Flask application.
+"""
+from src.server import create_app
 import os
 
 app = create_app()
