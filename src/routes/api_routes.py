@@ -6,7 +6,7 @@ to the frontend for pages like Home, Blog, About, etc.
 """
 
 from flask import Blueprint, jsonify, current_app, request, Response
-from app.models.post import Post
+from src.models.post import Post
 from typing import List, Dict, Any
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
@@ -49,7 +49,7 @@ def blog_list_api() -> Response:
     Returns:
         Response: A JSON array of post objects, each a summary.
     """
-    posts: List[Post] = Post.get_all_posts(current_app.db, published_only=True)
+    posts: List[Post] = Post.objects(is_published=True).order_by('-publication_date')
     # Convert full post objects to a list of summary dictionaries
     posts_summary: List[Dict[str, Any]] = [
         {
@@ -73,7 +73,7 @@ def blog_post_api(slug: str) -> Response:
     Returns:
         Response: A JSON object of the full blog post or a 404 error.
     """
-    post = Post.get_post_by_slug(current_app.db, slug)
+    post = Post.objects(slug=slug).first()
     if post:
         return jsonify(post.to_dict())
     return jsonify({'message': 'Post not found'}), 404

@@ -1,8 +1,27 @@
+"""
+Utility module for setting up application logging.
+
+This module provides a function to configure logging for the Flask application,
+including file rotation and console output.
+"""
 import logging
 import os
 from logging.handlers import RotatingFileHandler
 
 def setup_logging(app):
+    """
+    Configures logging for the Flask application.
+
+    Logs are written to both a rotating file (app.log) and the console.
+    The log level is determined by the 'LOG_LEVEL' environment variable,
+    defaulting to INFO.
+
+    Args:
+        app (Flask): The Flask application instance.
+
+    Returns:
+        logging.Logger: The configured logger instance.
+    """
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
 
@@ -13,7 +32,7 @@ def setup_logging(app):
     log_file = os.path.join(log_dir, 'app.log')
 
     # Create a logger
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger() # Get the root logger
     logger.setLevel(numeric_level)
 
     # Create handlers

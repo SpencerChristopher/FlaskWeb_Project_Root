@@ -4,7 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Application State ---
     let userState = {
         loggedIn: false,
-        user: null
+        user: null,
+        accessToken: null,
+        refreshToken: null
     };
 
     // --- DOM Element Cache ---
@@ -13,9 +15,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helper Functions ---
     async function fetchAPI(url, options = {}) {
+        // Add Authorization header for authenticated requests
+        const headers = options.headers || {};
+        if (userState.accessToken) {
+            headers['Authorization'] = `Bearer ${userState.accessToken}`;
+        }
+        options.headers = headers;
+
         try {
             const response = await fetch(url, options);
             if (!response.ok) {
+                // Handle 401 Unauthorized or 403 Forbidden
+                if (response.status === 401 || response.status === 403) {
+                    // Optionally, try to refresh token here or redirect to login
+                    console.warn('Authentication error:', response.status);
+                    userState.loggedIn = false;
+                    userState.user = null;
+                    userState.accessToken = null;
+                    userState.refreshToken = null;
+                    updateNavUI();
+                    window.location.hash = '#login'; // Redirect to login page
+                    throw new Error('Authentication required or forbidden.');
+                }
+
                 let errorData;
                 try {
                     errorData = await response.json();
@@ -55,7 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="card h-100">
                         <div class="card-body">
                             <h4 class="card-title">${post.title}</h4>
-                            <h6 class="card-subtitle mb-2 text-muted">${new Date(post.publication_date.$date).toLocaleDateString()}</h6>
+                            <h6 class="card-subtitle mb-2 text-muted">${post.is_published ? new Date(post.publication_date).toLocaleDateString() : 'Not Published'}</h6>
                             <p class="card-text">${post.summary}</p>
                             <a href="#blog/${post.slug}" class="btn btn-primary btn-sm">Read More</a>
                         </div>
@@ -77,7 +99,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="container px-4 px-lg-5">
                     <h2 class="text-center mt-0">${post.title}</h2>
                     <hr class="divider" />
-                    <div class="text-muted text-center mb-4">Published on ${new Date(post.publication_date.$date).toLocaleDateString()}</div>
+                    <div class="text-muted text-center mb-4">Published on ${post.is_published ? new Date(post.publication_date).toLocaleDateString() : 'Not Published'}</div>
                     <div class="row gx-4 gx-lg-5 justify-content-center">
                         <div class="col-lg-8">
                             ${post.content}
@@ -112,7 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </section>`,
         adminDashboard: (posts) => {
             const postRows = posts.map(post => `
-                <tr data-post-id="${post._id}">
+                <tr data-post-id="${post.id}">
                     <td>${post.title}</td>
                     <td>${post.is_published ? '<span class="badge bg-success">Published</span>' : '<span class="badge bg-secondary">Draft</span>'}</td>
                     <td>${new Date(post.publication_date).toLocaleDateString()}</td>
@@ -216,8 +238,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateNavUI() {
         mainNavList.querySelector('#admin-link')?.parentElement.remove();
         mainNavList.querySelector('#logout-link')?.parentElement.remove();
+        
         if (userState.loggedIn) {
-            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link" id="admin-link" href="#admin">Dashboard</a></li>');
+            // Only show Dashboard link if user has 'admin' role
+            if (userState.user && userState.user.roles && userState.user.roles.includes('admin')) {
+                mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link" id="admin-link" href="#admin">Dashboard</a></li>');
+            }
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link" id="logout-link" href="#">Logout</a></li>');
             mainNavList.querySelector('#logout-link').addEventListener('click', handleLogout);
         } else {
@@ -244,8 +270,23 @@ document.addEventListener('DOMContentLoaded', () => {
         errorDiv.style.display = 'none';
         try {
             const data = await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-            userState.loggedIn = true; userState.user = data.user;
-            updateNavUI(); window.location.hash = '#admin';
+            
+            // Store tokens and user info
+            userState.accessToken = data.access_token;
+            userState.refreshToken = data.refresh_token;
+            userState.loggedIn = true;
+            // Decode the access token to get user details (username, roles)
+            const payload = JSON.parse(atob(data.access_token.split('.')[1]));
+            userState.user = { 
+                id: payload.sub, 
+                username: payload.username, // Assuming username is in claims
+                roles: payload.roles || [] // Assuming roles are in claims
+            }; 
+            localStorage.setItem('accessToken', data.access_token);
+            localStorage.setItem('refreshToken', data.refresh_token);
+
+            updateNavUI(); 
+            window.location.hash = '#admin';
         } catch (error) {
             errorDiv.textContent = error.message; errorDiv.style.display = 'block';
         }
@@ -255,7 +296,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if(event) event.preventDefault();
         try {
             await fetchAPI('/api/auth/logout', { method: 'POST' });
-            userState.loggedIn = false; userState.user = null;
+            userState.loggedIn = false; 
+            userState.user = null;
+            userState.accessToken = null;
+            userState.refreshToken = null;
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
             updateNavUI(); window.location.hash = '#home';
         } catch (error) { alert('Logout failed: ' + error.message); }
     }
@@ -300,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Change form to update mode
             const form = document.getElementById('postForm');
-            form.dataset.postId = post._id; // Use the real ID from the response
+            form.dataset.postId = post.id; // Use the real ID from the response
             document.getElementById('form-title').textContent = 'Edit Post';
             
             const formButtons = document.getElementById('form-buttons');
@@ -376,16 +422,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- App Initialization ---
     async function initializeApp() {
-        try {
-            const data = await fetchAPI('/api/auth/status');
-            if (data.logged_in) { userState.loggedIn = true; userState.user = data.user; }
-        } catch (error) {
-            console.error("Could not verify auth status. Assuming logged out.", error);
-        } finally {
-            updateNavUI();
-            window.addEventListener('hashchange', router);
-            router(); // Initial route load
+        // Load tokens from localStorage
+        userState.accessToken = localStorage.getItem('accessToken');
+        userState.refreshToken = localStorage.getItem('refreshToken');
+
+        if (userState.accessToken) {
+            try {
+                const data = await fetchAPI('/api/auth/status'); // This will validate the token
+                if (data.logged_in) { 
+                    userState.loggedIn = true; 
+                    userState.user = data.user; 
+                } else {
+                    // Token might be invalid or expired, clear it
+                    userState.accessToken = null;
+                    userState.refreshToken = null;
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                }
+            } catch (error) {
+                console.error("Could not verify auth status. Assuming logged out.", error);
+                // Clear tokens if API call fails (e.g., network error, server down)
+                userState.accessToken = null;
+                userState.refreshToken = null;
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+            }
         }
+        
+        updateNavUI();
+        window.addEventListener('hashchange', router);
+        router(); // Initial route load
     }
 
     initializeApp();
