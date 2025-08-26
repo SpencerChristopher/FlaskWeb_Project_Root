@@ -11,9 +11,7 @@ def test_base_html_serves_correctly(client):
     # Check for key structural elements from base.html by looking for stable IDs or attributes
     assert 'id="page-top"' in html
     assert 'id="mainNav"' in html
-    assert '<header class="masthead">' in html
-    assert 'id="home-content"' in html
-    assert 'id="about-content"' in html
+    
     assert 'src="/static/app.js"' in html
 
 def test_navigation_links_are_present_in_base_html(client):

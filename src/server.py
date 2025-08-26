@@ -10,7 +10,8 @@ from flask import Flask, jsonify
 from src.utils.logger import setup_logging
 from src.extensions import db, bcrypt, jwt
 from src.events import event_dispatcher
-
+import datetime # Add this import
+from flask_limiter.errors import RateLimitExceeded # Import RateLimitExceeded
 
 from dotenv import load_dotenv
 
@@ -49,6 +50,14 @@ def create_app():
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT
     jwt.init_app(app)
 
+
+        # Configure JWT token expiry times
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = datetime.timedelta(minutes=15)
+    app.config["JWT_REFRESH_TOKEN_EXPIRES"] = datetime.timedelta(days=7)
+
+    # Initialize Flask-Limiter
+    from src.extensions import limiter
+    limiter.init_app(app)
 
     # Load secret key
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
@@ -99,7 +108,7 @@ def create_app():
     @app.errorhandler(404)
     def not_found_error(error):
         """
-        Handles 404 Not Found errors.
+        Handles 404 Not Found errors by returning a JSON response.
 
         Args:
             error: The error object.
@@ -108,9 +117,17 @@ def create_app():
             Response: A JSON response with a 404 status code.
         """
         app.logger.warning(f"404 Not Found: {error}")
-        return jsonify({"error": "Not Found", "message": str(error)}), 404
+        return jsonify({"error": "Not Found", "message": "The requested URL was not found on the server."}), 404
 
-    @app.errorhandler(500)
+    @app.errorhandler(RateLimitExceeded) # Specific handler for rate limit exceeded
+    def ratelimit_handler(e):
+        """
+        Handles RateLimitExceeded errors, returning a 429 Too Many Requests response.
+        """
+        app.logger.warning(f"Rate Limit Exceeded: {e.description}")
+        return jsonify({"error": "Too Many Requests", "message": e.description}), 429
+
+    @app.errorhandler(Exception) # Change 500 to Exception
     def internal_error(error):
         """
         Handles 500 Internal Server Errors.
@@ -121,8 +138,22 @@ def create_app():
         Returns:
             Response: A JSON response with a 500 status code.
         """
-        app.logger.error(f"500 Internal Server Error: {error}")
-        return jsonify({"error": "Internal Server Error", "message": str(error)}), 500
+        # Log the full traceback internally for debugging purposes
+        app.logger.error(f"500 Internal Server Error: {error}", exc_info=True)
+
+        response = {
+            "status_code": 500,
+            "error": "Internal Server Error",
+            "message": "An unexpected error occurred. Please try again later."
+        }
+
+        # Only include detailed error message in debug or testing mode
+        if app.debug: # Only show full details in debug mode
+            response["details"] = str(error)
+        elif app.testing: # In testing, provide a generic error message for details
+            response["details"] = "Simulated internal server error during testing."
+
+        return jsonify(response), 500
 
     @app.errorhandler(403)
     def forbidden_error(error):

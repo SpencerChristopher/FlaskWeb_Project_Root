@@ -5,7 +5,13 @@ This script connects to the MongoDB database and creates a user with
 the 'admin' role based on environment variables.
 """
 import os
+import sys
 from dotenv import load_dotenv
+
+# Add project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
 from src.models.user import User
 from src.extensions import db # Import the db instance
 from flask import Flask # Import Flask to create a dummy app for context
