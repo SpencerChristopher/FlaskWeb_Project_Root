@@ -30,4 +30,5 @@ def test_admin_route_is_unauthorized_without_login(client):
     assert response.status_code == 401
     assert response.content_type == 'application/json'
     data = response.get_json()
-    assert data['error'] == 'Authentication required'
+    assert 'msg' in data # Flask-JWT-Extended's default error message key
+    assert data['msg'] == 'Missing Authorization Header'

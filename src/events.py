@@ -4,9 +4,11 @@ Observer design pattern implementation.
 """
 from typing import Callable, Dict, List, Any
 
+
 class Event:
     """Base class for all application events."""
     pass
+
 
 class PostCreatedEvent(Event):
     def __init__(self, post_id: str, user_id: str):
@@ -19,6 +21,7 @@ class PostCreatedEvent(Event):
         """
         self.post_id = post_id
         self.user_id = user_id
+
 
 class PostUpdatedEvent(Event):
     def __init__(self, post_id: str, user_id: str, changes: Dict[str, Any]):
@@ -34,6 +37,7 @@ class PostUpdatedEvent(Event):
         self.user_id = user_id
         self.changes = changes
 
+
 class PostDeletedEvent(Event):
     def __init__(self, post_id: str, user_id: str):
         """
@@ -46,6 +50,7 @@ class PostDeletedEvent(Event):
         self.post_id = post_id
         self.user_id = user_id
 
+
 class UserLoggedInEvent(Event):
     def __init__(self, user_id: str):
         """
@@ -56,8 +61,10 @@ class UserLoggedInEvent(Event):
         """
         self.user_id = user_id
 
+
 class EventDispatcher:
     """A simple in-memory event dispatcher."""
+
     def __init__(self):
         """Initializes the EventDispatcher."""
         self._listeners: Dict[type, List[Callable[[Event], None]]] = {}
@@ -68,6 +75,11 @@ class EventDispatcher:
             self._listeners[event_type] = []
         self._listeners[event_type].append(listener)
 
+    import logging # Add this import
+
+
+# ... (rest of the file)
+
     def dispatch(self, event: Event):
         """Dispatch an event to all registered listeners."""
         event_type = type(event)
@@ -77,7 +89,11 @@ class EventDispatcher:
                     listener(event)
                 except Exception as e:
                     # Log the error, but don't stop other listeners
-                    print(f"Error dispatching event {event_type.__name__} to listener {listener.__name__}: {e}")
+                    logging.error(
+                        f"Listener {listener.__name__} failed for event "
+                        f"{event_type.__name__}: {e}",
+                        exc_info=True
+                    )
 
 # Global event dispatcher instance
 # This can be imported and used throughout the application

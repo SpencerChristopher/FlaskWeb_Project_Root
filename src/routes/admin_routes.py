@@ -7,12 +7,18 @@ All routes in this module require administrator privileges.
 from functools import wraps
 from typing import Callable, Any
 
-from flask import Blueprint, request, jsonify, current_app, Response
+from flask import Blueprint, request, jsonify, Response # Removed current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from slugify import slugify
+import bleach
+from mongoengine.errors import ValidationError
 
 from src.models.post import Post
 from src.models.user import User
+
+# Define allowed tags and attributes for bleach.clean() at module level
+ALLOWED_TAGS = ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre']
+ALLOWED_ATTRS = {'a': ['href', 'title']}
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 
@@ -84,15 +90,21 @@ def create_post() -> Response:
     if not author_user:
         return jsonify({'error': 'Author not found.'}), 404 # Should not happen if token is valid
 
+    sanitized_content = bleach.clean(data['content'], tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
+    sanitized_summary = bleach.clean(data['summary'], tags=[], attributes={}) # Summary usually plain text
+
     new_post = Post(
         title=title,
         slug=post_slug,
-        content=data['content'],
-        summary=data['summary'],
-        author=author_user, # Assign the User object
+        content=sanitized_content,
+        summary=sanitized_summary,
+        author=author_user,
         is_published=data.get('is_published', False)
     )
-    new_post.save()
+    try:
+        new_post.save()
+    except ValidationError as e:
+        return jsonify({'error': 'Validation Error', 'details': e.message}), 400
     
     return jsonify(new_post.to_dict()), 201
 
@@ -146,10 +158,13 @@ def update_post(post_id: str) -> Response:
 
     post.title = title
     post.slug = post_slug
-    post.content = data['content']
-    post.summary = data['summary']
+    post.content = bleach.clean(data['content'], tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
+    post.summary = bleach.clean(data['summary'], tags=[], attributes={})
     post.is_published = data.get('is_published', False)
-    post.save()
+    try:
+        post.save()
+    except ValidationError as e:
+        return jsonify({'error': 'Validation Error', 'details': e.message}), 400
     
     return jsonify(post.to_dict()), 200
 
@@ -171,3 +186,6 @@ def delete_post(post_id: str) -> Response:
         return jsonify({'message': 'Post deleted successfully'}), 200
     else:
         return jsonify({'error': 'Error deleting post or post not found'}), 404
+
+
+

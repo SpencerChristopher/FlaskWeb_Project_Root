@@ -5,8 +5,14 @@ This script creates a default admin user (if not exists) and sample blog posts.
 It requires environment variables for MongoDB connection and admin credentials.
 """
 import os
+import sys
 from datetime import datetime, timedelta, UTC
 from dotenv import load_dotenv
+
+# Add project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
 from src.models.user import User
 from src.models.post import Post
 from src.extensions import db # Import the db instance

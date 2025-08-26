@@ -8,6 +8,7 @@ from flask import Blueprint, render_template, Response
 
 bp = Blueprint('main_routes', __name__)
 
+
 @bp.route('/')
 def index() -> Response:
     """
@@ -19,4 +20,3 @@ def index() -> Response:
         Response: The rendered base.html template.
     """
     return render_template('base.html')
-

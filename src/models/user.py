@@ -1,5 +1,6 @@
 """
-This module defines the User model for authentication and authorization using MongoEngine.
+This module defines the User model for authentication and authorization
+using MongoEngine.
 """
 
 from src.extensions import db, bcrypt
@@ -19,11 +20,15 @@ class User(db.Document):
 
     def set_password(self, password: str) -> None:
         """Hashes the provided password and sets it for the user."""
-        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+        self.password_hash = bcrypt.generate_password_hash(password).decode(
+            'utf-8'
+        )
 
     def check_password(self, password: str) -> bool:
         """Checks if the provided password matches the user's hashed password."""
-        return bcrypt.check_password_hash(self.password_hash, password)
+        return bcrypt.check_password_hash(
+            self.password_hash, password
+        )
 
     meta = {
         'collection': 'users',
