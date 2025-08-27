@@ -13,8 +13,9 @@ def test_non_existent_api_route_returns_404(client):
     response = client.get('/api/i-do-not-exist')
     assert response.status_code == 404
     assert response.content_type == 'application/json'
-    data = response.get_json()
-    assert data['error'] == 'Not Found'
+    data = response.json
+    assert data['error_code'] == 'NOT_FOUND'
+    assert data['message'] == 'The requested URL was not found on the server.'
 
 def test_blog_post_not_found_returns_404(client):
     """Verifies the API correctly handles a resource not found within a valid route."""
@@ -22,6 +23,7 @@ def test_blog_post_not_found_returns_404(client):
     assert response.status_code == 404
     assert response.content_type == 'application/json'
     data = response.get_json()
+    assert data['error_code'] == 'NOT_FOUND'
     assert data['message'] == 'Post not found'
 
 def test_admin_route_is_unauthorized_without_login(client):

@@ -6,12 +6,14 @@ initializing the Flask application, configuring extensions,
 registering blueprints, and setting up error handlers.
 """
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, g
+
 from src.utils.logger import setup_logging
 from src.extensions import db, bcrypt, jwt
-from src.events import event_dispatcher
+
 import datetime # Add this import
 from flask_limiter.errors import RateLimitExceeded # Import RateLimitExceeded
+from src.exceptions import APIException, NotFoundException, UnauthorizedException, ForbiddenException, BadRequestException, ValidationError
 
 from dotenv import load_dotenv
 
@@ -107,17 +109,9 @@ def create_app():
     # --- Error Handlers ---
     @app.errorhandler(404)
     def not_found_error(error):
-        """
-        Handles 404 Not Found errors by returning a JSON response.
-
-        Args:
-            error: The error object.
-
-        Returns:
-            Response: A JSON response with a 404 status code.
-        """
         app.logger.warning(f"404 Not Found: {error}")
-        return jsonify({"error": "Not Found", "message": "The requested URL was not found on the server."}), 404
+        response = NotFoundException("The requested URL was not found on the server.").to_dict()
+        return jsonify(response), 404
 
     @app.errorhandler(RateLimitExceeded) # Specific handler for rate limit exceeded
     def ratelimit_handler(e):
@@ -127,47 +121,44 @@ def create_app():
         app.logger.warning(f"Rate Limit Exceeded: {e.description}")
         return jsonify({"error": "Too Many Requests", "message": e.description}), 429
 
+    @app.errorhandler(APIException)
+    def handle_api_exception(error):
+        """
+        Handles custom APIException instances, returning a standardized JSON response.
+        """
+        log_message = (
+            f"API Exception: {error.status_code} - {error.error_code} - {error.message}. "
+            f"Method: {request.method}, Path: {request.path}, IP: {request.remote_addr}"
+        )
+        if error.status_code in [400, 422] and request.is_json:
+            try:
+                log_message += f", Request Data: {request.json}"
+            except Exception:
+                log_message += ", Request Data: <unparseable JSON>"
+        
+        app.logger.warning(log_message, exc_info=True if error.status_code == 500 else False)
+        response = error.to_dict()
+        return jsonify(response), error.status_code
+
     @app.errorhandler(Exception) # Change 500 to Exception
     def internal_error(error):
         """
-        Handles 500 Internal Server Errors.
-
-        Args:
-            error: The error object.
-
-        Returns:
-            Response: A JSON response with a 500 status code.
+        Handles unhandled exceptions, returning a generic 500 Internal Server Error.
         """
-        # Log the full traceback internally for debugging purposes
-        app.logger.error(f"500 Internal Server Error: {error}", exc_info=True)
-
-        response = {
-            "status_code": 500,
-            "error": "Internal Server Error",
-            "message": "An unexpected error occurred. Please try again later."
-        }
-
-        # Only include detailed error message in debug or testing mode
-        if app.debug: # Only show full details in debug mode
-            response["details"] = str(error)
-        elif app.testing: # In testing, provide a generic error message for details
-            response["details"] = "Simulated internal server error during testing."
-
-        return jsonify(response), 500
+        log_message = (
+            f"Unhandled Exception: {error}. "
+            f"Method: {request.method}, Path: {request.path}, IP: {request.remote_addr}"
+        )
+        app.logger.error(log_message, exc_info=True)
+        # For unhandled exceptions, return a generic APIException
+        response = APIException().to_dict()
+        return jsonify(response), APIException.status_code
 
     @app.errorhandler(403)
     def forbidden_error(error):
-        """
-        Handles 403 Forbidden errors.
-
-        Args:
-            error: The error object.
-
-        Returns:
-            Response: A JSON response with a 403 status code.
-        """
         app.logger.warning(f"403 Forbidden: {error}")
-        return jsonify({"error": "Forbidden", "message": str(error)}), 403
+        response = ForbiddenException(str(error)).to_dict()
+        return jsonify(response), 403
     # --- End Error Handlers ---
 
     return app

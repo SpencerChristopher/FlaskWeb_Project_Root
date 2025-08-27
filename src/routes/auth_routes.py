@@ -6,12 +6,15 @@ It includes routes for logging in, logging out, and checking the
 current authentication status.
 """
 
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity
 from src.models.user import User
 from typing import Dict, Any
-from src.events import event_dispatcher, UserLoggedInEvent
+from src.events import user_logged_in
 from src.extensions import limiter # Import limiter
+from src.exceptions import BadRequestException, UnauthorizedException
+from src.schemas import UserRegistration
+from pydantic import ValidationError as PydanticValidationError
 
 
 bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
@@ -32,7 +35,7 @@ def login() -> Response:
     """
     data: Dict[str, Any] = request.get_json()
     if not data or not data.get('username') or not data.get('password'):
-        return jsonify({'error': 'Username and password are required'}), 400
+        raise BadRequestException("Username and password are required")
 
     username = data['username']
     password = data['password']
@@ -46,25 +49,26 @@ def login() -> Response:
             identity=str(user.id), fresh=False
         )  # Refresh tokens are not "fresh"
 
-        event_dispatcher.dispatch(UserLoggedInEvent(user_id=str(user.id)))  # Dispatch event
+        user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
 
         return jsonify(access_token=access_token, refresh_token=refresh_token), 200
     else:
-        return jsonify({'error': 'Invalid username or password'}), 401
+        raise UnauthorizedException("Invalid username or password")
 
 @bp.route('/register', methods=['POST'])
 def register() -> Response:
     """
     Registers a new user.
-    (Placeholder - actual implementation to follow)
     """
-    data: Dict[str, Any] = request.get_json()
-    if not data or not data.get('username') or not data.get('password') or \
-            not data.get('email'):
-        return jsonify({'error': 'Username, password, and email are required'}), 400
+    try:
+        user_data = UserRegistration(**request.get_json())
+    except PydanticValidationError as e:
+        raise BadRequestException("Invalid registration data", details=e.errors())
 
     # Placeholder for actual user registration logic
-    return jsonify({'message': 'User registration endpoint (placeholder)'}), 200
+    # In a real app, you would check if username/email already exists
+    # and then create the user.
+    return jsonify({'message': 'User registration endpoint (placeholder)', 'received_data': user_data.model_dump()}), 200
 
 
 @bp.route('/logout', methods=['POST'])
