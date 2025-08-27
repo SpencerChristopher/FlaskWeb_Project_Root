@@ -10,15 +10,13 @@ from typing import Callable, Any
 from flask import Blueprint, request, jsonify, Response # Removed current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from slugify import slugify
-import bleach
 from mongoengine.errors import ValidationError
+from pydantic import ValidationError as PydanticValidationError
 
 from src.models.post import Post
 from src.models.user import User
-
-# Define allowed tags and attributes for bleach.clean() at module level
-ALLOWED_TAGS = ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre']
-ALLOWED_ATTRS = {'a': ['href', 'title']}
+from src.schemas import BlogPostCreateUpdate
+from src.exceptions import BadRequestException, NotFoundException, ConflictException
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 
@@ -75,36 +73,34 @@ def create_post() -> Response:
     Returns:
         Response: The newly created post object (201) or an error message.
     """
-    data = request.get_json()
-    if not data or not data.get('title') or not data.get('content') or not data.get('summary'):
-        return jsonify({'error': 'Title, content, and summary are required'}), 400
+    try:
+        post_data = BlogPostCreateUpdate(**request.get_json())
+    except PydanticValidationError as e:
+        raise BadRequestException("Invalid post data", details=e.errors())
 
-    title = data['title']
-    post_slug = slugify(title)
+    post_slug = slugify(post_data.title)
 
     if Post.objects(slug=post_slug).first():
-        return jsonify({'error': 'A post with this title already exists'}), 409
+        raise ConflictException("A post with this title already exists")
 
     current_user_id = get_jwt_identity()
     author_user = User.objects(id=current_user_id).first()
     if not author_user:
-        return jsonify({'error': 'Author not found.'}), 404 # Should not happen if token is valid
-
-    sanitized_content = bleach.clean(data['content'], tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
-    sanitized_summary = bleach.clean(data['summary'], tags=[], attributes={}) # Summary usually plain text
+        # This case should ideally be caught by admin_required or JWT validation
+        raise NotFoundException("Author not found.") 
 
     new_post = Post(
-        title=title,
+        title=post_data.title,
         slug=post_slug,
-        content=sanitized_content,
-        summary=sanitized_summary,
+        content=post_data.content,
+        summary=post_data.summary,
         author=author_user,
-        is_published=data.get('is_published', False)
+        is_published=post_data.is_published
     )
     try:
         new_post.save()
-    except ValidationError as e:
-        return jsonify({'error': 'Validation Error', 'details': e.message}), 400
+    except ValidationError as e: # MongoEngine ValidationError
+        raise BadRequestException("Database validation error", details=str(e))
     
     return jsonify(new_post.to_dict()), 201
 
@@ -122,7 +118,7 @@ def get_post(post_id: str) -> Response:
     """
     post = Post.objects(id=post_id).first()
     if not post:
-        return jsonify({'error': 'Post not found'}), 404
+        raise NotFoundException("Post not found")
     return jsonify(post.to_dict())
 
 @bp.route('/posts/<string:post_id>', methods=['PUT'])
@@ -142,29 +138,29 @@ def update_post(post_id: str) -> Response:
     """
     post = Post.objects(id=post_id).first()
     if not post:
-        return jsonify({'error': 'Post not found'}), 404
+        raise NotFoundException("Post not found")
 
-    data = request.get_json()
-    if not data or not data.get('title') or not data.get('content') or not data.get('summary'):
-        return jsonify({'error': 'Title, content, and summary are required'}), 400
+    try:
+        post_data = BlogPostCreateUpdate(**request.get_json())
+    except PydanticValidationError as e:
+        raise BadRequestException("Invalid post data", details=e.errors())
 
-    title = data['title']
-    post_slug = slugify(title)
+    post_slug = slugify(post_data.title)
 
     # Check if another post with the new slug already exists
     existing_post = Post.objects(slug=post_slug).first()
     if existing_post and str(existing_post.id) != post_id:
-        return jsonify({'error': 'A post with this title already exists'}), 409
+        raise ConflictException("A post with this title already exists")
 
-    post.title = title
+    post.title = post_data.title
     post.slug = post_slug
-    post.content = bleach.clean(data['content'], tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
-    post.summary = bleach.clean(data['summary'], tags=[], attributes={})
-    post.is_published = data.get('is_published', False)
+    post.content = post_data.content
+    post.summary = post_data.summary
+    post.is_published = post_data.is_published
     try:
         post.save()
-    except ValidationError as e:
-        return jsonify({'error': 'Validation Error', 'details': e.message}), 400
+    except ValidationError as e: # MongoEngine ValidationError
+        raise BadRequestException("Database validation error", details=str(e))
     
     return jsonify(post.to_dict()), 200
 
@@ -185,7 +181,7 @@ def delete_post(post_id: str) -> Response:
         post.delete()
         return jsonify({'message': 'Post deleted successfully'}), 200
     else:
-        return jsonify({'error': 'Error deleting post or post not found'}), 404
+        raise NotFoundException("Post not found")
 
 
 

@@ -9,6 +9,7 @@ from flask import Blueprint, jsonify, current_app, request, Response
 from src.models.post import Post
 from typing import List, Dict, Any
 from src.extensions import limiter # Import limiter
+from src.exceptions import NotFoundException, BadRequestException
 
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
@@ -96,7 +97,7 @@ def blog_post_api(slug: str) -> Response:
     post = Post.objects(slug=slug).first()
     if post:
         return jsonify(post.to_dict())
-    return jsonify({'message': 'Post not found'}), 404
+    raise NotFoundException("Post not found")
 
 
 @bp.route('/license', methods=['GET'])
@@ -140,16 +141,14 @@ def contact_api() -> Response:
     """
     data = request.get_json()
     if not data:
-        return jsonify({'message': 'Invalid JSON payload'}), 400
+        raise BadRequestException("Invalid JSON payload")
 
     name = data.get('name')
     email = data.get('email')
     message = data.get('message')
 
     if not all([name, email, message]):
-        return jsonify(
-            {'message': 'Name, email, and message are required fields'}
-        ), 400
+        raise BadRequestException("Name, email, and message are required fields")
 
     # Log the submission for demonstration purposes
     current_app.logger.info(

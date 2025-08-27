@@ -70,7 +70,8 @@ class TestJWTAuth:
         )
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert data["error"] == "Invalid username or password"
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Invalid username or password"
 
     def test_failed_login_non_existent_user(self, client, setup_users):
         """Test login with a non-existent username."""
@@ -81,7 +82,8 @@ class TestJWTAuth:
         )
         assert response.status_code == 401
         data = json.loads(response.data)
-        assert data["error"] == "Invalid username or password"
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Invalid username or password"
 
     def test_status_no_token(self, client, setup_users):
         """Test /api/auth/status without a token."""
