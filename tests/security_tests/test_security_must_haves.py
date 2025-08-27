@@ -6,7 +6,7 @@ from flask_jwt_extended import create_access_token, create_refresh_token
 
 from src.models.user import User
 from src.models.post import Post
-from tests.conftest import client
+
 
 # --- Fixtures ---
 
@@ -53,7 +53,11 @@ class TestInputValidation:
         payload = {'title': 'Invalid Post'}
         response = client.post('/api/admin/posts', headers=admin_headers, json=payload)
         assert response.status_code == 400
-        assert 'error' in response.json
+        assert response.json['error_code'] == 'BAD_REQUEST'
+        assert response.json['message'] == 'Invalid post data'
+        assert isinstance(response.json['details'], list)
+        assert any(err['loc'] == ['summary'] and err['msg'] == 'Field required' for err in response.json['details'])
+        assert any(err['loc'] == ['content'] and err['msg'] == 'Field required' for err in response.json['details'])
 
     def test_create_post_oversized_title(self, client, admin_headers):
         """Test creating a post with an oversized title."""
@@ -64,7 +68,10 @@ class TestInputValidation:
         }
         response = client.post('/api/admin/posts', headers=admin_headers, json=payload)
         assert response.status_code == 400
-        assert 'error' in response.json
+        assert response.json['error_code'] == 'BAD_REQUEST'
+        assert response.json['message'] == 'Invalid post data'
+        assert isinstance(response.json['details'], list)
+        assert any(err['loc'] == ['title'] and 'at most 200 characters' in err['msg'] for err in response.json['details'])
 
     def test_create_post_xss_payload(self, client, admin_headers):
         """Test creating a post with an XSS payload."""
@@ -140,8 +147,8 @@ class TestErrorHandlingAndLogging:
         response = client.get('/api/admin/posts', headers=admin_headers)
         assert response.status_code == 500
         assert response.headers['Content-Type'] == 'application/json'
-        assert 'error' in response.json
-        assert 'Internal Server Error' in response.json['error']
+        assert response.json['error_code'] == 'INTERNAL_SERVER_ERROR'
+        assert response.json['message'] == 'An unexpected error occurred.'
 
     def test_no_stack_trace_in_500_response(self, client, admin_headers, monkeypatch):
         """Test that no stack trace is leaked in a 500 response."""
