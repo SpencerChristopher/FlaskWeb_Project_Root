@@ -6,7 +6,7 @@ from src.models.user import User
 import datetime
 from mongoengine.fields import ReferenceField
 from mongoengine.errors import DoesNotExist
-from src.events import event_dispatcher, PostCreatedEvent, PostUpdatedEvent, PostDeletedEvent
+from src.events import post_created, post_updated, post_deleted
 
 
 class Post(db.Document):
@@ -42,11 +42,11 @@ class Post(db.Document):
         super(Post, self).save(*args, **kwargs)  # Call super save first to get an ID if new
 
         if is_new:
-            event_dispatcher.dispatch(PostCreatedEvent(post_id=str(self.id), user_id=str(self.author.id)))
+            post_created.send(self, post_id=str(self.id), user_id=str(self.author.id))
         else:
             # For updates, you might want to pass specific changes,
             # but for simplicity, we'll just pass the ID for now.
-            event_dispatcher.dispatch(PostUpdatedEvent(post_id=str(self.id), user_id=str(self.author.id), changes={}))
+            post_updated.send(self, post_id=str(self.id), user_id=str(self.author.id), changes={})
         
         return self
 
@@ -65,9 +65,7 @@ class Post(db.Document):
             pass
         super(Post, self).delete(*args, **kwargs)
         if user_id:
-            event_dispatcher.dispatch(
-                PostDeletedEvent(post_id=post_id, user_id=user_id)
-            )
+            post_deleted.send(self, post_id=post_id, user_id=user_id)
 
 
     def to_dict(self) -> dict:
