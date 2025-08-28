@@ -1,4 +1,3 @@
-
 """
 This module defines the API routes for user authentication.
 
@@ -13,7 +12,7 @@ from typing import Dict, Any
 from src.events import user_logged_in
 from src.extensions import limiter # Import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
-from src.schemas import UserRegistration
+from src.schemas import UserRegistration, ChangePasswordRequest
 from pydantic import ValidationError as PydanticValidationError
 
 
@@ -24,14 +23,6 @@ bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
 def login() -> Response:
     """
     Authenticates a user and returns JWT access and refresh tokens.
-
-    Expects a JSON payload with:
-    - 'username' (str)
-    - 'password' (str)
-
-    Returns:
-        Response: A JSON object with access and refresh tokens, or an error
-        message.
     """
     data: Dict[str, Any] = request.get_json()
     if not data or not data.get('username') or not data.get('password'):
@@ -63,11 +54,11 @@ def register() -> Response:
     try:
         user_data = UserRegistration(**request.get_json())
     except PydanticValidationError as e:
-        raise BadRequestException("Invalid registration data", details=e.errors())
+        # Extract just the messages for a cleaner response
+        error_messages = [error['msg'] for error in e.errors()]
+        raise BadRequestException("Invalid registration data", details=error_messages)
 
     # Placeholder for actual user registration logic
-    # In a real app, you would check if username/email already exists
-    # and then create the user.
     return jsonify({'message': 'User registration endpoint (placeholder)', 'received_data': user_data.model_dump()}), 200
 
 
@@ -75,14 +66,8 @@ def register() -> Response:
 @jwt_required()
 def logout() -> Response:
     """
-    Logs out the currently authenticated user by invalidating their token.
-    (Note: This example does not implement token blocklisting/revocation,
-    which is recommended for production.)
-
-    Returns:
-        Response: A success message.
+    Logs out the currently authenticated user.
     """
-    # Token blocklisting/revocation logic would go here in a real app
     return jsonify({'message': 'Logged out successfully'}), 200
 
 
@@ -90,10 +75,7 @@ def logout() -> Response:
 @jwt_required(optional=True)
 def status() -> Response:
     """
-    Checks the authentication status of the current session using JWT.
-
-    Returns:
-        Response: A JSON object indicating login status and user info from JWT.
+    Checks the authentication status of the current session.
     """
     current_user_id = get_jwt_identity()
     if current_user_id:
@@ -108,3 +90,27 @@ def status() -> Response:
                 }
             }), 200
     return jsonify({'logged_in': False}), 200
+
+@bp.route('/change-password', methods=['POST'])
+@jwt_required()
+def change_password() -> Response:
+    """
+    Allows a logged-in user to change their password.
+    """
+    try:
+        data = ChangePasswordRequest(**request.get_json())
+    except PydanticValidationError as e:
+        # Extract just the messages for a cleaner response
+        error_messages = [error['msg'] for error in e.errors()]
+        raise BadRequestException("Invalid data", details=error_messages)
+
+    user_id = get_jwt_identity()
+    user = User.objects(id=user_id).first()
+
+    if not user or not user.check_password(data.current_password):
+        raise UnauthorizedException("Invalid current password")
+
+    user.set_password(data.new_password)
+    user.save()
+
+    return jsonify({'message': 'Password updated successfully'}), 200

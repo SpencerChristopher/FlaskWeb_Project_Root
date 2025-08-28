@@ -13,8 +13,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 from src.models.user import User
-from src.extensions import db # Import the db instance
-from flask import Flask # Import Flask to create a dummy app for context
+from src.extensions import db
+from src.schemas import password_complexity_validator # Import the validator
+from flask import Flask
 
 # Load environment variables
 load_dotenv()
@@ -24,7 +25,7 @@ app = Flask(__name__)
 app.config['MONGODB_SETTINGS'] = {
     'host': os.environ.get('MONGO_URI')
 }
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key') # Needed for Flask-Login/Bcrypt context
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
 db.init_app(app)
 
 # Push an application context
@@ -40,9 +41,16 @@ if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
     app_context.pop()
     exit(1)
 
+# Validate the admin password complexity before proceeding
+try:
+    password_complexity_validator(ADMIN_PASSWORD)
+except ValueError as e:
+    print(f"Error: Admin password does not meet complexity requirements: {e}")
+    app_context.pop()
+    exit(1)
+
 print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
 try:
-    # Test connection by trying to access a collection
     User.objects.first()
     print("Successfully connected to MongoDB via MongoEngine.")
 except Exception as e:
@@ -55,9 +63,8 @@ admin_user_obj = User.objects(username=ADMIN_USERNAME).first()
 if admin_user_obj:
     print(f"Admin user '{ADMIN_USERNAME}' already exists.")
 else:
-    # Create the new admin user with 'admin' role
     admin_user_obj = User(username=ADMIN_USERNAME, email=f"{ADMIN_USERNAME}@example.com", role='admin')
-    admin_user_obj.set_password(ADMIN_PASSWORD) # Use the User model's method
+    admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
     print(f"Admin user '{ADMIN_USERNAME}' created successfully with role 'admin'.")
 
