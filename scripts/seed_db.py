@@ -15,31 +15,23 @@ sys.path.insert(0, project_root)
 
 from src.models.user import User
 from src.models.post import Post
-from src.extensions import db # Import the db instance
-from flask import Flask # Import Flask to create a dummy app for context
-
+from src.extensions import db
+from src.schemas import password_complexity_validator # Import the validator
+from flask import Flask
 
 # Load environment variables
 load_dotenv()
 
-# Create a minimal Flask app context for MongoEngine
-# This is necessary because MongoEngine needs an app context to initialize
-# when not running within a full Flask application.
+# Create a minimal Flask app context
 app = Flask(__name__)
 app.config['MONGODB_SETTINGS'] = {
     'host': os.environ.get('MONGO_URI')
 }
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key') # Needed for Flask-Login/Bcrypt context
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
 db.init_app(app)
 
-# Push an application context
 app_context = app.app_context()
 app_context.push()
-
-# Ensure bcrypt is initialized if used outside of a request context
-# This is handled by app.extensions, but ensure it's available
-# if generate_password_hash is called directly.
-# If bcrypt is only used via the User model, this might not be strictly necessary here.
 
 MONGO_URI = os.environ.get('MONGO_URI')
 if not MONGO_URI:
@@ -51,15 +43,21 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
     raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set in .env")
 
+# Validate the admin password complexity before proceeding
+try:
+    password_complexity_validator(ADMIN_PASSWORD)
+except ValueError as e:
+    print(f"Error: Admin password in .env file does not meet complexity requirements: {e}")
+    app_context.pop()
+    exit(1)
+
 print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
 try:
-    # Test connection by trying to access a collection
-    # MongoEngine connects lazily, so we need to force a connection check
     User.objects.first()
     print("Successfully connected to MongoDB via MongoEngine.")
 except Exception as e:
     print(f"Error connecting to MongoDB: {e}")
-    app_context.pop() # Pop context on error
+    app_context.pop()
     exit(1)
 
 # --- Seed Admin User ---
@@ -68,12 +66,11 @@ if admin_user_obj:
     print(f"Admin user '{ADMIN_USERNAME}' already exists. Skipping.")
 else:
     admin_user_obj = User(username=ADMIN_USERNAME, email="admin@example.com")
-    admin_user_obj.set_password(ADMIN_PASSWORD) # Use the User model's method
+    admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
     print(f"Added admin user: {ADMIN_USERNAME}")
 
 # --- Seed Blog Posts ---
-# Ensure admin_user_obj is available for post creation
 if not admin_user_obj:
     print("Admin user not found or created. Cannot seed posts without an author.")
     app_context.pop()
@@ -90,7 +87,7 @@ else:
         summary="A refreshing IPA.",
         slug=post1_slug,
         is_published=True,
-        author=admin_user_obj # Assign the User object
+        author=admin_user_obj
     )
     post1.save()
     print(f"Added blog post: {post1_slug}")
@@ -106,13 +103,12 @@ else:
         summary="Simply amazing.",
         slug=post2_slug,
         is_published=True,
-        publication_date=datetime.now(UTC) - timedelta(days=3), # Example of setting a past date
-        author=admin_user_obj # Assign the User object
+        publication_date=datetime.now(UTC) - timedelta(days=3),
+        author=admin_user_obj
     )
     post2.save()
     print(f"Added blog post: {post2_slug}")
 
 print("Database seeding complete.")
 
-# Pop the application context
 app_context.pop()

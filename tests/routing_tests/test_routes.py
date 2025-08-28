@@ -34,3 +34,15 @@ def test_admin_route_is_unauthorized_without_login(client):
     data = response.get_json()
     assert 'msg' in data # Flask-JWT-Extended's default error message key
     assert data['msg'] == 'Missing Authorization Header'
+
+def test_change_password_route_is_unauthorized_without_login(client):
+    """Ensures the change password API endpoint is properly protected."""
+    response = client.post('/api/auth/change-password', json={
+        "current_password": "old",
+        "new_password": "new"
+    })
+    assert response.status_code == 401
+    assert response.content_type == 'application/json'
+    data = response.get_json()
+    assert 'msg' in data
+    assert data['msg'] == 'Missing Authorization Header'

@@ -2,27 +2,31 @@
 
 ## Description
 
-This project is a personal website and blog built using the Flask web framework, MongoDB as the database, and a JavaScript Single Page Application (SPA) for the frontend. It features a public-facing blog, **JWT-based user authentication with role-based access control (RBAC)**, and an administrative panel for managing blog posts. The backend incorporates an **Observer design pattern** for decoupled event handling.
+This project is a personal website and blog built with Flask and MongoDB, featuring a decoupled frontend and a JSON-based API. The backend leverages **Pydantic** for robust data validation, **Blinker** for a signal-based event-driven architecture, and **JWT** for secure authentication. The frontend is a vanilla JavaScript Single Page Application (SPA).
 
 ## Features
 
-*   **Blog**: Display blog posts with titles, summaries, content, and publication dates.
-*   **User Authentication**: Secure **JWT-based** login with **Role-Based Access Control (RBAC)** for administrators and other user roles.
-*   **Admin Panel**: Create, edit, and delete blog posts.
-*   **Single Page Application (SPA)**: Dynamic content loading without full page reloads, providing a smooth user experience.
+*   **API-First Design**: A comprehensive JSON API serves all public and administrative content.
+*   **Pydantic Validation**: All API inputs, especially for CRUD operations, are strictly validated using Pydantic models, ensuring data integrity and security.
+*   **Event-Driven Architecture**: Utilizes the **Blinker** signaling library to decouple application components. Events are dispatched for actions like user logins and post modifications, allowing for extensible and maintainable code.
+*   **User Authentication**: Secure JWT-based login with role-based access control (RBAC) implemented via custom claims in the JSON Web Token.
+*   **Admin Panel**: A secure area for administrators to perform full CRUD (Create, Read, Update, Delete) operations on blog posts.
+*   **Security Hardening**: Includes rate limiting on sensitive endpoints with **Flask-Limiter** and HTML sanitization with **Bleach** to prevent XSS attacks.
+*   **Single Page Application (SPA)**: The frontend dynamically renders content without full page reloads, providing a smooth user experience.
 *   **Dockerized Environment**: Easy setup and deployment using Docker Compose for both the Flask application and MongoDB.
-*   **Event-Driven Architecture**: Backend utilizes an **Observer design pattern** for decoupled and extensible event handling (e.g., logging, future notifications).
 
 ## Technologies Used
 
 *   **Backend**: Flask (Python)
-*   **Database**: MongoDB
+*   **Database**: MongoDB with Flask-MongoEngine
+*   **API Validation**: Pydantic
 *   **Authentication**: Flask-JWT-Extended, Flask-Bcrypt
-*   **Database Driver**: Flask-MongoEngine
+*   **Event Handling**: Blinker
+*   **Security**: Flask-Limiter, Bleach
 *   **Dependency Management**: Poetry
 *   **Containerization**: Docker, Docker Compose
-*   **Event Handling**: Custom Observer Pattern Implementation
-*   **Frontend**: HTML, CSS (Bootstrap), JavaScript (Vanilla SPA)
+*   **Testing**: Pytest, pytest-flask
+*   **Frontend**: HTML, CSS, JavaScript (Vanilla SPA)
 
 ## Setup and Installation
 
@@ -30,9 +34,9 @@ Follow these steps to get the project up and running on your local machine.
 
 ### Prerequisites
 
-*   [Docker Desktop](https://www.docker.com/products/docker-desktop) (includes Docker Engine and Docker Compose)
+*   [Docker Desktop](https://www.docker.com/products/docker-desktop)
 *   [Python 3.10+](https://www.python.org/downloads/)
-*   [Poetry](https://python-poetry.org/docs/#installation) (Python package manager)
+*   [Poetry](https://python-poetry.org/docs/#installation)
 
 ### 1. Clone the Repository
 
@@ -43,33 +47,17 @@ cd FlaskWeb_Project_Root
 
 ### 2. Set up Environment Variables
 
-Create a `.env` file in the project root directory (`FlaskWeb_Project_Root/`) based on `.env.template`.
+Create a `.env` file in the project root from the template.
 
 ```bash
 cp .env.template .env
 ```
 
-Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.**
-
-```dotenv
-SECRET_KEY=your_flask_secret_key_here # IMPORTANT: Change this to a strong, random key (used for Flask sessions and JWT signing)
-PORT=5000
-
-ADMIN_USERNAME=admin # Default admin username for seeding
-ADMIN_PASSWORD=admin # Default admin password for seeding
-
-MONGO_URI=mongodb://mongo:27017/appdb # Connection string for MongoDB (used by Flask-MongoEngine)
-
-# Optional: External API keys if your project expands
-KAGGLE_API_KEY=
-LINKEDIN_API_TOKEN=
-LEETCODE_SESSION=
-HTB_TOKEN=
-```
+Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.** A strong `SECRET_KEY` is critical for security.
 
 ### 3. Build and Run Docker Containers
 
-Navigate to the project root directory in your terminal and start the Docker containers:
+Start the MongoDB database container first, followed by the main application container.
 
 ```bash
 docker-compose -f docker-compose.db.yml up -d
@@ -78,7 +66,7 @@ docker-compose up -d
 
 ### 4. Install Python Dependencies
 
-Install the project's Python dependencies using Poetry:
+Install the project's Python dependencies using Poetry.
 
 ```bash
 poetry install
@@ -86,15 +74,13 @@ poetry install
 
 ### 5. Seed the Database
 
-Run the seeding script to populate the MongoDB with initial data (e.g., a sample blog post and an admin user).
+Run the following scripts to initialize the database, create the admin user, and seed sample data.
 
 ```bash
-# Ensure your MongoDB container is running: docker-compose up -d mongo
-
-# 1. Drop existing database (optional, but recommended for a clean start)
+# 1. Drop existing database (optional, for a clean start)
 poetry run python scripts/drop_db.py
 
-# 2. Create the initial admin user
+# 2. Create the initial admin user (credentials from .env)
 poetry run python scripts/create_admin.py
 
 # 3. Seed initial data (sample posts)
@@ -103,71 +89,58 @@ poetry run python scripts/seed_db.py
 
 ### 6. Access the Application
 
-Once all services are up and the database is seeded, you can access the application in your web browser:
+Run the Flask application using the Poetry environment.
 
 ```bash
-# Run the Flask application (ensure your venv is activated)
 poetry run python main.py
 ```
 
-```
-http://localhost:5000
-```
+The application will be available at `http://localhost:5000`.
 
 ## Usage
 
 ### Public Blog
 
-Navigate to the home page. You should see the blog posts listed. Click on a post to view its full content.
+Navigate to the home page. The SPA will fetch and display a list of blog posts. Click on a post to view its full content.
 
 ### Admin Panel
 
 1.  Go to `http://localhost:5000/#login`.
-2.  Log in with the admin credentials set in your `.env` file (default: `username=admin`, `password=admin`).
-3.  Log in with the admin credentials set in your `.env` file (default: `username=admin`, `password=admin`). Upon successful login, a JWT (JSON Web Token) will be issued and managed by the frontend. You will then be redirected to the admin dashboard where you can manage posts.
+2.  Log in with the admin credentials set in your `.env` file.
+3.  Upon successful login, a JWT will be stored by the frontend, and you will be redirected to the admin dashboard to manage posts.
 
 ## Project Structure
 
 ```
 . # Project Root
 ├── src/                    # Main application source code
-│   ├── models/             # Database models (Post, User)
+│   ├── models/             # MongoEngine database models (Post, User)
 │   ├── routes/             # Flask blueprints for API and web routes
+│   ├── schemas.py          # Pydantic schemas for API validation
+│   ├── exceptions.py       # Custom application exception classes
+│   ├── events.py           # Blinker signal definitions
+│   ├── listeners.py        # Blinker signal listeners
+│   ├── extensions/         # Centralized Flask extension instances
 │   ├── utils/              # Utility functions (e.g., logger)
-│   ├── extensions/         # Centralized Flask extension instances (db, bcrypt, jwt)
-│   ├── events/             # Event definitions for Observer pattern
-│   ├── listeners/          # Event listeners for Observer pattern
-│   └── __init__.py         # Flask app creation and configuration
-├── scripts/                # Utility scripts
-│   ├── create_admin.py     # Script to create initial admin user
-│   ├── seed_db.py          # Script to seed initial data
-│   ├── clear_applog.py     # Script to clear application log file
-│   └── drop_db.py          # Script to drop the entire database
-├── static/                 # Frontend static files (JS, CSS, images)
-├── templates/              # Jinja2 templates for the base HTML structure
+│   └── __init__.py         # Flask app factory and configuration
+├── scripts/                # Utility scripts (seeding, admin creation)
+├── static/                 # Frontend static files (JS, CSS)
+├── templates/              # Base Jinja2 template for the SPA shell
 ├── .env                    # Environment variables (local, sensitive)
 ├── .env.template           # Template for .env
-├── docker-compose.db.yml   # Docker Compose configuration for MongoDB
-├── docker-compose.yml      # Docker Compose configuration for the Flask app
+├── docker-compose.db.yml   # Docker Compose for MongoDB
+├── docker-compose.yml      # Docker Compose for the Flask app
 ├── Dockerfile              # Dockerfile for the Flask application
-├── main.py                 # Main application entry point (formerly app.py)
+├── main.py                 # Main application entry point
 ├── pyproject.toml          # Poetry project configuration
-├── poetry.lock             # Poetry lock file for consistent dependencies
 ├── pytest.ini              # Pytest configuration
-├── README.md               # Project README file
+├── README.md               # This file
 └── .gitignore              # Git ignore rules
 ```
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
-
-1.  Fork the repository.
-2.  Create a new branch (`git checkout -b feature/your-feature-name`).
-3.  Make your changes.
-4.  Commit your changes (`git commit -m 'feat: Add new feature'`).
-5.  Push to the branch (`git push origin feature/your-feature-name`).
-6.  Open a Pull Request.
+Contributions are welcome! Please fork the repository, create a feature branch, and open a pull request.
 
 ## License
 
@@ -175,7 +148,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgements
 
-*   [Start Bootstrap - Creative Theme](https://startbootstrap.com/theme/creative) for the base HTML/CSS template.
-*   [Flask](https://flask.palletsprojects.com/) for the web framework.
-*   [MongoDB](https://www.mongodb.com/) for the database.
-*   **Special thanks to Google and the Gemini team for the development and assistance provided through the [Gemini CLI](https://github.com/google/generative-ai-docs).**
+*   **Special thanks to Google and the Gemini team for the development and assistance provided through the Gemini CLI.**
