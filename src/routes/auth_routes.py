@@ -6,7 +6,7 @@ current authentication status.
 """
 
 from flask import Blueprint, request, jsonify, Response, current_app
-from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity, create_refresh_token, set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from src.models.user import User
 from typing import Dict, Any
 from src.events import user_logged_in
@@ -36,14 +36,23 @@ def login() -> Response:
         access_token = create_access_token(
             identity=str(user.id), additional_claims={"roles": [user.role]}
         )
-        refresh_token = create_access_token(
-            identity=str(user.id), fresh=False
-        )  # Refresh tokens are not "fresh"
+        refresh_token = create_refresh_token(
+            identity=str(user.id)
+        )
 
         user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
+        current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
 
-        return jsonify(access_token=access_token, refresh_token=refresh_token), 200
+        response = jsonify({
+            'message': 'Login successful',
+            'access_token': access_token,
+            'refresh_token': refresh_token
+        })
+        set_access_cookies(response, access_token)
+        set_refresh_cookies(response, refresh_token)
+        return response, 200
     else:
+        current_app.logger.warning(f"Failed login attempt for user: {username} from IP: {request.remote_addr}")
         raise UnauthorizedException("Invalid username or password")
 
 @bp.route('/register', methods=['POST'])
@@ -59,6 +68,7 @@ def register() -> Response:
         raise BadRequestException("Invalid registration data", details=error_messages)
 
     # Placeholder for actual user registration logic
+    current_app.logger.info(f"New user registration for: {user_data.username} from IP: {request.remote_addr}")
     return jsonify({'message': 'User registration endpoint (placeholder)', 'received_data': user_data.model_dump()}), 200
 
 
@@ -68,7 +78,22 @@ def logout() -> Response:
     """
     Logs out the currently authenticated user.
     """
-    return jsonify({'message': 'Logged out successfully'}), 200
+    response = jsonify({'message': 'Logged out successfully'})
+    unset_jwt_cookies(response)
+    return response, 200
+
+@bp.route('/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh() -> Response:
+    """
+    Refreshes an access token using a valid refresh token.
+    """
+    current_user_id = get_jwt_identity()
+    current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
+    new_access_token = create_access_token(identity=current_user_id)
+    response = jsonify({'message': 'Token refreshed'})
+    set_access_cookies(response, new_access_token)
+    return response, 200
 
 
 @bp.route('/status', methods=['GET'])
@@ -112,5 +137,6 @@ def change_password() -> Response:
 
     user.set_password(data.new_password)
     user.save()
+    current_app.logger.info(f"Password successfully changed for user ID: {user_id} from IP: {request.remote_addr}")
 
     return jsonify({'message': 'Password updated successfully'}), 200

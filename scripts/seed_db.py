@@ -16,11 +16,27 @@ sys.path.insert(0, project_root)
 from src.models.user import User
 from src.models.post import Post
 from src.extensions import db
-from src.schemas import password_complexity_validator # Import the validator
 from flask import Flask
+import re
 
 # Load environment variables
-load_dotenv()
+with open('.env') as f:
+    for line in f:
+        if line.strip() and not line.startswith('#'):
+            key, value = line.strip().split('=', 1)
+            os.environ[key] = value
+
+# --- Password Complexity Validator for Seeding ---
+def validate_password_complexity(password: str):
+    """Enforces password complexity: 8+ chars, 1 upper, 1 lower, 1 digit."""
+    if len(password) < 8:
+        raise ValueError('Password must be at least 8 characters long')
+    if not re.search(r'[A-Z]', password):
+        raise ValueError('Password must contain at least one uppercase letter')
+    if not re.search(r'[a-z]', password):
+        raise ValueError('Password must contain at least one lowercase letter')
+    if not re.search(r'\d', password):
+        raise ValueError('Password must contain at least one digit')
 
 # Create a minimal Flask app context
 app = Flask(__name__)
@@ -39,13 +55,14 @@ if not MONGO_URI:
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+print(f"The password is: {ADMIN_PASSWORD}")
 
 if not ADMIN_USERNAME or not ADMIN_PASSWORD:
     raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set in .env")
 
 # Validate the admin password complexity before proceeding
 try:
-    password_complexity_validator(ADMIN_PASSWORD)
+    validate_password_complexity(ADMIN_PASSWORD)
 except ValueError as e:
     print(f"Error: Admin password in .env file does not meet complexity requirements: {e}")
     app_context.pop()
@@ -65,7 +82,7 @@ admin_user_obj = User.objects(username=ADMIN_USERNAME).first()
 if admin_user_obj:
     print(f"Admin user '{ADMIN_USERNAME}' already exists. Skipping.")
 else:
-    admin_user_obj = User(username=ADMIN_USERNAME, email="admin@example.com")
+    admin_user_obj = User(username=ADMIN_USERNAME, email="admin@example.com", role='admin')
     admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
     print(f"Added admin user: {ADMIN_USERNAME}")

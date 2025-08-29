@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorDiv = document.getElementById('login-error');
         errorDiv.style.display = 'none';
         try {
-            const data = await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+            const data = await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), suppressAuthRedirect: true });
             userState.accessToken = data.access_token;
             userState.refreshToken = data.refresh_token;
             userState.loggedIn = true;

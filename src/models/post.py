@@ -7,6 +7,7 @@ import datetime
 from mongoengine.fields import ReferenceField
 from mongoengine.errors import DoesNotExist
 from src.events import post_created, post_updated, post_deleted
+import bleach
 
 
 class Post(db.Document):
@@ -38,6 +39,13 @@ class Post(db.Document):
         if not self.publication_date and self.is_published:
             self.publication_date = datetime.datetime.now(datetime.UTC)
         self.last_updated = datetime.datetime.now(datetime.UTC)
+
+        # Sanitize content and summary before saving
+        allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code', 'em', 'i', 'li', 'ol', 'p', 'pre', 'strong', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+        allowed_attributes = {'a': ['href', 'title'], 'abbr': ['title'], 'acronym': ['title']}
+
+        self.content = bleach.clean(self.content, tags=allowed_tags, attributes=allowed_attributes, strip=True)
+        self.summary = bleach.clean(self.summary, tags=allowed_tags, attributes=allowed_attributes, strip=True)
 
         super(Post, self).save(*args, **kwargs)  # Call super save first to get an ID if new
 

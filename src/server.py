@@ -14,6 +14,8 @@ from src.extensions import db, bcrypt, jwt
 import datetime # Add this import
 from flask_limiter.errors import RateLimitExceeded # Import RateLimitExceeded
 from src.exceptions import APIException, NotFoundException, UnauthorizedException, ForbiddenException, BadRequestException, ValidationError
+from mongoengine.errors import NotUniqueError, ValidationError as MongoEngineValidationError
+from pymongo.errors import ConnectionFailure
 
 from dotenv import load_dotenv
 
@@ -51,6 +53,22 @@ def create_app():
     # Initialize JWTManager immediately after app creation
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT
     jwt.init_app(app)
+
+    # Callback function to check if a JWT has been revoked
+    @jwt.token_in_blocklist_loader
+    def check_if_token_revoked(jwt_header, jwt_payload):
+        from src.models.token_blocklist import TokenBlocklist
+        jti = jwt_payload["jti"]
+        token = TokenBlocklist.objects(jti=jti).first()
+        return token is not None # Return True if token is in blocklist (revoked)
+
+    # Configure JWT token location (e.g., headers, JSON body)
+    app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
+    app.config["JWT_COOKIE_SECURE"] = False # Set to True in production with HTTPS
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = True
+    app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
+    app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
+    app.config["JWT_COOKIE_SAMESITE"] = "Lax" # Or "Strict" or "None" (requires Secure=True)
 
 
         # Configure JWT token expiry times
@@ -94,17 +112,21 @@ def create_app():
 
     # Register blueprints here
 
-    # Register blueprints here
-    from src.routes import main_routes
-    from src.routes import auth_routes
-    from src.routes import admin_routes
-    from src.routes import api_routes # Import api_routes
-    import src.listeners # Import listeners to register them
+    # --- Security Headers ---
+    @app.after_request
+    def add_security_headers(response):
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        # response.headers['Content-Security-Policy'] = "default-src 'self'"
+        return response
 
+    # --- Route Registration ---
+    from src.routes import main_routes, api_routes, auth_routes, admin_routes
     app.register_blueprint(main_routes.bp)
+    app.register_blueprint(api_routes.bp)
     app.register_blueprint(auth_routes.bp)
     app.register_blueprint(admin_routes.bp)
-    app.register_blueprint(api_routes.bp) # Register api_routes
 
     # --- Error Handlers ---
     @app.errorhandler(404)
@@ -118,8 +140,40 @@ def create_app():
         """
         Handles RateLimitExceeded errors, returning a 429 Too Many Requests response.
         """
-        app.logger.warning(f"Rate Limit Exceeded: {e.description}")
+        app.logger.warning(f"Rate Limit Exceeded for IP: {request.remote_addr} - {e.description}")
         return jsonify({"error": "Too Many Requests", "message": e.description}), 429
+
+    @app.errorhandler(MongoEngineValidationError)
+    def handle_mongoengine_validation_error(error):
+        """
+        Handles MongoEngine ValidationError, converting it to a BadRequestException.
+        """
+        details_list = []
+        if hasattr(error, 'errors') and isinstance(error.errors, dict):
+            for field, err_obj in error.errors.items():
+                msg = ""
+                if hasattr(err_obj, 'message'):
+                    msg = err_obj.message
+                else:
+                    msg = str(err_obj)
+                details_list.append({"loc": [field], "msg": msg})
+        else:
+            # For generic MongoEngineValidationErrors without specific field errors
+            details_list.append({"loc": [], "msg": str(error)})
+        details = details_list
+        
+        app.logger.warning(f"MongoEngine Validation Error: {details}")
+        response = BadRequestException("Validation error", details=details).to_dict()
+        return jsonify(response), 400
+
+    @app.errorhandler(NotUniqueError)
+    def handle_not_unique_error(error):
+        """
+        Handles MongoEngine NotUniqueError, converting it to a ConflictException.
+        """
+        app.logger.warning(f"Not Unique Error: {error}")
+        response = ConflictException(str(error)).to_dict()
+        return jsonify(response), 409
 
     @app.errorhandler(APIException)
     def handle_api_exception(error):
@@ -139,6 +193,15 @@ def create_app():
         app.logger.warning(log_message, exc_info=True if error.status_code == 500 else False)
         response = error.to_dict()
         return jsonify(response), error.status_code
+
+    @app.errorhandler(ConnectionFailure)
+    def handle_pymongo_connection_failure(error):
+        """
+        Handles pymongo.errors.ConnectionFailure, indicating a database connection issue.
+        """
+        app.logger.error(f"Database Connection Failure: {error}", exc_info=True)
+        response = APIException("Database connection error", status_code=500, error_code="DATABASE_ERROR").to_dict()
+        return jsonify(response), 500
 
     @app.errorhandler(Exception) # Change 500 to Exception
     def internal_error(error):

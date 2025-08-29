@@ -1,15 +1,15 @@
+import re
 import pytest
 from src.models.user import User
 
 # Fixture to create a user in the database
 @pytest.fixture
 def test_user(app):
-    with app.app_context():
-        user = User(username='testuser', email='test@example.com', role='user')
-        user.set_password('Password123') # Complex password
-        user.save()
-        yield user
-        user.delete()
+    user = User(username='testuser', email='test@example.com', role='user')
+    user.set_password('Password123') # Complex password
+    user.save()
+    yield user
+    user.delete()
 
 # Helper function to log in a user and get tokens
 def login_user(client, username, password):
@@ -18,7 +18,13 @@ def login_user(client, username, password):
         'password': password
     })
     assert response.status_code == 200
-    return response.get_json()['access_token']
+
+    # Extract access token from Set-Cookie header
+    for cookie_header in response.headers.getlist('Set-Cookie'):
+        match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
+        if match:
+            return match.group(1)
+    raise Exception("Access token cookie not found in response headers")
 
 def test_change_password_successfully(client, test_user):
     """Tests that a logged-in user can successfully change their password."""

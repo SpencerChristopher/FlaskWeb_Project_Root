@@ -14,11 +14,23 @@ sys.path.insert(0, project_root)
 
 from src.models.user import User
 from src.extensions import db
-from src.schemas import password_complexity_validator # Import the validator
 from flask import Flask
+import re
 
 # Load environment variables
 load_dotenv()
+
+# --- Password Complexity Validator for Seeding ---
+def validate_password_complexity(password: str):
+    """Enforces password complexity: 8+ chars, 1 upper, 1 lower, 1 digit."""
+    if len(password) < 8:
+        raise ValueError('Password must be at least 8 characters long')
+    if not re.search(r'[A-Z]', password):
+        raise ValueError('Password must contain at least one uppercase letter')
+    if not re.search(r'[a-z]', password):
+        raise ValueError('Password must contain at least one lowercase letter')
+    if not re.search(r'\d', password):
+        raise ValueError('Password must contain at least one digit')
 
 # Create a minimal Flask app context for MongoEngine
 app = Flask(__name__)
@@ -43,7 +55,7 @@ if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
 
 # Validate the admin password complexity before proceeding
 try:
-    password_complexity_validator(ADMIN_PASSWORD)
+    validate_password_complexity(ADMIN_PASSWORD)
 except ValueError as e:
     print(f"Error: Admin password does not meet complexity requirements: {e}")
     app_context.pop()

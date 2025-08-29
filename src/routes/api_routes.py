@@ -1,3 +1,4 @@
+import re
 from flask import Blueprint, jsonify, current_app, request, Response
 from src.models.post import Post
 from typing import List, Dict, Any
@@ -44,12 +45,9 @@ def blog_list_api() -> Response:
     if page < 1 or per_page < 1:
         raise BadRequestException("Page and per_page must be positive integers.")
 
-    try:
-        paginated_posts = Post.objects(is_published=True).order_by(
-            '-publication_date'
-        ).paginate(page=page, per_page=per_page)
-    except ValidationError as e:
-        raise NotFoundException(f"Page {page} does not exist.") from e
+    paginated_posts = Post.objects(is_published=True).order_by(
+        '-publication_date'
+    ).paginate(page=page, per_page=per_page)
 
     posts_summary: List[Dict[str, Any]] = [
         {
@@ -79,6 +77,10 @@ def blog_list_api() -> Response:
 
 @bp.route('/blog/<string:slug>', methods=['GET'])
 def blog_post_api(slug: str) -> Response:
+    # Validate slug format using regex
+    if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', slug):
+        raise BadRequestException("Invalid slug format.")
+
     post = Post.objects(slug=slug).first()
     if post:
         return jsonify(post.to_dict())

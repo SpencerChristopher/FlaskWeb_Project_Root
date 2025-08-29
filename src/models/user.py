@@ -5,6 +5,7 @@ using MongoEngine.
 
 from src.extensions import db, bcrypt
 import datetime
+from src.events import user_deleted
 
 
 class User(db.Document):
@@ -29,6 +30,14 @@ class User(db.Document):
         return bcrypt.check_password_hash(
             self.password_hash, password
         )
+
+    def delete(self, *args, **kwargs):
+        """
+        Overrides the default delete method to dispatch a signal before deletion.
+        """
+        user_id = str(self.id)
+        super().delete(*args, **kwargs)
+        user_deleted.send(self, user_id=user_id)
 
     meta = {
         'collection': 'users',
