@@ -1,10 +1,10 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from typing import Optional
 import bleach
 import re
 
 # --- Reusable Password Complexity Validator ---
-def password_complexity_validator(v: str) -> str:
+def password_complexity_validator(cls, v: str, info: ValidationInfo) -> str:
     """Enforces password complexity: 8+ chars, 1 upper, 1 lower, 1 digit."""
     if len(v) < 8:
         raise ValueError('Password must be at least 8 characters long')
@@ -27,12 +27,14 @@ class BlogPostCreateUpdate(BaseModel):
     content: str = Field(..., min_length=1)
     is_published: Optional[bool] = False
 
-    @validator('content')
-    def sanitize_content(cls, v):
+    @field_validator('content')
+    @classmethod
+    def sanitize_content(cls, v: str) -> str:
         return bleach.clean(v, tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS)
 
-    @validator('summary')
-    def sanitize_summary(cls, v):
+    @field_validator('summary')
+    @classmethod
+    def sanitize_summary(cls, v: str) -> str:
         return bleach.clean(v, tags=[], attributes={}) # Summary usually plain text
 
 class UserRegistration(BaseModel):
@@ -40,10 +42,10 @@ class UserRegistration(BaseModel):
     email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
     password: str
 
-    _validate_password = validator('password', allow_reuse=True)(password_complexity_validator)
+    _validate_password = field_validator('password')(password_complexity_validator)
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-    _validate_new_password = validator('new_password', allow_reuse=True)(password_complexity_validator)
+    _validate_new_password = field_validator('new_password')(password_complexity_validator)

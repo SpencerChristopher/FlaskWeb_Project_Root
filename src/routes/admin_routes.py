@@ -7,7 +7,7 @@ All routes in this module require administrator privileges.
 from functools import wraps
 from typing import Callable, Any
 
-from flask import Blueprint, request, jsonify, Response # Removed current_app
+from flask import Blueprint, request, jsonify, Response, current_app # Removed current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from slugify import slugify
 from mongoengine.errors import ValidationError
@@ -16,7 +16,7 @@ from pydantic import ValidationError as PydanticValidationError
 from src.models.post import Post
 from src.models.user import User
 from src.schemas import BlogPostCreateUpdate
-from src.exceptions import BadRequestException, NotFoundException, ConflictException
+from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 
@@ -38,7 +38,11 @@ def admin_required(f: Callable) -> Callable:
         current_user_claims = get_jwt()
         
         if "roles" not in current_user_claims or "admin" not in current_user_claims["roles"]:
-            return jsonify({'error': 'Admin access required.'}), 403
+            current_app.logger.warning(
+                f"Unauthorized admin access attempt by user ID: {current_user_id} "
+                f"with roles: {current_user_claims.get('roles', 'N/A')} from IP: {request.remote_addr}"
+            )
+            raise ForbiddenException("Admin access required.")
         
         # Optionally, fetch the user object if needed in the view function
         # request.current_user = User.objects(id=current_user_id).first()
@@ -99,8 +103,10 @@ def create_post() -> Response:
     )
     try:
         new_post.save()
-    except ValidationError as e: # MongoEngine ValidationError
-        raise BadRequestException("Database validation error", details=str(e))
+    except ValidationError as e:
+        # Convert MongoEngine validation error to a more structured format
+        error_details = {field: message for field, message in e.errors.items()}
+        raise BadRequestException("Validation failed", details=error_details)
     
     return jsonify(new_post.to_dict()), 201
 
@@ -159,8 +165,10 @@ def update_post(post_id: str) -> Response:
     post.is_published = post_data.is_published
     try:
         post.save()
-    except ValidationError as e: # MongoEngine ValidationError
-        raise BadRequestException("Database validation error", details=str(e))
+    except ValidationError as e:
+        # Convert MongoEngine validation error to a more structured format
+        error_details = {field: message for field, message in e.errors.items()}
+        raise BadRequestException("Validation failed", details=error_details)
     
     return jsonify(post.to_dict()), 200
 
