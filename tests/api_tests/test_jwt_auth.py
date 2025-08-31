@@ -6,37 +6,9 @@ from src.extensions import db
 from flask_jwt_extended import decode_token, create_access_token, create_refresh_token
 import datetime
 
-# Helper function to get a valid JWT token
-def get_jwt_token(client, username, password):
-    response = client.post(
-        "/api/auth/login",
-        json={"username": username, "password": password},
-        content_type="application/json",
-    )
-    assert response.status_code == 200
-    
-    # Extract access token from Set-Cookie header
-    for cookie_header in response.headers.getlist('Set-Cookie'):
-        match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
-        if match:
-            return match.group(1)
-    raise Exception("Access token cookie not found in response headers")
 
-# Helper function to get a valid refresh token
-def get_jwt_refresh_token(client, username, password):
-    response = client.post(
-        "/api/auth/login",
-        json={"username": username, "password": password},
-        content_type="application/json",
-    )
-    assert response.status_code == 200
 
-    # Extract refresh token from Set-Cookie header
-    for cookie_header in response.headers.getlist('Set-Cookie'):
-        match = re.search(r'refresh_token_cookie=([^;]+)', cookie_header)
-        if match:
-            return match.group(1)
-    raise Exception("Refresh token cookie not found in response headers")
+
 
 @pytest.fixture(scope="function", autouse=True)
 def setup_users(app):
@@ -113,9 +85,9 @@ class TestTokenLifecycle:
         data = json.loads(response.data)
         assert data["logged_in"] is False
 
-    def test_status_with_valid_token(self, client, setup_users):
+    def test_status_with_valid_token(self, client, setup_users, login_user_fixture):
         """Test /api/auth/status with a valid token."""
-        access_token = get_jwt_token(client, "testadmin", "testpassword")
+        access_token = login_user_fixture("testadmin", "testpassword")
         response = client.get(
             "/api/auth/status", headers={"Authorization": f"Bearer {access_token}"}
         )
@@ -131,13 +103,14 @@ class TestTokenLifecycle:
         response = client.get(
             "/api/auth/status", headers={"Authorization": f"Bearer {invalid_token}"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
         data = json.loads(response.data)
-        assert "msg" in data # Flask-JWT-Extended's default error message key
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Signature verification failed or token is malformed."
 
-    def test_logout_successful(self, client, setup_users):
+    def test_logout_successful(self, client, setup_users, login_user_fixture):
         """Test successful logout (token is sent, backend confirms)."""
-        access_token = get_jwt_token(client, "testadmin", "testpassword")
+        access_token = login_user_fixture("testadmin", "testpassword")
         response = client.post(
             "/api/auth/logout", headers={"Authorization": f"Bearer {access_token}"}
         )
@@ -145,18 +118,19 @@ class TestTokenLifecycle:
         data = json.loads(response.data)
         assert data["message"] == "Logged out successfully"
 
-        # After logout, the token should ideally be invalid (if blocklisting is implemented)
-        # For now, just check status with the token again - it should still be valid
-        # unless blocklisting is active.
+        # After logout, the token should be invalid (blocklisted)
+        # Attempt to use the token again and assert 401 Unauthorized
         response = client.get(
             "/api/auth/status", headers={"Authorization": f"Bearer {access_token}"}
         )
-        assert response.status_code == 200 # Still 200 because no blocklisting
-        assert json.loads(response.data)["logged_in"] is True # Still logged in
+        assert response.status_code == 401
+        data = json.loads(response.data)
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Token has been revoked."
 
-    def test_refresh_access_token_successful(self, client, setup_users):
+    def test_refresh_access_token_successful(self, client, setup_users, get_refresh_token_fixture):
         """Test successful refresh of access token using a valid refresh token."""
-        refresh_token = get_jwt_refresh_token(client, "testadmin", "testpassword")
+        refresh_token = get_refresh_token_fixture("testadmin", "testpassword")
         response = client.post(
             "/api/auth/refresh", headers={"Authorization": f"Bearer {refresh_token}"}
         )
@@ -166,9 +140,24 @@ class TestTokenLifecycle:
         assert data["message"] == "Token refreshed"
         assert "Set-Cookie" in response.headers
 
-        # Verify the new access token is valid (from cookie)
-        # This part of the test needs to be updated to retrieve the token from the cookie
-        # For now, we just assert the response and cookie presence.
+        # Extract the new access token from the Set-Cookie header
+        new_access_token = None
+        for cookie_header in response.headers.getlist('Set-Cookie'):
+            match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
+            if match:
+                new_access_token = match.group(1)
+                break
+        assert new_access_token is not None, "New access token cookie not found in refresh response"
+
+        # Use the new access token to access a protected endpoint
+        protected_response = client.get(
+            "/api/auth/status", headers={"Authorization": f"Bearer {new_access_token}"}
+        )
+        assert protected_response.status_code == 200
+        protected_data = json.loads(protected_response.data)
+        assert protected_data["logged_in"] is True
+        assert protected_data["user"]["username"] == "testadmin"
+        assert protected_data["user"]["role"] == "admin"
 
     def test_refresh_access_token_with_expired_refresh_token(self, client, setup_users, app):
         """Test refresh fails with an expired refresh token."""
@@ -191,23 +180,26 @@ class TestTokenLifecycle:
         response = client.post(
             "/api/auth/refresh", headers={"Authorization": f"Bearer {invalid_refresh_token}"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
         data = json.loads(response.data)
-        assert "msg" in data
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Signature verification failed or token is malformed."
 
-    def test_refresh_access_token_with_access_token(self, client, setup_users):
+    def test_refresh_access_token_with_access_token(self, client, setup_users, login_user_fixture):
         """Test refresh fails if an access token is used instead of a refresh token."""
-        access_token = get_jwt_token(client, "testadmin", "testpassword")
+        access_token = login_user_fixture("testadmin", "testpassword")
         response = client.post(
             "/api/auth/refresh", headers={"Authorization": f"Bearer {access_token}"}
         )
-        assert response.status_code == 422
+        assert response.status_code == 401
         data = json.loads(response.data)
-        assert "msg" in data
-        assert "Only refresh tokens are allowed" in data["msg"]
+        assert data["error_code"] == "UNAUTHORIZED"
+        assert data["message"] == "Signature verification failed or token is malformed."
 
-    def test_refresh_token_is_http_only_cookie(self, client, setup_users):
+    def test_refresh_token_is_http_only_cookie(self, client, setup_users, login_user_fixture):
         """Test that the refresh token is sent as an HTTP-only cookie."""
+        # Perform a login to get the cookies
+        login_user_fixture("testadmin", "testpassword") # This call sets the cookies
         response = client.post(
             "/api/auth/login",
             json={"username": "testadmin", "password": "testpassword"},

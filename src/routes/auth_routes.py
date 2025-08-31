@@ -5,6 +5,7 @@ It includes routes for logging in, logging out, and checking the
 current authentication status.
 """
 
+import datetime
 from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity, create_refresh_token, set_access_cookies, set_refresh_cookies, unset_jwt_cookies
 from src.models.user import User
@@ -78,6 +79,14 @@ def logout() -> Response:
     """
     Logs out the currently authenticated user.
     """
+    from flask_jwt_extended import get_jwt
+    from src.models.token_blocklist import TokenBlocklist
+
+    jti = get_jwt()["jti"]
+    now = datetime.datetime.now(datetime.timezone.utc)
+    blocklisted_token = TokenBlocklist(jti=jti, expires_at=now + datetime.timedelta(minutes=15)) # Block for access token expiry
+    blocklisted_token.save(write_concern={'w': 1})
+
     response = jsonify({'message': 'Logged out successfully'})
     unset_jwt_cookies(response)
     return response, 200
@@ -128,6 +137,7 @@ def change_password() -> Response:
         # Extract just the messages for a cleaner response
         error_messages = [error['msg'] for error in e.errors()]
         raise BadRequestException("Invalid data", details=error_messages)
+        current_app.logger.warning(f"Invalid data for change password: {error_messages}")
 
     user_id = get_jwt_identity()
     user = User.objects(id=user_id).first()

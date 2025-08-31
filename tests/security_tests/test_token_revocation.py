@@ -1,47 +1,12 @@
-import re
 import pytest
 from src.models.user import User
 from flask_jwt_extended import decode_token, create_refresh_token
 from src.models.token_blocklist import TokenBlocklist
 import datetime
 
-# Helper function to log in a user and get tokens
-def login_user(client, username, password):
-    response = client.post('/api/auth/login', json={
-        'username': username,
-        'password': password
-    })
-    assert response.status_code == 200
 
-    # Extract access token from Set-Cookie header
-    for cookie_header in response.headers.getlist('Set-Cookie'):
-        match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
-        if match:
-            return match.group(1)
-    raise Exception("Access token cookie not found in response headers")
 
-    # Extract access token from Set-Cookie header
-    set_cookie_header = response.headers.get('Set-Cookie')
-    if set_cookie_header:
-        match = re.search(r'access_token_cookie=([^;]+)', set_cookie_header)
-        if match:
-            return match.group(1)
-    raise Exception("Access token cookie not found in response headers")
 
-# Helper function to get a refresh token
-def get_refresh_token(client, username, password):
-    response = client.post('/api/auth/login', json={
-        'username': username,
-        'password': password
-    })
-    assert response.status_code == 200
-
-    # Extract refresh token from Set-Cookie header
-    for cookie_header in response.headers.getlist('Set-Cookie'):
-        match = re.search(r'refresh_token_cookie=([^;]+)', cookie_header)
-        if match:
-            return match.group(1)
-    raise Exception("Refresh token cookie not found in response headers")
 
 @pytest.fixture
 def test_admin_user(app):
@@ -51,13 +16,13 @@ def test_admin_user(app):
     yield admin_user
     admin_user.delete()
 
-def test_admin_access_after_user_deletion(client, app, test_admin_user):
+def test_admin_access_after_user_deletion(client, app, test_admin_user, login_user_fixture):
     """
     Tests that an admin user's JWT cannot be used to access admin endpoints
     after the user has been deleted from the database.
     """
     # 1. Log in as admin to get a token
-    admin_token = login_user(client, 'adminuser', 'AdminPassword123')
+    admin_token = login_user_fixture('adminuser', 'AdminPassword123')
     headers = {
         'Authorization': f'Bearer {admin_token}'
     }
@@ -80,18 +45,18 @@ def test_admin_access_after_user_deletion(client, app, test_admin_user):
     # 3. Attempt to access an admin-protected endpoint with the token of the deleted user
     response = client.get('/api/admin/posts', headers=headers)
     
-    # 4. Assert that access is denied (403 Forbidden or 401 Unauthorized)
-    assert response.status_code == 403 or response.status_code == 401
+    # 4. Assert that access is denied (401 Unauthorized) and token is revoked
+    assert response.status_code == 401
     data = response.get_json()
-    assert 'msg' in data
-    assert 'Token has been revoked' in data['msg'] or 'Admin access required.' in data['msg'] or 'Unauthorized' in data['msg']
+    assert data['error_code'] == 'UNAUTHORIZED'
+    assert data['message'] == 'Token has been revoked.'
 
-def test_blacklisted_refresh_token_rejected(client, app, test_admin_user):
+def test_blacklisted_refresh_token_rejected(client, app, test_admin_user, get_refresh_token_fixture):
     """
     Tests that a blacklisted refresh token cannot be used to obtain a new access token.
     """
     # 1. Log in as admin to get a refresh token
-    refresh_token = get_refresh_token(client, 'adminuser', 'AdminPassword123')
+    refresh_token = get_refresh_token_fixture('adminuser', 'AdminPassword123')
     
     # 2. Blacklist the refresh token
     with app.app_context():
@@ -110,5 +75,5 @@ def test_blacklisted_refresh_token_rejected(client, app, test_admin_user):
     # 4. Assert that the request is unauthorized (token revoked)
     assert response.status_code == 401
     data = response.get_json()
-    assert 'msg' in data
-    assert 'Token has been revoked' in data['msg']
+    assert data['error_code'] == 'UNAUTHORIZED'
+    assert data['message'] == 'Token has been revoked.'

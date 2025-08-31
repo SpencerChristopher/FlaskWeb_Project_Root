@@ -32,8 +32,8 @@ def test_admin_route_is_unauthorized_without_login(client):
     assert response.status_code == 401
     assert response.content_type == 'application/json'
     data = response.get_json()
-    assert 'msg' in data # Flask-JWT-Extended's default error message key
-    assert 'Missing JWT' in data['msg']
+    assert data['error_code'] == 'UNAUTHORIZED'
+    assert data['message'] == 'Missing or invalid token.'
 
 def test_change_password_route_is_unauthorized_without_login(client):
     """Ensures the change password API endpoint is properly protected."""
@@ -44,5 +44,5 @@ def test_change_password_route_is_unauthorized_without_login(client):
     assert response.status_code == 401
     assert response.content_type == 'application/json'
     data = response.get_json()
-    assert 'msg' in data
-    assert 'Missing JWT' in data['msg']
+    assert data['error_code'] == 'UNAUTHORIZED'
+    assert data['message'] == 'Missing or invalid token.'

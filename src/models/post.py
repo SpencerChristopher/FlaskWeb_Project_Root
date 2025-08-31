@@ -4,6 +4,7 @@ This module defines the Post model using MongoEngine.
 from src.extensions import db
 from src.models.user import User
 import datetime
+from datetime import timezone
 from mongoengine.fields import ReferenceField
 from mongoengine.errors import DoesNotExist
 from src.events import post_created, post_updated, post_deleted
@@ -20,7 +21,7 @@ class Post(db.Document):
     summary = db.StringField(max_length=400)
     author = ReferenceField(User, required=True)
     publication_date = db.DateTimeField()
-    last_updated = db.DateTimeField(default=datetime.datetime.now(datetime.UTC))
+    last_updated = db.DateTimeField(default=datetime.datetime.now(datetime.timezone.utc))
     is_published = db.BooleanField(default=False)
 
 
@@ -37,8 +38,8 @@ class Post(db.Document):
         is_new = self.id is None  # Check if it's a new document
 
         if not self.publication_date and self.is_published:
-            self.publication_date = datetime.datetime.now(datetime.UTC)
-        self.last_updated = datetime.datetime.now(datetime.UTC)
+            self.publication_date = datetime.datetime.now(datetime.timezone.utc)
+        self.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         # Sanitize content and summary before saving
         allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code', 'em', 'i', 'li', 'ol', 'p', 'pre', 'strong', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
@@ -91,7 +92,10 @@ class Post(db.Document):
             "slug": self.slug,
             "content": self.content,
             "summary": self.summary,
-            "author": author_id,
+            "author": {
+                "id": str(self.author.id),
+                "username": self.author.username
+            },
             "publication_date": (
                 self.publication_date.isoformat()
                 if self.publication_date

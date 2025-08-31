@@ -7,15 +7,17 @@ registering blueprints, and setting up error handlers.
 """
 import os
 from flask import Flask, jsonify, request, g
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from src.utils.logger import setup_logging
 from src.extensions import db, bcrypt, jwt
 
-import datetime # Add this import
+import datetime
+import time # Added for retry logic # Add this import
 from flask_limiter.errors import RateLimitExceeded # Import RateLimitExceeded
 from src.exceptions import APIException, NotFoundException, UnauthorizedException, ForbiddenException, BadRequestException, ValidationError
 from mongoengine.errors import NotUniqueError, ValidationError as MongoEngineValidationError
-from pymongo.errors import ConnectionFailure
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
 from dotenv import load_dotenv
 
@@ -49,16 +51,34 @@ def create_app():
         template_folder=os.path.join(project_root, 'templates'),
         static_folder=os.path.join(project_root, 'static')
     )
+    app.wsgi_app = ProxyFix(app.wsgi_app)
     
     # Initialize JWTManager immediately after app creation
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT
     jwt.init_app(app)
+
+    @jwt.unauthorized_loader
+    def unauthorized_response(callback_exception):
+        return UnauthorizedException("Missing or invalid token.").to_dict(), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token_response(callback_exception):
+        return UnauthorizedException("Signature verification failed or token is malformed.").to_dict(), 401
+
+    @jwt.revoked_token_loader
+    def revoked_token_response(jwt_header, jwt_payload):
+        return UnauthorizedException("Token has been revoked.").to_dict(), 401
+
+    @jwt.needs_fresh_token_loader
+    def needs_fresh_token_response(callback_exception):
+        return UnauthorizedException("Fresh token required.").to_dict(), 401
 
     # Callback function to check if a JWT has been revoked
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         from src.models.token_blocklist import TokenBlocklist
         jti = jwt_payload["jti"]
+        # Use read_concern to ensure the read operation sees the latest data
         token = TokenBlocklist.objects(jti=jti).first()
         return token is not None # Return True if token is in blocklist (revoked)
 
@@ -95,15 +115,38 @@ def create_app():
         raise ValueError("MONGO_URI environment variable not set!")
     
     app.config['MONGODB_SETTINGS'] = {
-        'host': mongo_uri
+        'host': mongo_uri,
+        'port': 27017,
+        'db': 'appdb'
     }
-    try:
-        db.init_app(app)
-        bcrypt.init_app(app) # Add this line
-        app.logger.info("Flask-MongoEngine initialized.")
-    except Exception as e:
-        app.logger.error(f"Failed to connect to MongoDB: {e}")
-        raise ConnectionError("Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status.") from e
+
+    MAX_DB_RETRIES = 5
+    DB_RETRY_DELAY_SECONDS = 5
+    db_connected = False
+
+    for i in range(MAX_DB_RETRIES):
+        try:
+            app.logger.info(f"Attempting to connect to MongoDB (attempt {i+1}/{MAX_DB_RETRIES})...")
+            db.init_app(app)
+            bcrypt.init_app(app)
+            app.logger.info("Flask-MongoEngine initialized.")
+            app.logger.info("Database connection successful.")
+            db_connected = True
+            break # Exit loop if connection is successful
+        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+            app.logger.warning(f"MongoDB connection failed: {e}. Retrying in {DB_RETRY_DELAY_SECONDS} seconds...")
+            time.sleep(DB_RETRY_DELAY_SECONDS)
+        except Exception as e:
+            app.logger.error(f"An unexpected error occurred during database initialization: {e}")
+            # For unexpected errors, we might not want to retry, or retry differently
+            break # Exit loop for unexpected errors
+
+    if not db_connected:
+        app.logger.critical("Failed to connect to MongoDB after multiple retries. Exiting application.")
+        # Depending on desired behavior, you might want to raise an exception here
+        # or exit the application process. For now, we'll just log and let Flask continue
+        # which might lead to further errors if DB is truly essential.
+        raise ConnectionError("Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status.")
     # --- End MongoDB Connection ---
 
     # --- Extensions Initialization ---
@@ -141,7 +184,7 @@ def create_app():
         Handles RateLimitExceeded errors, returning a 429 Too Many Requests response.
         """
         app.logger.warning(f"Rate Limit Exceeded for IP: {request.remote_addr} - {e.description}")
-        return jsonify({"error": "Too Many Requests", "message": e.description}), 429
+        return jsonify({"error_code": "TOO_MANY_REQUESTS", "message": "Too Many Requests", "details": e.description}), 429
 
     @app.errorhandler(MongoEngineValidationError)
     def handle_mongoengine_validation_error(error):
@@ -202,6 +245,19 @@ def create_app():
         app.logger.error(f"Database Connection Failure: {error}", exc_info=True)
         response = APIException("Database connection error", status_code=500, error_code="DATABASE_ERROR").to_dict()
         return jsonify(response), 500
+
+    @app.errorhandler(ServerSelectionTimeoutError)
+    def handle_server_selection_timeout(error):
+        """
+        Handles pymongo.errors.ServerSelectionTimeoutError for database connection timeouts.
+        """
+        app.logger.error(f"Database connection timeout: {error}", exc_info=True)
+        response = APIException(
+            "Service temporarily unavailable, please try again later.",
+            status_code=503,
+            error_code="SERVICE_UNAVAILABLE"
+        ).to_dict()
+        return jsonify(response), 503
 
     @app.errorhandler(Exception) # Change 500 to Exception
     def internal_error(error):

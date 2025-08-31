@@ -39,6 +39,17 @@ class User(db.Document):
         super().delete(*args, **kwargs)
         user_deleted.send(self, user_id=user_id)
 
+    def to_dict(self) -> dict:
+        """
+        Serializes the User object to a dictionary for JSON responses.
+        """
+        return {
+            "id": str(self.id),
+            "username": self.username,
+            "email": self.email,
+            "role": self.role
+        }
+
     meta = {
         'collection': 'users',
         'indexes': ['username', 'email']

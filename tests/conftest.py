@@ -1,7 +1,9 @@
+import re
 import pytest
 import os
 from src.server import create_app
 from mongoengine import get_db, disconnect
+from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
 from src.models.post import Post
 from src.extensions import limiter
@@ -26,19 +28,30 @@ def app():
     # Establish an application context before yielding the app
     with app.app_context():
         db = get_db()
-        db.client.drop_database(db.name) # Clean DB before tests
+        try:
+            db.client.drop_database(db.name) # Clean DB before tests
+        except ServerSelectionTimeoutError:
+            pass
 
     yield app
 
     with app.app_context():
         db = get_db()
-        db.client.drop_database(db.name) # Clean DB after tests
+        try:
+            db.client.drop_database(db.name) # Clean DB after tests
+        except ServerSelectionTimeoutError:
+            pass
         disconnect()
 
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Resets the Flask-Limiter storage before each test function."""
-    limiter.reset()
+    # Only reset if the limiter storage has been initialized
+    if limiter._storage:
+        limiter.reset()
+
+
+
 
 @pytest.fixture(scope='function')
 def setup_users(app):
@@ -52,15 +65,55 @@ def setup_users(app):
         regular_user.set_password('testpassword')
         regular_user.save()
         yield admin_user, regular_user
-        admin_user.delete()
-        regular_user.delete()
+
 
 @pytest.fixture(autouse=True)
-def cleanup_posts():
-    """Cleans up all Post objects after each test function."""
-    Post.drop_collection()
+def clean_collections_per_function(app):
+    """Cleans up specific collections after each test function."""
+    yield
+    with app.app_context():
+        db = get_db()
+        try:
+            # Explicitly drop collections that are modified by tests
+            User.drop_collection()
+            Post.drop_collection()
+            from src.models.token_blocklist import TokenBlocklist # Import inside the function
+            TokenBlocklist.drop_collection()
+            # Add other collections here if they are modified by tests
+        except ServerSelectionTimeoutError:
+            pass
 
 
+@pytest.fixture
+def login_user_fixture(client):
+    def _login_user(username, password):
+        response = client.post('/api/auth/login', json={
+            'username': username,
+            'password': password
+        })
+        assert response.status_code == 200
+        
+        # Extract access token from Set-Cookie header
+        for cookie_header in response.headers.getlist('Set-Cookie'):
+            match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
+            if match:
+                return match.group(1)
+        raise Exception("Access token cookie not found in response headers")
+    return _login_user
 
+@pytest.fixture
+def get_refresh_token_fixture(client):
+    def _get_refresh_token(username, password):
+        response = client.post('/api/auth/login', json={
+            'username': username,
+            'password': password
+        })
+        assert response.status_code == 200
 
-
+        # Extract refresh token from Set-Cookie header
+        for cookie_header in response.headers.getlist('Set-Cookie'):
+            match = re.search(r'refresh_token_cookie=([^;]+)', cookie_header)
+            if match:
+                return match.group(1)
+        raise Exception("Refresh token cookie not found in response headers")
+    return _get_refresh_token

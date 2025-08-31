@@ -108,7 +108,7 @@ def create_post() -> Response:
         error_details = {field: message for field, message in e.errors.items()}
         raise BadRequestException("Validation failed", details=error_details)
     
-    return jsonify(new_post.to_dict()), 201
+    return jsonify({'message': 'Post created successfully', 'id': str(new_post.id), 'title': new_post.title, 'slug': new_post.slug, 'content': new_post.content, 'summary': new_post.summary, 'is_published': new_post.is_published, 'author': {'id': str(new_post.author.id), 'username': new_post.author.username}}), 201
 
 @bp.route('/posts/<string:post_id>', methods=['GET'])
 @admin_required
@@ -170,7 +170,7 @@ def update_post(post_id: str) -> Response:
         error_details = {field: message for field, message in e.errors.items()}
         raise BadRequestException("Validation failed", details=error_details)
     
-    return jsonify(post.to_dict()), 200
+    return jsonify({'message': 'Post updated successfully', 'id': str(post.id), 'title': post.title, 'slug': post.slug, 'content': post.content, 'summary': post.summary, 'is_published': post.is_published, 'author': {'id': str(post.author.id), 'username': post.author.username}}), 200
 
 @bp.route('/posts/<string:post_id>', methods=['DELETE'])
 @admin_required
