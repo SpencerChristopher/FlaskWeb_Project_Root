@@ -1,0 +1,40 @@
+name: Test and Deploy to WSL
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest # Using a GitHub-hosted runner for build and test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9' # Adjust to your project's Python version
+
+      - name: Install dependencies
+        run: pip install poetry && poetry install
+
+      - name: Build Docker images
+        run: docker-compose build
+
+      - name: Run tests
+        run: poetry run pytest
+
+  deploy-to-wsl:
+    needs: build-and-test
+    runs-on: self-hosted # This will use your wsl-test labeled runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to WSL
+        run: |
+          cd C:/Users/chris/Github/personal site project/FlaskWeb_Project_Root/FlaskWeb_Project_Root/ # Adjust this path to your project root on the WSL runner
+          ./scripts/deploy.sh
+          docker system prune -f

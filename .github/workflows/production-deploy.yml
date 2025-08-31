@@ -1,0 +1,19 @@
+name: Deploy to Production (Raspberry Pi)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy-to-pi:
+    runs-on: self-hosted # This will use your pi-prod labeled runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to Raspberry Pi
+        run: |
+          cd C:/Users/chris/Github/personal site project/FlaskWeb_Project_Root/FlaskWeb_Project_Root/ # Adjust this path to your project root on the Raspberry Pi runner
+          ./scripts/deploy.sh
+          docker system prune -f
