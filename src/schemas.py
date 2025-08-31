@@ -10,12 +10,10 @@ from password_strength import PasswordPolicy
 # This policy can be customized based on desired complexity rules
 # Example: min length 8, require 1 uppercase, 1 lowercase, 1 digit, 1 special character
 password_policy = PasswordPolicy.from_names(
-    length=6, # Relaxed from 8
-    uppercase=0, # Relaxed from 1
-    numbers=0, # Relaxed from 1
-    special=0, # Relaxed from 1
-    nonletters=0,
-    strength=0.0 # Relaxed from 0.6
+    length=8,
+    uppercase=1,
+    numbers=1,
+    special=1
 )
 
 # --- Reusable Password Complexity Validator using password_strength ---
@@ -26,12 +24,14 @@ def password_strength_validator(cls, v: str, info: ValidationInfo) -> str:
     """
     test_results = password_policy.test(v)
 
-    if test_results: # If test_results is not empty, some policies failed
+    if test_results:  # If test_results is not empty, some policies failed
         error_messages = []
         if 'length' in test_results:
             error_messages.append(f'Password must be at least {password_policy.length} characters long.')
         if 'uppercase' in test_results:
             error_messages.append(f'Password must contain at least {password_policy.uppercase} uppercase letter(s).')
+        if 'lowercase' in test_results:
+            error_messages.append(f'Password must contain at least {password_policy.lowercase} lowercase letter(s).')
         if 'numbers' in test_results:
             error_messages.append(f'Password must contain at least {password_policy.numbers} digit(s).')
         if 'special' in test_results:
@@ -64,7 +64,7 @@ class BlogPostCreateUpdate(BaseModel):
     @field_validator('summary')
     @classmethod
     def sanitize_summary(cls, v: str) -> str:
-        return bleach.clean(v, tags=[], attributes={}) # Summary usually plain text
+        return bleach.clean(v, tags=[], attributes={})  # Summary usually plain text
 
 class UserRegistration(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
@@ -77,4 +77,4 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-    # _validate_new_password = field_validator('new_password')(password_strength_validator)
+    _validate_new_password = field_validator('new_password')(password_strength_validator)

@@ -35,6 +35,5 @@ jobs:
 
       - name: Deploy to WSL
         run: |
-          cd C:/Users/chris/Github/personal site project/FlaskWeb_Project_Root/FlaskWeb_Project_Root/ # Adjust this path to your project root on the WSL runner
           ./scripts/deploy.sh
           docker system prune -f

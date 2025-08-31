@@ -1,50 +1,37 @@
 import os
 import sys
-from dotenv import load_dotenv
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from mongoengine import get_db
-from flask import Flask
 
 # Add project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
-# Load environment variables
-load_dotenv()
-
-# Create a minimal Flask app context for MongoEngine
-app = Flask(__name__)
-app.config['MONGODB_SETTINGS'] = {
-    'host': 'localhost',
-    'port': 27017,
-    'db': 'appdb'
-}
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
-
-# Initialize MongoEngine
-from src.extensions import db
-db.init_app(app)
-
-# Push an application context
-app_context = app.app_context()
-app_context.push()
+from scripts.utils import get_flask_app_context
 
 def check_db_connection_script():
     """
-    Checks the database connection and prints the result.
+    Checks the database connection using the MONGO_URI from the environment.
     """
-    # Get the actual database object within the application context
-    current_db = get_db()
+    # Set up Flask app context (this also loads .env and gets MONGO_URI)
+    app_context = get_flask_app_context()
+    
+    mongo_uri = os.environ.get('MONGO_URI')
+    print(f"Attempting to connect to MongoDB at: {mongo_uri}")
+
     try:
+        # Get the actual database object within the application context
+        current_db = get_db()
+        # The 'ping' command is a lightweight way to check the connection
         current_db.client.admin.command('ping')
         print("Database connection successful.")
         return True
     except (ConnectionFailure, ServerSelectionTimeoutError) as e:
         print(f"Failed to connect to MongoDB: {e}")
         return False
+    finally:
+        # Ensure the context is popped even if an error occurs
+        app_context.pop()
 
 if __name__ == '__main__':
     check_db_connection_script()
-
-# Pop the application context
-app_context.pop()

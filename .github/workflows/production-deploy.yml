@@ -14,6 +14,5 @@ jobs:
 
       - name: Deploy to Raspberry Pi
         run: |
-          cd C:/Users/chris/Github/personal site project/FlaskWeb_Project_Root/FlaskWeb_Project_Root/ # Adjust this path to your project root on the Raspberry Pi runner
           ./scripts/deploy.sh
           docker system prune -f

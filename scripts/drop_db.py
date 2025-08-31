@@ -5,44 +5,38 @@ This is useful for development and testing to reset the database state.
 It connects using the MONGO_URI from the .env file.
 """
 import os
-from dotenv import load_dotenv
-from src.extensions import db
-from flask import Flask
-from pymongo import MongoClient # Use pymongo directly for dropping database
+import sys
+from pymongo import MongoClient
 
-# Load environment variables
-load_dotenv()
+# Add project root to the Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
-MONGO_URI = os.environ.get('MONGO_URI')
-if not MONGO_URI:
-    print("Error: MONGO_URI must be set in your .env file.")
-    exit(1)
+from scripts.utils import get_flask_app_context
 
-# Create a minimal Flask app context for MongoEngine
-# This is necessary because MongoEngine needs an app context to initialize
-app = Flask(__name__)
-app.config['MONGODB_SETTINGS'] = {
-    'host': MONGO_URI
-}
-# SECRET_KEY is not strictly needed for dropping DB, but good for consistency
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key') 
-db.init_app(app)
+def drop_database():
+    """
+    Connects to MongoDB using MONGO_URI and drops the entire database.
+    """
+    # get_flask_app_context also loads .env and ensures MONGO_URI is set
+    app_context = get_flask_app_context()
+    
+    mongo_uri = os.environ.get('MONGO_URI')
+    print(f"Attempting to connect to MongoDB at: {mongo_uri}")
 
-# Push an application context
-app_context = app.app_context()
-app_context.push()
+    try:
+        # Use pymongo directly to drop the database
+        client = MongoClient(mongo_uri)
+        db_name = client.get_default_database().name
+        
+        client.drop_database(db_name)
+        print(f"Database '{db_name}' dropped successfully.")
 
-print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
-try:
-    # Use pymongo directly to drop the database
-    client = MongoClient(MONGO_URI)
-    db_name = client.get_default_database().name # Get the database name from the URI
-    client.drop_database(db_name)
-    print(f"Database '{db_name}' dropped successfully.")
-except Exception as e:
-    print(f"Error dropping database: {e}")
-    app_context.pop()
-    exit(1)
+    except Exception as e:
+        print(f"An error occurred while trying to drop the database: {e}")
+    finally:
+        # Ensure the context is popped
+        app_context.pop()
 
-# Pop the application context
-app_context.pop()
+if __name__ == '__main__':
+    drop_database()

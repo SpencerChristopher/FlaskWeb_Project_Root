@@ -6,8 +6,7 @@ It requires environment variables for MongoDB connection and admin credentials.
 """
 import os
 import sys
-from datetime import datetime, timedelta, UTC
-from dotenv import load_dotenv
+from datetime import datetime, timedelta, timezone
 
 # Add project root to the Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -15,50 +14,19 @@ sys.path.insert(0, project_root)
 
 from src.models.user import User
 from src.models.post import Post
-from src.extensions import db
-from flask import Flask
-import re
+from scripts.utils import get_flask_app_context, validate_password_complexity
 
-# Load environment variables
-with open('.env') as f:
-    for line in f:
-        if line.strip() and not line.startswith('#'):
-            key, value = line.strip().split('=', 1)
-            os.environ[key] = value
-
-# --- Password Complexity Validator for Seeding ---
-def validate_password_complexity(password: str):
-    """Enforces password complexity: 8+ chars, 1 upper, 1 lower, 1 digit."""
-    if len(password) < 8:
-        raise ValueError('Password must be at least 8 characters long')
-    if not re.search(r'[A-Z]', password):
-        raise ValueError('Password must contain at least one uppercase letter')
-    if not re.search(r'[a-z]', password):
-        raise ValueError('Password must contain at least one lowercase letter')
-    if not re.search(r'\d', password):
-        raise ValueError('Password must contain at least one digit')
-
-# Create a minimal Flask app context
-app = Flask(__name__)
-app.config['MONGODB_SETTINGS'] = {
-    'host': os.environ.get('MONGO_URI')
-}
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
-db.init_app(app)
-
-app_context = app.app_context()
-app_context.push()
+# Set up Flask app context (this also loads .env)
+app_context = get_flask_app_context()
 
 MONGO_URI = os.environ.get('MONGO_URI')
-if not MONGO_URI:
-    raise ValueError("MONGO_URI environment variable not set!")
-
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
-print(f"The password is: {ADMIN_PASSWORD}")
 
-if not ADMIN_USERNAME or not ADMIN_PASSWORD:
-    raise ValueError("ADMIN_USERNAME and ADMIN_PASSWORD must be set in .env")
+if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
+    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set in your .env file.")
+    app_context.pop()
+    exit(1)
 
 # Validate the admin password complexity before proceeding
 try:
@@ -70,6 +38,7 @@ except ValueError as e:
 
 print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
 try:
+    # A simple query to check the connection
     User.objects.first()
     print("Successfully connected to MongoDB via MongoEngine.")
 except Exception as e:
@@ -120,7 +89,7 @@ else:
         summary="Simply amazing.",
         slug=post2_slug,
         is_published=True,
-        publication_date=datetime.now(UTC) - timedelta(days=3),
+        publication_date=datetime.now(timezone.utc) - timedelta(days=3),
         author=admin_user_obj
     )
     post2.save()

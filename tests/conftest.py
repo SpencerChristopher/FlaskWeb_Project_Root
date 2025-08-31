@@ -11,7 +11,12 @@ from src.extensions import limiter
 @pytest.fixture(scope='session')
 def app():
     """Create and configure a new app instance for the test session."""
-    os.environ["MONGO_URI"] = "mongodb://localhost:27017/pytest_appdb"
+    # Determine MONGO_URI based on environment
+    if os.environ.get("DOCKER_CONTAINER"): # Check if running inside a Docker container
+        mongo_uri = "mongodb://mongo:27017/pytest_appdb"
+    else:
+        mongo_uri = "mongodb://localhost:27017/pytest_appdb"
+    os.environ["MONGO_URI"] = mongo_uri
 
     app = create_app()
     app.config.update({

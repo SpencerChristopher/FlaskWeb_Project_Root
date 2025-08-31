@@ -28,15 +28,13 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 *   **Testing**: Pytest, pytest-flask
 *   **Frontend**: HTML, CSS, JavaScript (Vanilla SPA)
 
-## Setup and Installation
+## Setup with Docker (Recommended)
 
-Follow these steps to get the project up and running on your local machine.
+This is the recommended way to run the project for development. The environment is fully containerized, and the web service features live-reloading for code changes.
 
 ### Prerequisites
 
 *   [Docker Desktop](https://www.docker.com/products/docker-desktop)
-*   [Python 3.10+](https://www.python.org/downloads/)
-*   [Poetry](https://python-poetry.org/docs/#installation)
 
 ### 1. Clone the Repository
 
@@ -55,53 +53,41 @@ cp .env.template .env
 
 Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.** A strong `SECRET_KEY` is critical for security.
 
-### 3. Build and Run Docker Containers
+### 3. Build and Run Containers
 
-Start the MongoDB database container first, followed by the main application container.
-
-```bash
-docker-compose -f docker-compose.db.yml up -d
-docker-compose up -d
-```
-
-### 4. Install Python Dependencies
-
-Install the project's Python dependencies using Poetry.
+Build the images and start the services in detached mode. The `docker-compose.override.yml` file is automatically used to enable live-reloading for development.
 
 ```bash
-poetry install
-```
-
-### 5. Seed the Database
-
-Run the following scripts to initialize the database, create the admin user, and seed sample data.
-
-```bash
-# 1. Drop existing database (optional, for a clean start)
-poetry run python scripts/drop_db.py
-
-# 2. Create the initial admin user (credentials from .env)
-poetry run python scripts/create_admin.py
-
-# 3. Seed initial data (sample posts)
-poetry run python scripts/seed_db.py
-```
-
-### 6. Access the Application
-
-Run the Flask application using the Poetry environment.
-
-```bash
-poetry run python main.py
+docker-compose up --build -d
 ```
 
 The application will be available at `http://localhost:5000`.
+
+### 4. Seed the Database
+
+Run the following commands to initialize the database by executing the scripts inside the running `web` container.
+
+```bash
+# 1. Drop existing database (optional, for a clean start)
+docker compose exec web poetry run python scripts/drop_db.py
+
+# 2. Create the initial admin user (credentials from .env)
+docker compose exec web poetry run python scripts/create_admin.py
+
+# 3. Seed initial data (sample posts)
+docker compose exec web poetry run python scripts/seed_db.py
+```
+
+To stop the services, run:
+```bash
+docker compose down
+```
 
 ## Usage
 
 ### Public Blog
 
-Navigate to the home page. The SPA will fetch and display a list of blog posts. Click on a post to view its full content.
+Navigate to `http://localhost:5000`. The SPA will fetch and display a list of blog posts. Click on a post to view its full content.
 
 ### Admin Panel
 
@@ -122,16 +108,16 @@ Navigate to the home page. The SPA will fetch and display a list of blog posts. 
 │   ├── listeners.py        # Blinker signal listeners
 │   ├── extensions/         # Centralized Flask extension instances
 │   ├── utils/              # Utility functions (e.g., logger)
-│   └── __init__.py         # Flask app factory and configuration
+│   └── server.py           # Flask app factory and configuration
 ├── scripts/                # Utility scripts (seeding, admin creation)
 ├── static/                 # Frontend static files (JS, CSS)
 ├── templates/              # Base Jinja2 template for the SPA shell
 ├── .env                    # Environment variables (local, sensitive)
 ├── .env.template           # Template for .env
-├── docker-compose.db.yml   # Docker Compose for MongoDB
-├── docker-compose.yml      # Docker Compose for the Flask app
+├── docker-compose.yml      # Main Docker Compose for all services
+├── docker-compose.override.yml # Development-specific overrides (e.g., volumes)
 ├── Dockerfile              # Dockerfile for the Flask application
-├── main.py                 # Main application entry point
+├── main.py                 # Main application entry point (for gunicorn)
 ├── pyproject.toml          # Poetry project configuration
 ├── pytest.ini              # Pytest configuration
 ├── README.md               # This file
