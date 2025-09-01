@@ -17,6 +17,7 @@ def app():
     else:
         mongo_uri = "mongodb://localhost:27017/pytest_appdb"
     os.environ["MONGO_URI"] = mongo_uri
+    os.environ['SECRET_KEY'] = 'test-secret-key'
 
     app = create_app()
     app.config.update({
