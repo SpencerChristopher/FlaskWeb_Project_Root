@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest # Using a GitHub-hosted runner for build and test
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -15,10 +15,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12' # Adjust to your project's Python version
+          python-version: '3.12'
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
 
       - name: Install dependencies
         run: pip install poetry && poetry install
+
+      - name: Run Linting
+        run: poetry run flake8 src tests
+
+      - name: Check Code Formatting
+        run: poetry run black --check src tests
+
+      - name: Create .env file
+        run: echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
 
       - name: Build Docker images
         run: docker compose build
