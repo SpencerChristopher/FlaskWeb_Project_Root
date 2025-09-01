@@ -23,8 +23,15 @@ jobs:
       - name: Build Docker images
         run: docker compose build
 
-      - name: Run tests
-        run: poetry run pytest
+      - name: Start containers
+        run: docker compose up -d
+
+      - name: Run tests in container
+        run: docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
 
   deploy-to-wsl:
     needs: build-and-test

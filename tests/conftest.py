@@ -2,11 +2,26 @@ import re
 import pytest
 import os
 from src.server import create_app
-from mongoengine import get_db, disconnect
+from mongoengine import get_db, disconnect, connect
 from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
 from src.models.post import Post
 from src.extensions import limiter
+
+@pytest.fixture(scope='session', autouse=True)
+def database_connection_check():
+    """
+    Gatekeeper fixture to check for database connection before running tests.
+    """
+    try:
+        # Use a temporary connection to check for availability
+        mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/pytest_appdb")
+        client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000)
+        client.server_info()
+        disconnect()
+    except ServerSelectionTimeoutError as e:
+        pytest.exit(f"Database connection failed: {e}. Aborting tests.")
+
 
 @pytest.fixture(scope='session')
 def app():
