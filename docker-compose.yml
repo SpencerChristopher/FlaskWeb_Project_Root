@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     build: .
@@ -7,8 +5,10 @@ services:
     restart: unless-stopped
     ports:
       - "5000:5000"
-    env_file:
-      - .env
+    
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/appdb
+      - DOCKER_CONTAINER=true
     depends_on:
       mongo:
         condition: service_healthy

@@ -13,36 +13,13 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
 from src.models.user import User
-from src.extensions import db
-from flask import Flask
-import re
+from scripts.utils import get_flask_app_context, validate_password_complexity
 
 # Load environment variables
 load_dotenv()
 
-# --- Password Complexity Validator for Seeding ---
-def validate_password_complexity(password: str):
-    """Enforces password complexity: 8+ chars, 1 upper, 1 lower, 1 digit."""
-    if len(password) < 8:
-        raise ValueError('Password must be at least 8 characters long')
-    if not re.search(r'[A-Z]', password):
-        raise ValueError('Password must contain at least one uppercase letter')
-    if not re.search(r'[a-z]', password):
-        raise ValueError('Password must contain at least one lowercase letter')
-    if not re.search(r'\d', password):
-        raise ValueError('Password must contain at least one digit')
-
-# Create a minimal Flask app context for MongoEngine
-app = Flask(__name__)
-app.config['MONGODB_SETTINGS'] = {
-    'host': os.environ.get('MONGO_URI')
-}
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
-db.init_app(app)
-
-# Push an application context
-app_context = app.app_context()
-app_context.push()
+# Set up Flask app context
+app_context = get_flask_app_context()
 
 MONGO_URI = os.environ.get('MONGO_URI')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
@@ -63,6 +40,7 @@ except ValueError as e:
 
 print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
 try:
+    # A simple query to check the connection
     User.objects.first()
     print("Successfully connected to MongoDB via MongoEngine.")
 except Exception as e:

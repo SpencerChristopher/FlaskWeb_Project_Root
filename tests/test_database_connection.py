@@ -14,7 +14,7 @@ def test_database_connection(caplog, monkeypatch): # Removed 'app' fixture
     # Create a dedicated app instance for this test to control its DB settings
     test_app = Flask(__name__)
     test_app.config['MONGODB_SETTINGS'] = {
-        'host': 'localhost', # Explicitly set to localhost for host-based testing
+        'host': 'mongo' if os.environ.get("DOCKER_CONTAINER") else 'localhost', # Explicitly set to localhost for host-based testing
         'port': 27017,
         'db': 'appdb'
     }
@@ -44,7 +44,8 @@ def test_database_connection(caplog, monkeypatch): # Removed 'app' fixture
         # 3. Was the database connected when the web app started?
         # This part still needs to create the main app to check its logs
         with caplog.at_level(logging.INFO):
-            monkeypatch.setenv('MONGO_URI', 'mongodb://localhost:27017/appdb')
+            mongo_uri_for_env = 'mongodb://mongo:27017/appdb' if os.environ.get("DOCKER_CONTAINER") else 'mongodb://localhost:27017/appdb'
+            monkeypatch.setenv('MONGO_URI', mongo_uri_for_env)
             app_instance = create_app() # Create the actual app to check its logs
             pass # No explicit call needed here, just let create_app run
 

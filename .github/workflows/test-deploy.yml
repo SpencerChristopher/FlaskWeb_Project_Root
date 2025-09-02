@@ -1,0 +1,68 @@
+name: Test and Deploy to WSL
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Cache Poetry dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pypoetry
+          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-poetry-
+
+      - name: Install dependencies
+        run: pip install poetry && poetry install
+
+      # - name: Run Linting
+      #   run: poetry run flake8 src tests
+
+      # - name: Check Code Formatting
+      #   run: poetry run black --check src tests
+
+      
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start containers
+        run: |
+          export SECRET_KEY=${{ secrets.SECRET_KEY }}
+          export LOG_LEVEL=INFO
+          docker compose up -d
+
+      
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
+
+  deploy-to-wsl:
+    needs: build-and-test
+    runs-on: self-hosted # This will use your wsl-test labeled runner
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Run database connection test
+        run: |
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
+
+      - name: Deploy to WSL
+        run: |
+          ./scripts/deploy.sh
+          docker system prune -f
