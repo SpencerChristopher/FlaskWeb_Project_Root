@@ -55,7 +55,7 @@ Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `AD
 
 ### 3. Build and Run Containers
 
-Build the images and start the services in detached mode. The `docker-compose.override.yml` file is automatically used to enable live-reloading for development.
+Build the images and start the services in detached mode. The `docker-compose.override.yml` file is automatically used to enable live-reloading for development by mounting local directories and running the Flask development server.
 
 ```bash
 docker-compose up --build -d
@@ -69,13 +69,13 @@ Run the following commands to initialize the database by executing the scripts i
 
 ```bash
 # 1. Drop existing database (optional, for a clean start)
-docker compose exec web poetry run python scripts/drop_db.py
+docker compose exec web /app/.venv/bin/python scripts/drop_db.py
 
 # 2. Create the initial admin user (credentials from .env)
-docker compose exec web poetry run python scripts/create_admin.py
+docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 
 # 3. Seed initial data (sample posts)
-docker compose exec web poetry run python scripts/seed_db.py
+docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
 To stop the services, run:
