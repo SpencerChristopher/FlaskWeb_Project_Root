@@ -45,13 +45,7 @@ jobs:
           export LOG_LEVEL=INFO
           docker compose up -d
 
-      - name: Run tests in container
-        run: |
-          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
-          # docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/api_tests
-          # docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/page_content_test
-          # docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/routing_tests
-          # docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/security_tests
+      
 
       - name: Stop containers
         if: always()
@@ -63,6 +57,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+
+      - name: Run database connection test
+        run: |
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
 
       - name: Deploy to WSL
         run: |
