@@ -13,9 +13,12 @@ def database_connection_check():
     """
     Gatekeeper fixture to check for database connection before running tests.
     """
-    try:
-        # Use a temporary connection to check for availability
+    if os.environ.get("DOCKER_CONTAINER"):
+        mongo_uri = "mongodb://mongo:27017/pytest_appdb"
+    else:
         mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/pytest_appdb")
+
+    try:
         client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000)
         client.server_info()
         disconnect()
