@@ -46,7 +46,12 @@ jobs:
           docker compose up -d
 
       - name: Run tests in container
-        run: docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest
+        run: |
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/api_tests
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/page_content_test
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/routing_tests
+          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/security_tests
 
       - name: Stop containers
         if: always()
