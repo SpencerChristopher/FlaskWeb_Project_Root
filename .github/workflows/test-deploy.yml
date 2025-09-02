@@ -40,7 +40,10 @@ jobs:
         run: docker compose build
 
       - name: Start containers
-        run: docker compose up -d -e SECRET_KEY=${{ secrets.SECRET_KEY }} -e LOG_LEVEL=INFO
+        run: |
+          export SECRET_KEY=${{ secrets.SECRET_KEY }}
+          export LOG_LEVEL=INFO
+          docker compose up -d
 
       - name: Run tests in container
         run: docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest
