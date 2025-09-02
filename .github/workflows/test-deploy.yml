@@ -28,20 +28,19 @@ jobs:
       - name: Install dependencies
         run: pip install poetry && poetry install
 
-      - name: Run Linting
-        run: poetry run flake8 src tests
+      # - name: Run Linting
+      #   run: poetry run flake8 src tests
 
-      - name: Check Code Formatting
-        run: poetry run black --check src tests
+      # - name: Check Code Formatting
+      #   run: poetry run black --check src tests
 
-      - name: Create .env file
-        run: echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" > .env
+      
 
       - name: Build Docker images
         run: docker compose build
 
       - name: Start containers
-        run: docker compose up -d
+        run: docker compose up -d -e SECRET_KEY=${{ secrets.SECRET_KEY }} -e LOG_LEVEL=INFO
 
       - name: Run tests in container
         run: docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest

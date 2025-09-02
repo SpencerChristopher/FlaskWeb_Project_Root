@@ -121,3 +121,5 @@ tests/*.log
 
 # Temporary commit message file
 commit_message.txt
+
+docker-compose.override.yml
