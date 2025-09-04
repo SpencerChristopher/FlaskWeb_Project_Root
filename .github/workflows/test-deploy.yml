@@ -53,7 +53,7 @@ jobs:
 
   deploy-to-wsl:
     needs: build-and-test
-    runs-on: self-hosted # This will use your wsl-test labeled runner
+    runs-on: LAPTOP-DGQCFFFI # Explicitly target the runner by its name
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -63,6 +63,20 @@ jobs:
           docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
 
       - name: Deploy to WSL
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          LOG_LEVEL: INFO
         run: |
           ./scripts/deploy.sh
           docker system prune -f
+
+      - name: Create Admin User
+        env:
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          echo "Attempting to create admin user..."
+          docker compose exec -T \
+            -e ADMIN_USERNAME="$ADMIN_USERNAME" \
+            -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
+            web python scripts/create_admin.py
