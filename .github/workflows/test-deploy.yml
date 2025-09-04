@@ -53,7 +53,7 @@ jobs:
 
   deploy-to-wsl:
     needs: build-and-test
-    runs-on: LAPTOP-DGQCFFFI # Explicitly target the runner by its name
+    runs-on: [self-hosted, wsl-test] # Target runner by its labels
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
