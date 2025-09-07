@@ -25,8 +25,11 @@ def get_flask_app_context():
     # Now that the path is set, we can import extensions
     from src.extensions import db
 
-    # Load environment variables from .env file
-    load_dotenv()
+    # Load .env file only if not in a container managed by the deploy script.
+    # The DOCKER_CONTAINER env var is set in docker-compose.yml.
+    if os.environ.get('DOCKER_CONTAINER') != 'true':
+        print("Running in local mode. Loading .env file...")
+        load_dotenv()
 
     app = Flask(__name__)
     mongo_uri = os.environ.get('MONGO_URI')

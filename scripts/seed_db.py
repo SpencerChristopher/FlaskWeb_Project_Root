@@ -24,7 +24,7 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
 if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set in your .env file.")
+    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set as environment variables or in .env file for local testing.")
     app_context.pop()
     exit(1)
 
