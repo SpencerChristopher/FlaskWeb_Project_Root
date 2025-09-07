@@ -15,8 +15,8 @@ sys.path.insert(0, project_root)
 from src.models.user import User
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
-# Load environment variables
-load_dotenv()
+# The get_flask_app_context() utility will handle loading the .env file
+# in local development environments.
 
 # Set up Flask app context
 app_context = get_flask_app_context()
@@ -26,7 +26,7 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
 if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set in your .env file.")
+    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set as environment variables or in .env file for local testing.")
     app_context.pop()
     exit(1)
 
