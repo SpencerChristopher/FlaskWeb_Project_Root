@@ -74,3 +74,19 @@ jobs:
         run: |
           ./scripts/deploy.sh
           docker system prune -f
+
+      - name: Create Admin User
+        run: |
+          docker exec \
+            -e MONGO_URI="mongodb://mongo:27017/appdb" \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/create_admin.py
+
+      - name: Seed Database
+        run: |
+          docker exec \
+            -e MONGO_URI="mongodb://mongo:27017/appdb" \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py
