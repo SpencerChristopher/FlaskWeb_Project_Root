@@ -51,7 +51,7 @@ EXPOSE 5000
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-CMD ["/app/.venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "main:wsgi_app"]
+CMD ["/app/.venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--log-level", "debug", "--access-logfile", "-", "main:wsgi_app"]
 
 # Create .pytest_cache directory and set permissions for appuser
 RUN mkdir -p .pytest_cache && chown -R appuser:appuser .pytest_cache
