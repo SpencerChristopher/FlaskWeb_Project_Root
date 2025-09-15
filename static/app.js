@@ -4,9 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Application State ---
     let userState = {
         loggedIn: false,
-        user: null,
-        accessToken: null,
-        refreshToken: null
+        user: null
     };
 
     // --- DOM Element Cache ---
@@ -15,10 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Helper Functions ---
     async function fetchAPI(url, options = {}) {
+        options.credentials = 'include'; // Include cookies in all fetch requests
         const headers = options.headers || {};
-        if (userState.accessToken) {
-            headers['Authorization'] = `Bearer ${userState.accessToken}`;
-        }
         options.headers = headers;
 
         try {
@@ -36,7 +32,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (e) {
                     errorData = { message: response.statusText };
                 }
-                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+                error.status = response.status; // Add status to the error object
+                throw error;
             }
             if (response.status === 204 || response.headers.get("content-length") === "0") return null;
             return await response.json();
@@ -271,17 +269,18 @@ document.addEventListener('DOMContentLoaded', () => {
         errorDiv.style.display = 'none';
         try {
             const data = await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), suppressAuthRedirect: true });
-            userState.accessToken = data.access_token;
-            userState.refreshToken = data.refresh_token;
             userState.loggedIn = true;
             const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-            userState.user = { id: payload.sub, username: payload.username, role: payload.roles[0] };
-            localStorage.setItem('accessToken', data.access_token);
-            localStorage.setItem('refreshToken', data.refresh_token);
+            const role = (payload.roles && Array.isArray(payload.roles) && payload.roles.length > 0) ? payload.roles[0] : 'user';
+            userState.user = { id: payload.sub, username: payload.username, role: role };
             updateNavUI();
             window.location.hash = '#admin';
         } catch (error) {
-            errorDiv.textContent = error.message;
+            if (error.status === 429) {
+                errorDiv.textContent = "You have made too many login attempts. Please wait a minute and try again.";
+            } else {
+                errorDiv.textContent = error.message;
+            }
             errorDiv.style.display = 'block';
         }
     }
@@ -297,10 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         userState.loggedIn = false;
         userState.user = null;
-        userState.accessToken = null;
-        userState.refreshToken = null;
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         updateNavUI();
         window.location.hash = '#home';
     }
@@ -441,21 +436,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- App Initialization ---
     async function initializeApp() {
-        const accessToken = localStorage.getItem('accessToken');
-        if (accessToken) {
-            userState.accessToken = accessToken;
-            try {
-                const data = await fetchAPI('/api/auth/status');
-                if (data.logged_in) {
-                    userState.loggedIn = true;
-                    userState.user = data.user;
-                } else {
-                    handleLogout(null, true);
-                }
-            } catch (error) {
-                console.error("Could not verify auth status. Assuming logged out.", error);
-                handleLogout(null, true);
+        try {
+            const data = await fetchAPI('/api/auth/status', { suppressAuthRedirect: true });
+            if (data.logged_in) {
+                userState.loggedIn = true;
+                userState.user = data.user;
+            } else {
+                userState.loggedIn = false;
+                userState.user = null;
             }
+        } catch (error) {
+            console.error("Could not verify auth status. Assuming logged out.", error);
+            userState.loggedIn = false;
+            userState.user = null;
         }
         updateNavUI();
         window.addEventListener('hashchange', router);
