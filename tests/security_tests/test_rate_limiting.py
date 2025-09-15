@@ -22,7 +22,6 @@ import time
 # def client_with_rate_limit(app_with_rate_limit):
 #     return app_with_rate_limit.test_client()
 
-@pytest.mark.skip(reason="IP-based rate limiting is complex to simulate in current test environment")
 class TestRateLimiting:
     """Tests for Rate Limiting & Abuse Control."""
 
