@@ -1,6 +1,9 @@
 import re
 import pytest
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 from src.server import create_app
 from mongoengine import get_db, disconnect, connect
 from pymongo.errors import ServerSelectionTimeoutError
@@ -40,9 +43,9 @@ def app():
     app = create_app()
     app.config.update({
         'TESTING': True,
-        'RATELIMIT_STORAGE_URI': 'memory://',
+        # RATELIMIT_STORAGE_URI is now loaded from .env
+        # RATELIMIT_KEY_FUNC is now loaded from extensions
         'RATELIMIT_STRATEGY': 'fixed-window',
-        'RATELIMIT_KEY_FUNC': lambda: "test_key",
         'RATELIMIT_DEFAULT': '100 per minute'
     })
 
