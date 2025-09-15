@@ -47,7 +47,7 @@ jobs:
         run: sleep 10 # Simple wait, more robust checks can be added
 
       - name: Run tests
-        run: docker exec flask_web_app /app/.venv/bin/pytest
+        run:  docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest
 
       - name: Stop containers
         if: always()
