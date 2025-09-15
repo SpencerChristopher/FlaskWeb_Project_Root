@@ -158,58 +158,7 @@ class TestRBAC:
         response = client.get('/api/admin/posts', headers=user_headers)
         assert response.status_code == 403
 
-@pytest.mark.skip(reason="IP-based rate limiting is complex to simulate in current test environment")
-class TestRateLimiting:
-    """Tests for Rate Limiting."""
 
-    @pytest.mark.skip(reason="IP-based rate limiting is complex to simulate in current test environment")
-    def test_login_rate_limiting(self, client, setup_users):
-        """Test that the login endpoint is rate-limited."""
-        username = "testadmin"
-        password = "testpassword"
-        # Make 5 requests (within the limit of 5 per minute)
-        for _ in range(5):
-            response = client.post(
-                "/api/auth/login",
-                json={"username": username, "password": password},
-                content_type="application/json",
-            )
-            assert response.status_code == 200 or response.status_code == 401 # Can be 401 if password is wrong
-
-        # The 6th request should be rate-limited
-        response = client.post(
-            "/api/auth/login",
-            json={"username": username, "password": password},
-            content_type="application/json",
-        )
-        assert response.status_code == 429 # Too Many Requests
-        data = response.json
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
-
-    @pytest.mark.skip(reason="IP-based rate limiting is complex to simulate in current test environment")
-    def test_contact_rate_limiting(self, client):
-        """Test that the contact endpoint is rate-limited."""
-        payload = {"name": "Test", "email": "test@example.com", "message": "Hello"}
-        # Make 5 requests (within the limit of 5 per minute)
-        for _ in range(5):
-            response = client.post(
-                "/api/contact",
-                json=payload,
-                content_type="application/json",
-            )
-            assert response.status_code == 200
-
-        # The 6th request should be rate-limited
-        response = client.post(
-            "/api/contact",
-            json=payload,
-            content_type="application/json",
-        )
-        assert response.status_code == 429 # Too Many Requests
-        data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
 
 class TestErrorHandlingAndLogging:
     """Tests for Error Handling & Logging."""
