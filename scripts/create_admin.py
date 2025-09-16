@@ -56,7 +56,7 @@ else:
     admin_user_obj = User(username=ADMIN_USERNAME, email=f"{ADMIN_USERNAME}@example.com", role='admin')
     admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
-    print(f"Admin user '{ADMIN_USERNAME}' created successfully with role 'admin'.")
+    print(f"Admin user {ADMIN_USERNAME} created successfully with role 'admin'.")
 
 # Pop the application context
 app_context.pop()

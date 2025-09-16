@@ -85,7 +85,7 @@ def create_app():
     # Configure JWT token location (e.g., headers, JSON body)
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
     app.config["JWT_COOKIE_SECURE"] = False # Set to True in production with HTTPS
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = True
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False # Set to False for development/debugging
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
     app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
     app.config["JWT_COOKIE_SAMESITE"] = "Lax" # Or "Strict" or "None" (requires Secure=True)

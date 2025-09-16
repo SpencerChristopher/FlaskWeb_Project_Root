@@ -32,6 +32,8 @@ def login() -> Response:
     username = data['username']
     password = data['password']
 
+    current_app.logger.debug(f"Login attempt for username: '{username}'")
+
     user = User.objects(username=username).first()
     if user and user.check_password(password):
         access_token = create_access_token(

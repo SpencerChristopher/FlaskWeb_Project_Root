@@ -31,15 +31,11 @@ RUN chown -R appuser:appuser /app
 RUN mkdir -p logs && chown -R appuser:appuser logs
 USER appuser
 
-# Create .pytest_cache directory and set permissions for appuser
-RUN mkdir -p .pytest_cache && chown -R appuser:appuser .pytest_cache
-
 # Copy the virtual environment from the builder stage
 COPY --from=builder /app/.venv ./.venv
 
 # Copy the application source code
 COPY ./src ./src
-COPY ./tests ./tests
 COPY ./scripts ./scripts
 COPY ./static ./static
 COPY ./templates ./templates
@@ -52,6 +48,3 @@ EXPOSE 5000
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
 CMD ["/app/.venv/bin/gunicorn", "--bind", "0.0.0.0:5000", "--log-level", "debug", "--access-logfile", "-", "main:wsgi_app"]
-
-# Create .pytest_cache directory and set permissions for appuser
-RUN mkdir -p .pytest_cache && chown -R appuser:appuser .pytest_cache
