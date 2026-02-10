@@ -47,9 +47,7 @@ def login() -> Response:
         current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
 
         response = jsonify({
-            'message': 'Login successful',
-            'access_token': access_token,
-            'refresh_token': refresh_token
+            'message': 'Login successful'
         })
         set_access_cookies(response, access_token)
         set_refresh_cookies(response, refresh_token)

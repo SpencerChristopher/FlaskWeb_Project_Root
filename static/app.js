@@ -417,14 +417,24 @@ document.addEventListener('DOMContentLoaded', () => {
         if (match) {
             const pageNum = match[1];
             const data = await fetchAPI(`/api/blog?page=${pageNum}`);
-            mainContentElement.innerHTML = templates.blogList(data);
+            try {
+                mainContentElement.innerHTML = templates.blogList(data);
+            } catch (renderError) {
+                console.error('Error rendering blogList template:', renderError);
+                mainContentElement.innerHTML = `<p class="text-danger text-center">Error loading blog posts. Please try again later.</p>`;
+            }
             return;
         }
         match = path.match(/^#blog\/(.+)$/);
         if (match) {
             const slug = match[1];
             const post = await fetchAPI(`/api/blog/${slug}`);
-            mainContentElement.innerHTML = templates.blogPost(post);
+            try {
+                mainContentElement.innerHTML = templates.blogPost(post);
+            } catch (renderError) {
+                console.error('Error rendering blogPost template:', renderError);
+                mainContentElement.innerHTML = `<p class="text-danger text-center">Error loading blog post. Please try again later.</p>`;
+            }
             return;
         }
         if (routes[path]) {
