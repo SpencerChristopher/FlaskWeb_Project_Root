@@ -64,16 +64,15 @@ jobs:
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY_WSL }}
 
+      - name: Generate Self-Signed Certificates
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/server.key 2048
+          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
 
       - name: Deploy to WSL
-        env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          LOG_LEVEL: INFO
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          MONGO_URI: mongodb://mongo:27017/appdb
         run: |
           ./scripts/deploy.sh
           docker system prune -f
