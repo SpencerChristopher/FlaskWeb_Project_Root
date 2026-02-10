@@ -17,6 +17,7 @@ from src.models.post import Post
 from src.models.user import User
 from src.schemas import BlogPostCreateUpdate
 from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException
+from src.events import post_created, post_updated, post_deleted
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 

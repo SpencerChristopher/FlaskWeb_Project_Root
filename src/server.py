@@ -22,6 +22,26 @@ from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from dotenv import load_dotenv
 
 
+def register_jwt_loaders(jwt_manager):
+    """Register all JWT loader functions with the JWTManager."""
+
+    @jwt_manager.unauthorized_loader
+    def unauthorized_response(callback_exception):
+        return UnauthorizedException("Missing or invalid token.").to_dict(), 401
+
+    @jwt_manager.invalid_token_loader
+    def invalid_token_response(callback_exception):
+        return UnauthorizedException("Signature verification failed or token is malformed.").to_dict(), 401
+
+    @jwt_manager.revoked_token_loader
+    def revoked_token_response(jwt_header, jwt_payload):
+        return UnauthorizedException("Token has been revoked.").to_dict(), 401
+
+    @jwt_manager.needs_fresh_token_loader
+    def needs_fresh_token_response(callback_exception):
+        return UnauthorizedException("Fresh token required.").to_dict(), 401
+
+
 def create_app():
     """
     Creates and configures the Flask application instance.
@@ -57,21 +77,8 @@ def create_app():
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT
     jwt.init_app(app)
 
-    @jwt.unauthorized_loader
-    def unauthorized_response(callback_exception):
-        return UnauthorizedException("Missing or invalid token.").to_dict(), 401
-
-    @jwt.invalid_token_loader
-    def invalid_token_response(callback_exception):
-        return UnauthorizedException("Signature verification failed or token is malformed.").to_dict(), 401
-
-    @jwt.revoked_token_loader
-    def revoked_token_response(jwt_header, jwt_payload):
-        return UnauthorizedException("Token has been revoked.").to_dict(), 401
-
-    @jwt.needs_fresh_token_loader
-    def needs_fresh_token_response(callback_exception):
-        return UnauthorizedException("Fresh token required.").to_dict(), 401
+    # Register all JWT callbacks
+    register_jwt_loaders(jwt)
 
     # Callback function to check if a JWT has been revoked
     @jwt.token_in_blocklist_loader
@@ -84,8 +91,8 @@ def create_app():
 
     # Configure JWT token location (e.g., headers, JSON body)
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
-    app.config["JWT_COOKIE_SECURE"] = False # Set to True in production with HTTPS
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = False # Set to False for development/debugging
+    app.config["JWT_COOKIE_SECURE"] = True # Set to True in production with HTTPS
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = True # Set to False for development/debugging
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
     app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
     app.config["JWT_COOKIE_SAMESITE"] = "Lax" # Or "Strict" or "None" (requires Secure=True)
