@@ -43,8 +43,8 @@ COPY ./tests ./tests
 
 COPY ./main.py ./
 
-# Make port 5000 available
-EXPOSE 5000
+# Make port 443 available
+EXPOSE 443
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment

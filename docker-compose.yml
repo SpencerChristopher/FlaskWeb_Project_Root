@@ -4,7 +4,9 @@ services:
     container_name: flask_web_app
     restart: unless-stopped
     ports:
-      - "5000:5000"
+      - "443:443"
+    volumes:
+      - ./certs:/app/certs:ro # Mount certs for HTTPS
     
     environment:
       - SECRET_KEY=${SECRET_KEY}
