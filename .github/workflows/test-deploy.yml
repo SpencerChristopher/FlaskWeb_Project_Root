@@ -57,7 +57,7 @@ jobs:
         run: docker compose up -d
 
       - name: Wait for services to be healthy
-        run: sleep 15
+        run: sleep 30
 
       - name: Run tests
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/
