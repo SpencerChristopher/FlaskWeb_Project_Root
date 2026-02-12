@@ -91,11 +91,15 @@ jobs:
       - name: Generate Self-Signed Certificates and Set Permissions
         run: |
           mkdir -p certs
-          openssl genrsa -out certs/server.key 2048
-          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
+            openssl genrsa -out certs/server.key 2048
+            openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          fi
           chmod 600 certs/server.key
           chmod 644 certs/server.crt
-          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R 1000:1000 /certs # Ensure ownership without sudo
+          UID=$(id -u)
+          GID=$(id -g)
+          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R $UID:$GID /certs # Ensure ownership without sudo
 
 
 
