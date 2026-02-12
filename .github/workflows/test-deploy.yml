@@ -97,9 +97,9 @@ jobs:
           fi
           chmod 600 certs/server.key
           chmod 644 certs/server.crt
-          UID=$(id -u)
-          GID=$(id -g)
-          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R $UID:$GID /certs # Ensure ownership without sudo
+          RUNNER_UID=$(id -u)
+          RUNNER_GID=$(id -g)
+          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R $RUNNER_UID:$RUNNER_GID /certs # Ensure ownership without sudo
 
 
 
