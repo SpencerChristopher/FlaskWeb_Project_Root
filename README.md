@@ -61,6 +61,13 @@ Required `.env` values (minimum):
 - `RATELIMIT_STORAGE_URI` (default: `redis://redis:6379/0`)
 - `LOG_LEVEL`
 - `FLASK_ENV`
+- `JWT_COOKIE_SECURE` (true/false)
+- `JWT_COOKIE_CSRF_PROTECT` (true/false)
+- `JWT_COOKIE_SAMESITE` (Lax/Strict/None)
+- `PROXY_FIX_X_FOR` (default: 1)
+- `PROXY_FIX_X_PROTO` (default: 1)
+- `PROXY_FIX_X_HOST` (default: 1)
+- `PROXY_FIX_X_PREFIX` (default: 1)
 
 ### 3. Build and Run Containers
 

@@ -36,11 +36,12 @@ def login() -> Response:
 
     user = User.objects(username=username).first()
     if user and user.check_password(password):
+        token_claims = {"roles": [user.role], "tv": user.token_version}
         access_token = create_access_token(
-            identity=str(user.id), additional_claims={"roles": [user.role]}
+            identity=str(user.id), additional_claims=token_claims
         )
         refresh_token = create_refresh_token(
-            identity=str(user.id)
+            identity=str(user.id), additional_claims=token_claims
         )
 
         user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
@@ -99,7 +100,13 @@ def refresh() -> Response:
     """
     current_user_id = get_jwt_identity()
     current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
-    new_access_token = create_access_token(identity=current_user_id)
+    user = User.objects(id=current_user_id).first()
+    if not user:
+        raise UnauthorizedException("Invalid user")
+    new_access_token = create_access_token(
+        identity=current_user_id,
+        additional_claims={"roles": [user.role], "tv": user.token_version}
+    )
     response = jsonify({'message': 'Token refreshed'})
     set_access_cookies(response, new_access_token)
     return response, 200

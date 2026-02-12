@@ -18,6 +18,7 @@ class User(db.Document):
     password_hash = db.StringField(required=True)
     created_at = db.DateTimeField(default=datetime.datetime.utcnow)
     role = db.StringField(default='user', choices=['user', 'editor', 'admin'])
+    token_version = db.IntField(default=0)
 
     def set_password(self, password: str) -> None:
         """Hashes the provided password and sets it for the user."""
@@ -38,6 +39,17 @@ class User(db.Document):
         user_id = str(self.id)
         super().delete(*args, **kwargs)
         user_deleted.send(self, user_id=user_id)
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to bump token_version when the user's role changes.
+        This invalidates existing tokens without requiring explicit blocklisting.
+        """
+        if self.id:
+            existing = User.objects(id=self.id).only("role", "token_version").first()
+            if existing and existing.role != self.role:
+                self.token_version = (existing.token_version or 0) + 1
+        return super().save(*args, **kwargs)
 
     def to_dict(self) -> dict:
         """

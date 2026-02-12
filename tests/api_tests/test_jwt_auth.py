@@ -164,7 +164,8 @@ class TestTokenLifecycle:
         with app.app_context():
             expired_refresh_token = create_refresh_token(
                 identity="testadmin_id", # Use a dummy ID as user might be deleted
-                expires_delta=datetime.timedelta(seconds=-1)
+                expires_delta=datetime.timedelta(seconds=-1),
+                additional_claims={"tv": 0}
             )
         response = client.post(
             "/api/auth/refresh", headers={"Authorization": f"Bearer {expired_refresh_token}"}
