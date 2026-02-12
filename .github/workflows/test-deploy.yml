@@ -95,7 +95,7 @@ jobs:
           openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
           chmod 600 certs/server.key
           chmod 644 certs/server.crt
-          sudo chown -R 1000:1000 certs # This step will ensure proper ownership for appuser
+          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R 1000:1000 /certs # Ensure ownership without sudo
 
 
 
