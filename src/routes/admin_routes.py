@@ -16,7 +16,7 @@ from pydantic import ValidationError as PydanticValidationError
 from src.models.post import Post
 from src.models.user import User
 from src.schemas import BlogPostCreateUpdate
-from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException
+from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException, UnauthorizedException
 from src.events import post_created, post_updated, post_deleted
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
@@ -37,7 +37,15 @@ def admin_required(f: Callable) -> Callable:
     def decorated_function(*args: Any, **kwargs: Any) -> Response:
         current_user_id = get_jwt_identity()
         current_user_claims = get_jwt()
-        
+
+        # Enforce current user existence and role from the database
+        current_user = User.objects(id=current_user_id).first()
+        if not current_user:
+            raise UnauthorizedException("Authentication required or invalid credentials.")
+
+        if current_user.role != "admin":
+            raise ForbiddenException("Admin access required.")
+
         if "roles" not in current_user_claims or "admin" not in current_user_claims["roles"]:
             current_app.logger.warning(
                 f"Unauthorized admin access attempt by user ID: {current_user_id} "
