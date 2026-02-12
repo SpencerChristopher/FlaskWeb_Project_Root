@@ -15,7 +15,10 @@ jobs:
       - name: Deploy to Raspberry Pi
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           LOG_LEVEL: INFO
+          FLASK_ENV: production
         run: |
           ./scripts/deploy.sh
           docker system prune -f
