@@ -23,4 +23,20 @@ echo "Starting Docker Compose services with override..."
 # We explicitly set RUN_MODE=https for the web service.
 docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
 
+echo "Waiting for MongoDB to be healthy..."
+for i in {1..30}; do
+  status=$(docker inspect -f '{{.State.Health.Status}}' mongodb 2>/dev/null || echo "unknown")
+  if [ "$status" = "healthy" ]; then
+    echo "MongoDB is healthy."
+    break
+  fi
+  sleep 2
+done
+
+if [ "$status" != "healthy" ]; then
+  echo "MongoDB did not become healthy in time."
+  docker compose ps
+  exit 1
+fi
+
 echo "Deployment complete."
