@@ -25,6 +25,7 @@ python-dotenv = "^1.1.1"
 python-slugify = "^8.0.1" # Added for slugify functionality
 redis = "^5.0.4"
 requests = "^2.32.3"
+flask-cors = "^4.0.0"
 
 
 

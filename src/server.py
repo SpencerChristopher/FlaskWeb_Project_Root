@@ -8,6 +8,7 @@ registering blueprints, and setting up error handlers.
 import os
 from flask import Flask, jsonify, request, g
 from werkzeug.middleware.proxy_fix import ProxyFix
+from flask_cors import CORS
 
 from src.utils.logger import setup_logging
 from src.extensions import db, bcrypt, jwt
@@ -82,6 +83,19 @@ def create_app():
         x_host=proxy_x_host,
         x_prefix=proxy_x_prefix,
     )
+
+    # CORS configuration for SPA clients
+    cors_origins = os.environ.get("CORS_ORIGINS", "")
+    if cors_origins:
+        allowed_origins = [o.strip() for o in cors_origins.split(",") if o.strip()]
+    else:
+        allowed_origins = []
+    if allowed_origins:
+        CORS(
+            app,
+            resources={r"/api/*": {"origins": allowed_origins}},
+            supports_credentials=True,
+        )
     
     # Initialize JWTManager immediately after app creation
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT

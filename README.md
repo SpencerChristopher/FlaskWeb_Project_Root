@@ -68,6 +68,7 @@ Required `.env` values (minimum):
 - `PROXY_FIX_X_PROTO` (default: 1)
 - `PROXY_FIX_X_HOST` (default: 1)
 - `PROXY_FIX_X_PREFIX` (default: 1)
+- `CORS_ORIGINS` (comma-separated, e.g. https://app.example.com)
 
 ### 3. Build and Run Containers
 
