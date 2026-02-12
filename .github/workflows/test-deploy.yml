@@ -39,7 +39,13 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           LOG_LEVEL: INFO # Already passed as build-arg, but good for consistency
           FLASK_ENV: development
-        run: docker compose build --build-arg LOG_LEVEL=INFO
+        run: |
+          echo "DEBUG: SECRET_KEY is set to ${SECRET_KEY}"
+          echo "DEBUG: ADMIN_USERNAME is set to ${ADMIN_USERNAME}"
+          echo "DEBUG: ADMIN_PASSWORD is set to ${ADMIN_PASSWORD}"
+          echo "DEBUG: LOG_LEVEL is set to ${LOG_LEVEL}"
+          echo "DEBUG: FLASK_ENV is set to ${FLASK_ENV}"
+          docker compose build --build-arg LOG_LEVEL=INFO
 
       - name: Start containers
         env:
