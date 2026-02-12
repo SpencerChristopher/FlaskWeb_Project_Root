@@ -30,6 +30,14 @@ jobs:
       - name: Install dependencies
         run: pip install poetry && poetry install
 
+      - name: Generate Self-Signed Certificates (CI)
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/server.key 2048
+          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          chmod 600 certs/server.key
+          chmod 644 certs/server.crt
+
 
 
       - name: Build Docker images
@@ -58,6 +66,9 @@ jobs:
 
       - name: Wait for services to be healthy
         run: sleep 30
+
+      - name: Seed Database (CI)
+        run: docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
 
       - name: Run tests
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/
@@ -115,3 +126,5 @@ jobs:
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             flask_web_app /app/.venv/bin/python scripts/seed_db.py
+
+

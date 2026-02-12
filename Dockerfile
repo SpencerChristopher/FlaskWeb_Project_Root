@@ -46,9 +46,9 @@ COPY ./tests ./tests
 
 COPY ./main.py ./
 
-# Make port 443 available
-EXPOSE 443
+# Make port 8000 available
+EXPOSE 8000
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:443 --workers 4 --log-level ${LOG_LEVEL} --access-logfile - --certfile /app/certs/server.crt --keyfile /app/certs/server.key 'main:create_app()'
+CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --log-level ${LOG_LEVEL} --access-logfile - 'main:create_app()'
