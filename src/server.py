@@ -71,7 +71,17 @@ def create_app():
         template_folder=os.path.join(project_root, 'templates'),
         static_folder=os.path.join(project_root, 'static')
     )
-    app.wsgi_app = ProxyFix(app.wsgi_app)
+    proxy_x_for = int(os.environ.get("PROXY_FIX_X_FOR", "1"))
+    proxy_x_proto = int(os.environ.get("PROXY_FIX_X_PROTO", "1"))
+    proxy_x_host = int(os.environ.get("PROXY_FIX_X_HOST", "1"))
+    proxy_x_prefix = int(os.environ.get("PROXY_FIX_X_PREFIX", "1"))
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=proxy_x_for,
+        x_proto=proxy_x_proto,
+        x_host=proxy_x_host,
+        x_prefix=proxy_x_prefix,
+    )
     
     # Initialize JWTManager immediately after app creation
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY") # Use the existing SECRET_KEY for JWT
@@ -84,18 +94,32 @@ def create_app():
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         from src.models.token_blocklist import TokenBlocklist
+        from src.models.user import User
         jti = jwt_payload["jti"]
-        # Use read_concern to ensure the read operation sees the latest data
+        user_id = jwt_payload.get("sub")
+        token_version = jwt_payload.get("tv")
+
         token = TokenBlocklist.objects(jti=jti).first()
-        return token is not None # Return True if token is in blocklist (revoked)
+        if token is not None:
+            return True
+
+        if not user_id:
+            return True
+        user = User.objects(id=user_id).only("token_version").first()
+        if not user:
+            return True
+        if token_version is None or user.token_version != token_version:
+            return True
+
+        return False
 
     # Configure JWT token location (e.g., headers, JSON body)
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
-    app.config["JWT_COOKIE_SECURE"] = True # Set to True in production with HTTPS
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = True # Set to False for development/debugging
+    app.config["JWT_COOKIE_SECURE"] = os.environ.get("JWT_COOKIE_SECURE", "true").lower() == "true"
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = os.environ.get("JWT_COOKIE_CSRF_PROTECT", "true").lower() == "true"
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
     app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
-    app.config["JWT_COOKIE_SAMESITE"] = "Lax" # Or "Strict" or "None" (requires Secure=True)
+    app.config["JWT_COOKIE_SAMESITE"] = os.environ.get("JWT_COOKIE_SAMESITE", "Lax")
 
 
         # Configure JWT token expiry times

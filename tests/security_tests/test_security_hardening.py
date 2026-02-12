@@ -31,13 +31,19 @@ def regular_user(client):
 @pytest.fixture
 def admin_headers(app, admin_user):
     """Return headers for an admin user."""
-    access_token = create_access_token(identity=str(admin_user.id), additional_claims={"roles": ["admin"]})
+    access_token = create_access_token(
+        identity=str(admin_user.id),
+        additional_claims={"roles": ["admin"], "tv": admin_user.token_version}
+    )
     return {'Authorization': f'Bearer {access_token}'}
 
 @pytest.fixture
 def user_headers(app, regular_user):
     """Return headers for a regular user."""
-    access_token = create_access_token(identity=str(regular_user.id), additional_claims={"roles": ["user"]})
+    access_token = create_access_token(
+        identity=str(regular_user.id),
+        additional_claims={"roles": ["user"], "tv": regular_user.token_version}
+    )
     return {'Authorization': f'Bearer {access_token}'}
 
 # --- Security Tests (MUST HAVE) ---
@@ -91,7 +97,7 @@ class TestJWTAuthentication:
         with client.application.app_context():
             access_token = create_access_token(
                 identity=str(admin_user.id),
-                additional_claims={"roles": ["admin"]},
+                additional_claims={"roles": ["admin"], "tv": admin_user.token_version},
                 expires_delta=timedelta(seconds=-1)
             )
         headers = {'Authorization': f'Bearer {access_token}'}
@@ -111,7 +117,10 @@ class TestJWTAuthentication:
     def test_blacklisted_token(self, client, admin_user, app):
         """Test that a blacklisted token is rejected."""
         with app.app_context():
-            access_token = create_access_token(identity=str(admin_user.id))
+            access_token = create_access_token(
+                identity=str(admin_user.id),
+                additional_claims={"roles": ["admin"], "tv": admin_user.token_version}
+            )
             decoded_token = decode_token(access_token)
             jti = decoded_token["jti"]
             expires = datetime.fromtimestamp(decoded_token["exp"])
@@ -129,7 +138,10 @@ class TestJWTAuthentication:
         """Test that admin_required rejects tokens with missing 'roles' claim."""
         with app.app_context():
             # Create a token WITHOUT the 'roles' claim
-            access_token = create_access_token(identity=str(regular_user.id), additional_claims={})
+            access_token = create_access_token(
+                identity=str(regular_user.id),
+                additional_claims={"tv": regular_user.token_version}
+            )
         headers = {'Authorization': f'Bearer {access_token}'}
         response = client.get('/api/admin/posts', headers=headers)
         assert response.status_code == 403
@@ -139,7 +151,10 @@ class TestJWTAuthentication:
         """Test that admin_required rejects tokens where 'roles' is not a list."""
         with app.app_context():
             # Create a token where 'roles' is a string, not a list
-            access_token = create_access_token(identity=str(regular_user.id), additional_claims={"roles": "user"})
+            access_token = create_access_token(
+                identity=str(regular_user.id),
+                additional_claims={"roles": "user", "tv": regular_user.token_version}
+            )
         headers = {'Authorization': f'Bearer {access_token}'}
         response = client.get('/api/admin/posts', headers=headers)
         assert response.status_code == 403

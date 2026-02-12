@@ -19,9 +19,9 @@ def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_f
 
     # Old token should no longer grant admin access
     response = client.get("/api/admin/posts", headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 401
     data = response.get_json()
-    assert data["error_code"] == "FORBIDDEN"
+    assert data["error_code"] == "UNAUTHORIZED"
 
 
 def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fixture):
@@ -40,6 +40,24 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
 
     # Old token should no longer authorize access
     response = client.get("/api/admin/posts", headers=headers)
+    assert response.status_code == 401
+    data = response.get_json()
+    assert data["error_code"] == "UNAUTHORIZED"
+
+
+def test_token_revoked_after_role_change_on_status(client, setup_users, login_user_fixture):
+    """
+    Tokens should be revoked if the user's role changes, even on non-admin endpoints.
+    """
+    access_token = login_user_fixture("testadmin", "testpassword")
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    admin_user = User.objects(username="testadmin").first()
+    assert admin_user is not None
+    admin_user.role = "user"
+    admin_user.save()
+
+    response = client.get("/api/auth/status", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"
