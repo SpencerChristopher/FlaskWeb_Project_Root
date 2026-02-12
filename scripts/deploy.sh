@@ -7,6 +7,16 @@ set -e
 echo "Creating docker-compose.override.yml from template..."
 cp docker-compose.override.yml.template docker-compose.override.yml
 
+echo "Setting default non-secret config for deployment..."
+: "${JWT_COOKIE_SECURE:=true}"
+: "${JWT_COOKIE_CSRF_PROTECT:=true}"
+: "${JWT_COOKIE_SAMESITE:=Lax}"
+: "${PROXY_FIX_X_FOR:=1}"
+: "${PROXY_FIX_X_PROTO:=1}"
+: "${PROXY_FIX_X_HOST:=1}"
+: "${PROXY_FIX_X_PREFIX:=1}"
+: "${CORS_ORIGINS:=https://localhost,https://127.0.0.1}"
+
 echo "Starting Docker Compose services with override..."
 # docker-compose will automatically pick up docker-compose.override.yml
 # provided it's in the same directory.
