@@ -1,4 +1,4 @@
-name: Test and Deploy to WSL
+name: Test and Deploy
 
 on:
   push:
@@ -28,26 +28,25 @@ jobs:
       - name: Install dependencies
         run: pip install poetry && poetry install
 
-      # - name: Run Linting
-      #   run: poetry run flake8 src tests
 
-      # - name: Check Code Formatting
-      #   run: poetry run black --check src tests
 
       - name: Build Docker images
-        run: docker compose build
+        run: docker compose build --build-arg LOG_LEVEL=INFO
 
       - name: Start containers
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          LOG_LEVEL: INFO
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          LOG_LEVEL: INFO # Or specific for dev/test
+          FLASK_ENV: development # For testing
         run: docker compose up -d
 
       - name: Wait for services to be healthy
-        run: sleep 10 # Simple wait, more robust checks can be added
+        run: sleep 15
 
       - name: Run tests
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/api_tests/ tests/page_content_test/ tests/routing_tests/ tests/security_tests/
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/
 
       - name: Stop containers
         if: always()
@@ -56,7 +55,7 @@ jobs:
   deploy-to-wsl:
     name: Deploy to WSL
     needs: build-and-test
-    runs-on: [wsl-test, wsl-runner, dev-runner] # Target runner by its labels
+    runs-on: [wsl-test, wsl-runner, dev-runner]
     timeout-minutes: 30
     steps:
       - name: Checkout code
@@ -64,21 +63,27 @@ jobs:
         with:
           ssh-key: ${{ secrets.SSH_PRIVATE_KEY_WSL }}
 
-      - name: Generate Self-Signed Certificates
+      - name: Generate Self-Signed Certificates and Set Permissions
         run: |
           mkdir -p certs
           openssl genrsa -out certs/server.key 2048
           openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          chmod 600 certs/server.key
+          chmod 644 certs/server.crt
+          sudo chown -R 1000:1000 certs # This step will ensure proper ownership for appuser
+
+
+
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
 
       - name: Deploy to WSL
         env:
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          LOG_LEVEL: INFO
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          MONGO_URI: mongodb://mongo:27017/appdb
+          LOG_LEVEL: INFO # Or specific for dev/test
+          FLASK_ENV: production # For deployment to WSL
         run: |
           ./scripts/deploy.sh
           docker system prune -f
@@ -86,7 +91,6 @@ jobs:
       - name: Create Admin User
         run: |
           docker exec \
-            -e MONGO_URI="mongodb://mongo:27017/appdb" \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
@@ -94,7 +98,6 @@ jobs:
       - name: Seed Database
         run: |
           docker exec \
-            -e MONGO_URI="mongodb://mongo:27017/appdb" \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             flask_web_app /app/.venv/bin/python scripts/seed_db.py

@@ -31,6 +31,9 @@ RUN chown -R appuser:appuser /app
 RUN mkdir -p logs && chown -R appuser:appuser logs
 USER appuser
 
+ARG LOG_LEVEL=INFO
+ENV LOG_LEVEL=$LOG_LEVEL
+
 # Copy the virtual environment from the builder stage
 COPY --from=builder /app/.venv ./.venv
 
@@ -48,12 +51,4 @@ EXPOSE 443
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-# Define the command to run the application. This uses a shell script to allow
-# for conditional logic based on the RUN_MODE environment variable.
-CMD if [ "$RUN_MODE" = "https" ]; then \
-        echo "Starting Gunicorn in HTTPS mode..."; \
-        exec /app/.venv/bin/gunicorn --bind 0.0.0.0:443 --workers 4 --log-level debug --access-logfile - --certfile /app/certs/server.crt --keyfile /app/certs/server.key main:wsgi_app; \
-    else \
-        echo "Starting Gunicorn in HTTP mode..."; \
-        exec /app/.venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 4 --log-level debug --access-logfile - main:wsgi_app; \
-    fi
+CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:443 --workers 4 --log-level ${LOG_LEVEL} --access-logfile - --certfile /app/certs/server.crt --keyfile /app/certs/server.key 'main:create_app()'

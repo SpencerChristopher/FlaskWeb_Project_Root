@@ -4,5 +4,3 @@ services:
       - "443:443" # Expose HTTPS port for local development
     volumes:
       - ./certs:/app/certs:ro # Mount local certs directory into container
-    environment:
-      - RUN_MODE=https # Tell Gunicorn to start in HTTPS mode

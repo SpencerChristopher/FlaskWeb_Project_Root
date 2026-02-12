@@ -5,15 +5,19 @@ services:
     restart: unless-stopped
     ports:
       - "443:443"
+    mem_limit: 2g # Added to prevent OOM errors during testing, pending SECRET_KEY fix
+    environment: # Explicitly define environment variables
+      SECRET_KEY: ${SECRET_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      ADMIN_USERNAME: ${ADMIN_USERNAME}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      MONGO_URI: mongodb://mongo:27017/appdb
+      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+      DOCKER_CONTAINER: "true"
+      FLASK_APP: main.py
+      FLASK_ENV: ${FLASK_ENV} # Will be set to 'development' or 'production' by calling environment
     volumes:
       - ./certs:/app/certs:ro # Mount certs for HTTPS
-    
-    environment:
-      - SECRET_KEY=${SECRET_KEY}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - MONGO_URI=mongodb://mongo:27017/appdb
-      - RATELIMIT_STORAGE_URI=redis://redis:6379/0
-      - DOCKER_CONTAINER=true
     depends_on:
       mongo:
         condition: service_healthy
