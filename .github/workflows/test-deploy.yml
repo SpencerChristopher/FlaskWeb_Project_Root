@@ -31,6 +31,12 @@ jobs:
 
 
       - name: Build Docker images
+        env:
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          LOG_LEVEL: INFO # Already passed as build-arg, but good for consistency
+          FLASK_ENV: development
         run: docker compose build --build-arg LOG_LEVEL=INFO
 
       - name: Start containers
