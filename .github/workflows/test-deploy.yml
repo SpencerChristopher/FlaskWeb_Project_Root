@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - dev
+      - main
 
 jobs:
   build-and-test:
@@ -24,6 +25,8 @@ jobs:
           if [ -f config.env ]; then
             grep -vE '^\s*#|^\s*$' config.env >> "$GITHUB_ENV"
           fi
+          echo "FLASK_ENV=development" >> "$GITHUB_ENV"
+          echo "TALISMAN_FORCE_HTTPS=false" >> "$GITHUB_ENV"
       - name: Validate required secrets
         run: |
           missing=0
@@ -57,8 +60,15 @@ jobs:
       - name: Seed Database (CI)
         run: docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
 
+      - name: Inject tests into container
+        run: |
+          docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
+          docker cp tests/. flask_web_app:/app/tests
+          docker cp pytest.ini flask_web_app:/app/pytest.ini
+          docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
+
       - name: Run tests
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
 
       - name: Capture logs on failure
         if: failure()
@@ -111,7 +121,10 @@ jobs:
       - name: Deploy to WSL
         run: |
           ./scripts/deploy.sh
-          docker compose down --volumes --remove-orphans
+
+      - name: Verify staging health
+        run: |
+          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
 
       - name: Create Admin User
         run: |
@@ -126,5 +139,68 @@ jobs:
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             flask_web_app /app/.venv/bin/python scripts/seed_db.py
+
+      - name: Capture deploy logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color > docker-compose-deploy.log
+
+      - name: Upload deploy logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-deploy-logs
+          path: docker-compose-deploy.log
+
+  deploy-to-prod:
+    name: Deploy to Prod
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: [prod-runner]
+    timeout-minutes: 30
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      LOG_LEVEL: INFO
+      FLASK_ENV: production
+      TALISMAN_FORCE_HTTPS: "true"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+      - name: Deploy to Prod
+        run: |
+          ./scripts/deploy.sh
+
+      - name: Verify prod health
+        run: |
+          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
+
+      - name: Capture prod logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color > docker-compose-prod.log
+
+      - name: Upload prod logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-prod-logs
+          path: docker-compose-prod.log
 
 
