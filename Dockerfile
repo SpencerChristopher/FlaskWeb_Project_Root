@@ -43,7 +43,6 @@ COPY ./src ./src
 COPY ./scripts ./scripts
 COPY ./static ./static
 COPY ./templates ./templates
-COPY ./tests ./tests
 COPY ./pytest.ini ./
 
 COPY ./main.py ./

@@ -8,32 +8,33 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      LOG_LEVEL: INFO # Or specific for dev/test
+      FLASK_ENV: development # For testing
+      TALISMAN_FORCE_HTTPS: "false"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-      # Adding a comment to force workflow re-evaluation
-
-
-      - name: Install dependencies
-        run: pip install poetry && poetry install
-
-      - name: Load non-secret defaults
+      - name: Load non-secret defaults (CI)
         run: |
           if [ -f config.env ]; then
-            cp config.env .env
+            grep -vE '^\s*#|^\s*$' config.env >> "$GITHUB_ENV"
+          fi
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
           fi
 
       - name: Generate Self-Signed Certificates (CI)
@@ -47,33 +48,11 @@ jobs:
 
 
       - name: Build Docker images
-        env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          LOG_LEVEL: INFO # Already passed as build-arg, but good for consistency
-          FLASK_ENV: development
-          TALISMAN_FORCE_HTTPS: "false"
         run: |
-          echo "DEBUG: SECRET_KEY is set to ${SECRET_KEY}"
-          echo "DEBUG: ADMIN_USERNAME is set to ${ADMIN_USERNAME}"
-          echo "DEBUG: ADMIN_PASSWORD is set to ${ADMIN_PASSWORD}"
-          echo "DEBUG: LOG_LEVEL is set to ${LOG_LEVEL}"
-          echo "DEBUG: FLASK_ENV is set to ${FLASK_ENV}"
-          docker compose build --build-arg LOG_LEVEL=INFO
+          docker compose -f docker-compose.yml build --build-arg LOG_LEVEL=INFO
 
       - name: Start containers
-        env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          LOG_LEVEL: INFO # Or specific for dev/test
-          FLASK_ENV: development # For testing
-          TALISMAN_FORCE_HTTPS: "false"
-        run: docker compose up -d
-
-      - name: Wait for services to be healthy
-        run: sleep 30
+        run: docker compose -f docker-compose.yml up -d --wait
 
       - name: Seed Database (CI)
         run: docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
@@ -81,50 +60,58 @@ jobs:
       - name: Run tests
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest tests/
 
+      - name: Capture logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml logs --no-color > docker-compose.log
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-compose.log
+
       - name: Stop containers
         if: always()
-        run: docker compose down
+        run: docker compose -f docker-compose.yml down
 
   deploy-to-wsl:
     name: Deploy to WSL
     needs: build-and-test
     runs-on: [wsl-test, wsl-runner, dev-runner]
     timeout-minutes: 30
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      LOG_LEVEL: INFO # Or specific for dev/test
+      FLASK_ENV: production # For deployment to WSL
+      TALISMAN_FORCE_HTTPS: "true"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          ssh-key: ${{ secrets.SSH_PRIVATE_KEY_WSL }}
-
-      - name: Generate Self-Signed Certificates and Set Permissions
-        run: |
-          mkdir -p certs
-          if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
-            openssl genrsa -out certs/server.key 2048
-            openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
-          fi
-          chmod 600 certs/server.key
-          chmod 644 certs/server.crt
-          RUNNER_UID=$(id -u)
-          RUNNER_GID=$(id -g)
-          docker run --rm -v "$PWD/certs:/certs" alpine:3.20 chown -R $RUNNER_UID:$RUNNER_GID /certs # Ensure ownership without sudo
+        uses: actions/checkout@v4
 
 
 
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Deploy to WSL
-        env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          LOG_LEVEL: INFO # Or specific for dev/test
-          FLASK_ENV: production # For deployment to WSL
-          TALISMAN_FORCE_HTTPS: "true"
         run: |
           ./scripts/deploy.sh
-          docker system prune -f
+          docker compose down --volumes --remove-orphans
 
       - name: Create Admin User
         run: |

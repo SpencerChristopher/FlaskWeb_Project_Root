@@ -12,6 +12,15 @@ if [ ! -f .env ] && [ -f config.env ]; then
   cp config.env .env
 fi
 
+echo "Ensuring certs directory..."
+mkdir -p certs
+if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
+  openssl genrsa -out certs/server.key 2048
+  openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+  chmod 600 certs/server.key
+  chmod 644 certs/server.crt
+fi
+
 echo "Starting Docker Compose services with override..."
 # docker-compose will automatically pick up docker-compose.override.yml
 # provided it's in the same directory.

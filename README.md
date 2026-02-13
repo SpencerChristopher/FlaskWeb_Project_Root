@@ -32,6 +32,10 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 
 This is the recommended way to run the project for development. The environment is fully containerized. Nginx terminates HTTPS on `:443` and proxies to the Flask API on the internal Docker network.
 
+## Deployment & CI/CD
+
+See `docs/DEPLOYMENT.md` for CI/CD flow, runner expectations, and production deployment notes.
+
 ### Prerequisites
 
 *   Docker Desktop
