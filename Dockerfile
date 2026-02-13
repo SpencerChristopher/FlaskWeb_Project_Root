@@ -33,6 +33,7 @@ USER appuser
 
 ARG LOG_LEVEL=INFO
 ENV LOG_LEVEL=$LOG_LEVEL
+ENV GUNICORN_TIMEOUT=30
 
 # Copy the virtual environment from the builder stage
 COPY --from=builder /app/.venv ./.venv
@@ -52,4 +53,4 @@ EXPOSE 8000
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 30 --log-level ${LOG_LEVEL} --access-logfile - 'main:create_app()'
+CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout ${GUNICORN_TIMEOUT} --log-level ${LOG_LEVEL} --access-logfile - 'main:create_app()'

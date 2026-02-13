@@ -30,6 +30,12 @@ jobs:
       - name: Install dependencies
         run: pip install poetry && poetry install
 
+      - name: Load non-secret defaults
+        run: |
+          if [ -f config.env ]; then
+            cp config.env .env
+          fi
+
       - name: Generate Self-Signed Certificates (CI)
         run: |
           mkdir -p certs
@@ -47,6 +53,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           LOG_LEVEL: INFO # Already passed as build-arg, but good for consistency
           FLASK_ENV: development
+          TALISMAN_FORCE_HTTPS: "false"
         run: |
           echo "DEBUG: SECRET_KEY is set to ${SECRET_KEY}"
           echo "DEBUG: ADMIN_USERNAME is set to ${ADMIN_USERNAME}"
@@ -62,6 +69,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           LOG_LEVEL: INFO # Or specific for dev/test
           FLASK_ENV: development # For testing
+          TALISMAN_FORCE_HTTPS: "false"
         run: docker compose up -d
 
       - name: Wait for services to be healthy
@@ -113,6 +121,7 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           LOG_LEVEL: INFO # Or specific for dev/test
           FLASK_ENV: production # For deployment to WSL
+          TALISMAN_FORCE_HTTPS: "true"
         run: |
           ./scripts/deploy.sh
           docker system prune -f

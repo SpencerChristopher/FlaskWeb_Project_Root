@@ -1,4 +1,4 @@
-# Flask Web Project
+ï»¿# Flask Web Project
 
 ## Description
 
@@ -45,13 +45,23 @@ cd FlaskWeb_Project_Root
 
 ### 2. Set up Environment Variables
 
-Create a `.env` file in the project root from the template.
+There are two env files:
+- `config.env` contains **non-secret defaults** shared across environments (committed).
+- `.env` contains **local overrides and secrets** (not committed).
+
+Create a `.env` file in the project root from the template, then add secrets.
 
 ```bash
 cp .env.template .env
 ```
 
-Edit the `.env` file and fill in the necessary values. **Ensure `MONGO_URI`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.** A strong `SECRET_KEY` is critical for security.
+Edit the `.env` file and fill in the necessary values. **Ensure `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.** A strong `SECRET_KEY` is critical for security.
+
+If you want to mirror CI/WSL defaults locally, you can start from:
+```bash
+cp config.env .env
+```
+Then add secrets to `.env`.
 
 Required `.env` values (minimum):
 - `SECRET_KEY`
@@ -61,6 +71,8 @@ Required `.env` values (minimum):
 - `RATELIMIT_STORAGE_URI` (default: `redis://redis:6379/0`)
 - `LOG_LEVEL`
 - `FLASK_ENV`
+- `TALISMAN_FORCE_HTTPS` (true/false)
+- `CSP_REPORT_URI` (optional)
 - `JWT_COOKIE_SECURE` (true/false)
 - `JWT_COOKIE_CSRF_PROTECT` (true/false)
 - `JWT_COOKIE_SAMESITE` (Lax/Strict/None)
@@ -69,6 +81,10 @@ Required `.env` values (minimum):
 - `PROXY_FIX_X_HOST` (default: 1)
 - `PROXY_FIX_X_PREFIX` (default: 1)
 - `CORS_ORIGINS` (comma-separated, e.g. https://app.example.com)
+- `GUNICORN_TIMEOUT` (seconds)
+- `MONGO_SERVER_SELECTION_TIMEOUT_MS` (ms)
+- `MONGO_CONNECT_TIMEOUT_MS` (ms)
+- `MONGO_SOCKET_TIMEOUT_MS` (ms)
 
 ### 3. Build and Run Containers
 
@@ -133,24 +149,25 @@ Navigate to `https://localhost`. The SPA will fetch and display a list of blog p
 ```
 . # Project Root
 +-- src/                      # Main application source code
-¦   +-- models/               # MongoEngine database models (Post, User)
-¦   +-- routes/               # Flask blueprints for API routes
-¦   +-- schemas.py            # Pydantic schemas for API validation
-¦   +-- exceptions.py         # Custom application exception classes
-¦   +-- events.py             # Blinker signal definitions
-¦   +-- listeners.py          # Blinker signal listeners
-¦   +-- extensions.py         # Centralized Flask extension instances
-¦   +-- utils/                # Utility functions (e.g., logger)
-¦   +-- server.py             # Flask app factory and configuration
+Â¦   +-- models/               # MongoEngine database models (Post, User)
+Â¦   +-- routes/               # Flask blueprints for API routes
+Â¦   +-- schemas.py            # Pydantic schemas for API validation
+Â¦   +-- exceptions.py         # Custom application exception classes
+Â¦   +-- events.py             # Blinker signal definitions
+Â¦   +-- listeners.py          # Blinker signal listeners
+Â¦   +-- extensions.py         # Centralized Flask extension instances
+Â¦   +-- utils/                # Utility functions (e.g., logger)
+Â¦   +-- server.py             # Flask app factory and configuration
 +-- scripts/                  # Utility scripts (seeding, admin creation)
 +-- static/                   # Frontend static files (JS, CSS)
 +-- templates/                # Base Jinja2 template for the SPA shell
 +-- docker/                   # Docker assets (nginx config, mongo init)
-¦   +-- nginx/nginx.conf       # TLS proxy config
-¦   +-- mongo/mongo-init.js    # Mongo init script
+Â¦   +-- nginx/nginx.conf       # TLS proxy config
+Â¦   +-- mongo/mongo-init.js    # Mongo init script
 +-- certs/                    # TLS certs (self-signed for dev/CI)
 +-- .env                      # Environment variables (local, sensitive)
 +-- .env.template             # Template for .env
++-- config.env                # Non-secret defaults shared across envs
 +-- docker-compose.yml        # Main Docker Compose (prod-like)
 +-- docker-compose.override.yml.template # Optional dev overrides
 +-- Dockerfile                # Dockerfile for the Flask application
@@ -171,3 +188,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgements
 
 *   Special thanks to Google and the Gemini team for the development and assistance provided through the Gemini CLI.
+
+

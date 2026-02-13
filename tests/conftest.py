@@ -67,6 +67,8 @@ def app():
         mongo_uri = "mongodb://localhost:27017/pytest_appdb"
     os.environ["MONGO_URI"] = mongo_uri
     os.environ['SECRET_KEY'] = 'test-secret-key'
+    os.environ.setdefault('FLASK_ENV', 'production')
+    os.environ.setdefault('TALISMAN_FORCE_HTTPS', 'false')
 
     app = create_app()
     app.config.update({

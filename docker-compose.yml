@@ -12,6 +12,9 @@ services:
       MONGO_URI: mongodb://mongo:27017/appdb
       RATELIMIT_STORAGE_URI: redis://redis:6379/0
       DOCKER_CONTAINER: "true"
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-30}
+      TALISMAN_FORCE_HTTPS: ${TALISMAN_FORCE_HTTPS:-true}
+      CSP_REPORT_URI: ${CSP_REPORT_URI:-}
       FLASK_APP: main.py
       FLASK_ENV: ${FLASK_ENV} # Will be set to 'development' or 'production' by calling environment
     depends_on:
