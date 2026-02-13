@@ -160,31 +160,31 @@ def create_app():
         raise ValueError("MONGO_URI environment variable not set!")
     
     app.config['MONGODB_SETTINGS'] = {
-        'host': mongo_uri,
-        'port': 27017,
-        'db': 'appdb'
+        'host': mongo_uri
     }
 
     MAX_DB_RETRIES = 5
     DB_RETRY_DELAY_SECONDS = 5
     db_connected = False
 
+    # Initialize extensions once; verify connectivity with retries.
+    db.init_app(app)
+    bcrypt.init_app(app)
+
+    from src.utils.db_utils import check_db_connection
+
     for i in range(MAX_DB_RETRIES):
         try:
             app.logger.info(f"Attempting to connect to MongoDB (attempt {i+1}/{MAX_DB_RETRIES})...")
-            db.init_app(app)
-            bcrypt.init_app(app)
-            app.logger.info("Flask-MongoEngine initialized.")
-            app.logger.info("Database connection successful.")
-            db_connected = True
-            break # Exit loop if connection is successful
+            if check_db_connection(app):
+                db_connected = True
+                break
         except (ConnectionFailure, ServerSelectionTimeoutError) as e:
             app.logger.warning(f"MongoDB connection failed: {e}. Retrying in {DB_RETRY_DELAY_SECONDS} seconds...")
-            time.sleep(DB_RETRY_DELAY_SECONDS)
         except Exception as e:
             app.logger.error(f"An unexpected error occurred during database initialization: {e}")
-            # For unexpected errors, we might not want to retry, or retry differently
-            break # Exit loop for unexpected errors
+            break
+        time.sleep(DB_RETRY_DELAY_SECONDS)
 
     if not db_connected:
         app.logger.critical("Failed to connect to MongoDB after multiple retries. Exiting application.")
@@ -210,6 +210,8 @@ def create_app():
         return response
 
     # --- Route Registration ---
+    # Import listeners to ensure Blinker handlers are registered.
+    import src.listeners
     from src.routes import main_routes, api_routes, auth_routes, admin_routes
     app.register_blueprint(main_routes.bp)
     app.register_blueprint(api_routes.bp)

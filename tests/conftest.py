@@ -11,6 +11,34 @@ from src.models.user import User
 from src.models.post import Post
 from src.extensions import limiter
 
+def _add_markers_by_path(item):
+    path = str(item.fspath)
+    if "tests\\risk_tests\\" in path or "tests/risk_tests/" in path:
+        item.add_marker(pytest.mark.risk)
+        item.add_marker(pytest.mark.integration)
+        return
+    if "tests\\api_tests\\" in path or "tests/api_tests/" in path:
+        item.add_marker(pytest.mark.integration)
+        return
+    if "tests\\security_tests\\" in path or "tests/security_tests/" in path:
+        item.add_marker(pytest.mark.security)
+        item.add_marker(pytest.mark.integration)
+        return
+    if "tests\\routing_tests\\" in path or "tests/routing_tests/" in path:
+        item.add_marker(pytest.mark.integration)
+        return
+    if "tests\\page_content_test\\" in path or "tests/page_content_test/" in path:
+        item.add_marker(pytest.mark.integration)
+        return
+    if "tests\\test_database_connection.py" in path or "tests/test_database_connection.py" in path:
+        item.add_marker(pytest.mark.integration)
+        return
+    item.add_marker(pytest.mark.unit)
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        _add_markers_by_path(item)
+
 @pytest.fixture(scope='session', autouse=True)
 def database_connection_check():
     """

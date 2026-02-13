@@ -43,6 +43,7 @@ COPY ./scripts ./scripts
 COPY ./static ./static
 COPY ./templates ./templates
 COPY ./tests ./tests
+COPY ./pytest.ini ./
 
 COPY ./main.py ./
 
@@ -51,4 +52,4 @@ EXPOSE 8000
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --log-level ${LOG_LEVEL} --access-logfile - 'main:create_app()'
+CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 30 --log-level ${LOG_LEVEL} --access-logfile - 'main:create_app()'
