@@ -9,6 +9,7 @@ import os
 from flask import Flask, jsonify, request, g
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask_cors import CORS
+from flask_talisman import Talisman
 
 from src.utils.logger import setup_logging
 from src.extensions import db, bcrypt, jwt
@@ -83,6 +84,57 @@ def create_app():
         x_host=proxy_x_host,
         x_prefix=proxy_x_prefix,
     )
+
+    # --- Security Headers with Talisman ---
+    app_env = os.environ.get('FLASK_ENV', 'development')
+    csp = {
+        'default-src': "'self'",
+        'script-src': [
+            "'self'",
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com'
+        ],
+        'style-src': [
+            "'self'",
+            'https://cdn.jsdelivr.net',
+            'https://fonts.googleapis.com',
+            "'unsafe-inline'"
+        ],
+        'font-src': [
+            'https://fonts.gstatic.com',
+            'https://cdn.jsdelivr.net'
+        ],
+        'img-src': '*'
+    }
+
+    talisman_kwargs = {
+        'content_security_policy': csp,
+        'content_security_policy_nonce_in': ['script-src'],
+        'referrer_policy': 'strict-origin-when-cross-origin',
+    }
+
+    if app_env == 'production':
+        talisman_kwargs['strict_transport_security'] = True
+        talisman_kwargs['strict_transport_security_max_age'] = 31536000
+        talisman_kwargs['strict_transport_security_include_subdomains'] = True
+        force_https = os.environ.get('TALISMAN_FORCE_HTTPS', 'true').lower() == 'true'
+        talisman_kwargs['force_https'] = force_https
+    else:  # Staging or development
+        report_uri = os.environ.get('CSP_REPORT_URI')
+        if report_uri:
+            talisman_kwargs['content_security_policy_report_only'] = True
+            talisman_kwargs['content_security_policy_report_uri'] = report_uri
+        # Avoid HTTPS redirects in dev/test
+        talisman_kwargs['force_https'] = False
+
+    Talisman(app, **talisman_kwargs)
+    # --- End Security Headers ---
+
+    @app.after_request
+    def add_extra_security_headers(response):
+        # Talisman does not set Permissions-Policy; add it explicitly.
+        response.headers['Permissions-Policy'] = "geolocation=(), microphone=(), camera=()"
+        return response
 
     # CORS configuration for SPA clients
     cors_origins = os.environ.get("CORS_ORIGINS", "")
@@ -160,7 +212,10 @@ def create_app():
         raise ValueError("MONGO_URI environment variable not set!")
     
     app.config['MONGODB_SETTINGS'] = {
-        'host': mongo_uri
+        'host': mongo_uri,
+        'serverSelectionTimeoutMS': int(os.environ.get('MONGO_SERVER_SELECTION_TIMEOUT_MS', 10000)),
+        'connectTimeoutMS': int(os.environ.get('MONGO_CONNECT_TIMEOUT_MS', 10000)),
+        'socketTimeoutMS': int(os.environ.get('MONGO_SOCKET_TIMEOUT_MS', 10000)),
     }
 
     MAX_DB_RETRIES = 5
@@ -199,15 +254,6 @@ def create_app():
     # --- End Extensions Initialization ---
 
     # Register blueprints here
-
-    # --- Security Headers ---
-    @app.after_request
-    def add_security_headers(response):
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
-        response.headers['X-XSS-Protection'] = '1; mode=block'
-        # response.headers['Content-Security-Policy'] = "default-src 'self'"
-        return response
 
     # --- Route Registration ---
     # Import listeners to ensure Blinker handlers are registered.
