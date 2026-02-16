@@ -7,11 +7,6 @@ set -e
 echo "Creating docker-compose.override.yml from template..."
 cp docker-compose.override.yml.template docker-compose.override.yml
 
-echo "Loading shared non-secret defaults..."
-if [ ! -f .env ] && [ -f config.env ]; then
-  cp config.env .env
-fi
-
 echo "Ensuring certs directory..."
 mkdir -p certs
 if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
@@ -25,7 +20,7 @@ echo "Starting Docker Compose services with override..."
 # docker-compose will automatically pick up docker-compose.override.yml
 # provided it's in the same directory.
 # We explicitly set RUN_MODE=https for the web service.
-docker compose -f docker-compose.yml -f docker-compose.override.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d
 
 echo "Waiting for MongoDB to be healthy..."
 for i in {1..30}; do
