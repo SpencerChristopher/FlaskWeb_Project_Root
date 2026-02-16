@@ -28,9 +28,14 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 *   **Testing**: Pytest, pytest-flask
 *   **Frontend**: HTML, CSS, JavaScript (Vanilla SPA)
 
-## Setup with Docker (Recommended)
+## Setup with Docker (Recommended for Local Development)
 
-This is the recommended way to run the project for development. The environment is fully containerized. Nginx terminates HTTPS on `:443` and proxies to the Flask API on the internal Docker network.
+This is the recommended way to run the project for local development and QA. The environment is fully containerized, allowing for consistent setup. Nginx terminates HTTPS on `:443` and proxies to the Flask API.
+
+**Understanding Docker Compose Files:**
+*   **`docker-compose.yml`**: This is the base configuration file. For local development, it now directly contains the `build: .` context for the `web` service.
+*   **`docker-compose.override.yml`**: (Generated from `docker-compose.override.yml.template`) This file **overrides** settings in `docker-compose.yml` for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
+
 
 ## Deployment & CI/CD
 
@@ -49,72 +54,53 @@ cd FlaskWeb_Project_Root
 
 ### 2. Set up Environment Variables
 
-There are two env files:
-- `config.env` contains **non-secret defaults** shared across environments (committed).
-- `.env` contains **local overrides and secrets** (not committed).
+For local development, you will typically need a `.env` file to store sensitive secrets and to set local overrides for environment variables defined in `docker-compose.yml`.
 
-Create a `.env` file in the project root from the template, then add secrets.
+*   **`docker-compose.yml`**: This file now centrally defines all non-secret default environment variables for the application (e.g., `LOG_LEVEL`, `FLASK_ENV`, `GUNICORN_TIMEOUT`). These values are used by default in both CI/CD and local environments.
+*   **`.env`**: This file is for **local overrides and sensitive secrets only**. It is not committed to Git.
+*   **`config.env`**: This file serves as a **reference** for all non-secret defaults. You can copy its contents into your local `.env` file as a starting point if you wish to override `docker-compose.yml` defaults, then add your secrets.
 
-```bash
-cp .env.template .env
-```
+**Steps:**
 
-Edit the `.env` file and fill in the necessary values. **Ensure `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are set.** A strong `SECRET_KEY` is critical for security.
+1.  **Create your local `.env` file:**
+    ```bash
+    cp .env.template .env
+    ```
+2.  **Edit the `.env` file:** Open the newly created `.env` file and fill in your specific values. **Ensure that `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are always set**, as these are critical for application functionality and security.
 
-If you want to mirror CI/WSL defaults locally, you can start from:
-```bash
-cp config.env .env
-```
-Then add secrets to `.env`.
-
-Required `.env` values (minimum):
+**Required `.env` values (minimum):**
 - `SECRET_KEY`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
-- `MONGO_URI` (default: `mongodb://mongo:27017/appdb`)
-- `RATELIMIT_STORAGE_URI` (default: `redis://redis:6379/0`)
-- `LOG_LEVEL`
-- `FLASK_ENV`
-- `TALISMAN_FORCE_HTTPS` (true/false)
-- `CSP_REPORT_URI` (optional)
-- `JWT_COOKIE_SECURE` (true/false)
-- `JWT_COOKIE_CSRF_PROTECT` (true/false)
-- `JWT_COOKIE_SAMESITE` (Lax/Strict/None)
-- `PROXY_FIX_X_FOR` (default: 1)
-- `PROXY_FIX_X_PROTO` (default: 1)
-- `PROXY_FIX_X_HOST` (default: 1)
-- `PROXY_FIX_X_PREFIX` (default: 1)
-- `CORS_ORIGINS` (comma-separated, e.g. https://app.example.com)
-- `GUNICORN_TIMEOUT` (seconds)
-- `MONGO_SERVER_SELECTION_TIMEOUT_MS` (ms)
-- `MONGO_CONNECT_TIMEOUT_MS` (ms)
-- `MONGO_SOCKET_TIMEOUT_MS` (ms)
 
 ### 3. Build and Run Containers
 
-Build the images and start the services in detached mode.
+Before running, ensure you have created your local `docker-compose.override.yml` and generated SSL certificates for Nginx.
 
-```bash
-docker compose --env-file .env up --build -d
-```
+1.  **Create your local `docker-compose.override.yml`:**
+    ```bash
+    cp docker-compose.override.yml.template docker-compose.override.yml
+    ```
+2.  **Generate Self-Signed SSL Certificates:**
+    Nginx expects certs at `./certs/server.crt` and `./certs/server.key`.
+    ```bash
+    mkdir -p certs
+    openssl genrsa -out certs/server.key 2048
+    openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+    ```
+3.  **Build and Run Services:**
+    Build the images and start the services in detached mode. Docker Compose will automatically detect and merge `docker-compose.override.yml`, ensuring the `web` service is built locally and source code volumes are mounted for live reloading.
 
-The application will be available at `https://localhost` (self-signed cert in dev).
+    ```bash
+    docker compose --env-file ./.env up --build -d
+    ```
 
-To verify:
-```bash
-curl -k -I https://localhost/
-```
+    The application will be available at `https://localhost` (self-signed cert in dev).
 
-### Certificates (Dev/CI)
-
-Nginx expects certs at `./certs/server.crt` and `./certs/server.key`.
-Generate self-signed certs for local development:
-
-```bash
-mkdir -p certs
-openssl genrsa -out certs/server.key 2048
-openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
-```
+    To verify:
+    ```bash
+    curl -k -I https://localhost/
+    ```
 
 ### 4. Seed the Database
 

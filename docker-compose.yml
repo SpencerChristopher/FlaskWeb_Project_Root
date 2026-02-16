@@ -5,18 +5,41 @@ services:
     restart: unless-stopped
     mem_limit: 2g # Added to prevent OOM errors during testing, pending SECRET_KEY fix
     environment: # Explicitly define environment variables
+      # Secrets (injected by CI)
       SECRET_KEY: ${SECRET_KEY}
-      LOG_LEVEL: ${LOG_LEVEL}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+
+      # Application & Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FLASK_ENV: ${FLASK_ENV:-production}
+      FLASK_APP: main.py
+      DOCKER_CONTAINER: "true"
+
+      # Infrastructure URIs
       MONGO_URI: mongodb://mongo:27017/appdb
       RATELIMIT_STORAGE_URI: redis://redis:6379/0
-      DOCKER_CONTAINER: "true"
+
+      # Gunicorn
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-30}
+
+      # Security & Cookies
+      JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-true}
+      JWT_COOKIE_CSRF_PROTECT: ${JWT_COOKIE_CSRF_PROTECT:-true}
+      JWT_COOKIE_SAMESITE: ${JWT_COOKIE_SAMESITE:-Lax}
       TALISMAN_FORCE_HTTPS: ${TALISMAN_FORCE_HTTPS:-true}
       CSP_REPORT_URI: ${CSP_REPORT_URI:-}
-      FLASK_APP: main.py
-      FLASK_ENV: ${FLASK_ENV} # Will be set to 'development' or 'production' by calling environment
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://localhost,https://127.0.0.1}
+
+      # Network Timeouts
+      PROXY_FIX_X_FOR: ${PROXY_FIX_X_FOR:-1}
+      PROXY_FIX_X_PROTO: ${PROXY_FIX_X_PROTO:-1}
+      PROXY_FIX_X_HOST: ${PROXY_FIX_X_HOST:-1}
+      PROXY_FIX_X_PREFIX: ${PROXY_FIX_X_PREFIX:-1}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${MONGO_SERVER_SELECTION_TIMEOUT_MS:-10000}
+      MONGO_CONNECT_TIMEOUT_MS: ${MONGO_CONNECT_TIMEOUT_MS:-10000}
+      MONGO_SOCKET_TIMEOUT_MS: ${MONGO_SOCKET_TIMEOUT_MS:-10000}
     depends_on:
       mongo:
         condition: service_healthy

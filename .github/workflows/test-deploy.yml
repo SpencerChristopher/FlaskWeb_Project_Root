@@ -16,9 +16,17 @@ jobs:
       LOG_LEVEL: INFO # Or specific for dev/test
       FLASK_ENV: development # For testing
       TALISMAN_FORCE_HTTPS: "false"
+      IMAGE_TAG: ghcr.io/${{ github.repository }}:latest # Tag for the built image
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Load non-secret defaults (CI)
         run: |
@@ -48,14 +56,29 @@ jobs:
           chmod 600 certs/server.key
           chmod 644 certs/server.crt
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-
-      - name: Build Docker images
-        run: |
-          docker compose -f docker-compose.yml build --build-arg LOG_LEVEL=INFO
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            LOG_LEVEL=${{ env.LOG_LEVEL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Start containers
-        run: docker compose -f docker-compose.yml up -d --wait
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml pull web
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait
 
       - name: Seed Database (CI)
         run: docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
@@ -72,7 +95,7 @@ jobs:
 
       - name: Capture logs on failure
         if: failure()
-        run: docker compose -f docker-compose.yml logs --no-color > docker-compose.log
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose.log
 
       - name: Upload logs on failure
         if: failure()
@@ -83,12 +106,13 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f docker-compose.yml down
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+
 
   deploy-to-wsl:
     name: Deploy to WSL
     needs: build-and-test
-    runs-on: [wsl-test, wsl-runner, dev-runner]
+    runs-on: wsl-staging
     timeout-minutes: 30
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
