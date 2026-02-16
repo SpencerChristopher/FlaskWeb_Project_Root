@@ -16,7 +16,7 @@ jobs:
       LOG_LEVEL: INFO # Or specific for dev/test
       FLASK_ENV: development # For testing
       TALISMAN_FORCE_HTTPS: "false"
-      IMAGE_TAG: ghcr.io/${{ github.repository | lower }}:latest # Tag for the built image
+      IMAGE_TAG: ghcr.io/${{ github.repository.toLowerCase() }}:latest # Tag for the built image
 
     steps:
       - name: Checkout code
@@ -68,7 +68,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.repository | lower }}:latest
+          tags: ghcr.io/${{ github.repository.toLowerCase() }}:latest
           platforms: linux/amd64,linux/arm64
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
