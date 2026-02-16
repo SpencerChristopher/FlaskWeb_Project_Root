@@ -44,6 +44,7 @@ COPY ./scripts ./scripts
 COPY ./static ./static
 COPY ./templates ./templates
 COPY ./pytest.ini ./
+COPY ./tests ./tests
 
 COPY ./main.py ./
 
