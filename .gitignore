@@ -125,3 +125,5 @@ tests/*.log
 commit_message.txt
 
 docker-compose.override.yml
+Phased_plan_DEVOPs.md
+phased_plan_backend.md

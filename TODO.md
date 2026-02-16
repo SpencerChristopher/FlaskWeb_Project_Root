@@ -10,3 +10,7 @@
 3. Add prod-only smoke tests:
    - Run minimal health checks (startup, DB connectivity, auth) in prod once env is ready
    - Keep full suite in CI/staging to avoid prod side-effects
+4. Create a new bootstrapping script for Raspberry Pi:
+   - Adapt `runner_bootstrap.sh` to dynamically detect ARM architecture.
+   - Adjust `wsl_bootstrap.sh` (minor changes) for non-WSL environment.
+   - Ensure it creates a robust environment for the production GitHub Actions runner.
