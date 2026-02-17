@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# Ensure image tag is provided by CI/CD
+if [ -z "${IMAGE_TAG:-}" ]; then
+  echo "IMAGE_TAG is not set."
+  exit 1
+fi
+
 # The environment variables are passed directly from GitHub Actions;
 # no need to create a .env file. This improves security by not writing secrets to disk.
 
@@ -17,7 +23,7 @@ echo "Starting Docker Compose services with override..."
 # docker-compose will automatically pick up docker-compose.override.yml
 # provided it's in the same directory.
 # We explicitly set RUN_MODE=https for the web service.
-docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait
+docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build
 
 echo "Waiting for MongoDB to be healthy..."
 for i in {1..30}; do

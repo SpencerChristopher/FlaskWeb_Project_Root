@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 
 load_dotenv()
+# Ensure test env disables HTTPS redirects before app creation
+os.environ.setdefault('FLASK_ENV', 'development')
+os.environ['TALISMAN_FORCE_HTTPS'] = 'false'
 from src.server import create_app
 from mongoengine import get_db, disconnect, connect
 from pymongo.errors import ServerSelectionTimeoutError
