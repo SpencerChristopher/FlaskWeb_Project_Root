@@ -41,6 +41,28 @@ This is the recommended way to run the project for local development and QA. The
 
 See `docs/DEPLOYMENT.md` for CI/CD flow, runner expectations, and production deployment notes.
 
+## CI/CD Preflight (Local)
+
+To avoid trial-and-error on GitHub Actions, run a local preflight before pushing:
+
+Windows PowerShell:
+```powershell
+.\scripts\preflight_ci.ps1
+```
+
+macOS/Linux:
+```bash
+./scripts/preflight_ci.sh
+```
+
+Optional local workflow run:
+```powershell
+.\scripts\preflight_ci.ps1 -RunAct
+```
+```bash
+./scripts/preflight_ci.sh -RunAct
+```
+
 ### Prerequisites
 
 *   Docker Desktop

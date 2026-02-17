@@ -1,3 +1,4 @@
 services:
   web:
-    image: ghcr.io/${{ github.repository | lower }}:latest
+    build: null
+    image: ${IMAGE_TAG}
