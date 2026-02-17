@@ -28,13 +28,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Load non-secret defaults (CI)
-        run: |
-          if [ -f config.env ]; then
-            grep -vE '^\s*#|^\s*$' config.env >> "$GITHUB_ENV"
-          fi
-          echo "FLASK_ENV=development" >> "$GITHUB_ENV"
-          echo "TALISMAN_FORCE_HTTPS=false" >> "$GITHUB_ENV"
       - name: Validate required secrets
         run: |
           missing=0
@@ -166,7 +159,7 @@ jobs:
 
       - name: Capture deploy logs on failure
         if: failure()
-        run: docker compose -f docker-compose.yml logs --no-color > docker-compose-deploy.log
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-deploy.log
 
       - name: Upload deploy logs on failure
         if: failure()
