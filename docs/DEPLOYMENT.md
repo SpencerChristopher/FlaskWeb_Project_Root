@@ -48,6 +48,7 @@ Configuration values are sourced in a hierarchical manner:
 4.  **Deploy to WSL:** Executes `scripts/deploy.sh` which:
     *   Generates self-signed certificates.
     *   Optionally performs a hard reset (`down -v`) when manually triggered with `workflow_dispatch` input `hard_rebuild=true`; before reset it attempts a MongoDB backup archive.
+    *   Auto-recovers once from Mongo auth/volume drift on staging (`DEPLOY_AUTO_RECOVER_MONGO_AUTH=true`) by performing a guarded hard reset if Mongo healthcheck reports `Authentication failed`.
     *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
     *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
 5.  **Verify Staging Health:** Runs `curl -k -f` check against `https://localhost/` to ensure the application stack is responsive.
@@ -61,6 +62,7 @@ Configuration values are sourced in a hierarchical manner:
 *   **ProxyFix:** `PROXY_FIX_X_FOR`, `PROXY_FIX_X_PROTO`, etc., are configured to handle reverse proxy headers.
 *   **Service Health Checks:** `mongo`, `redis`, and the `web` (Flask) services all have `healthcheck` definitions in `docker-compose.yml`. MongoDB healthcheck uses authenticated root credentials.
 *   **MongoDB Auth Mode:** `web` connects via authenticated `MONGO_URI` using the app user. Mongo init script provisions app-user roles for both `appdb` and `pytest_appdb`.
+*   **Mongo Start Grace:** Mongo healthcheck includes a start period to avoid false unhealthy status during first-time user/init script setup.
 
 ## Required GitHub Secrets
 - `SECRET_KEY`
@@ -84,6 +86,7 @@ Configuration values are sourced in a hierarchical manner:
 ## Notes
 *   Keep Mongo/Redis ports internal within the Docker network unless explicit exposure is required for local debugging.
 *   `docker-compose.yml` is the primary source for non-secret environment defaults (when building locally). `docker-compose.ci.yml` overrides image sourcing for CI/CD.
+*   Compose service names are `web`, `nginx`, `mongo`, and `redis`. For ad-hoc troubleshooting, use these with `docker compose ... logs`; container names (`flask_web_app`, `nginx_proxy`, `mongodb`) are for `docker logs`.
 
 ## Workflow Preflight (Local)
 To avoid trial-and-error on GitHub, run a local preflight before pushing:

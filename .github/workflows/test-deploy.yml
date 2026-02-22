@@ -176,6 +176,7 @@ jobs:
           DEPLOY_RESET_VOLUMES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
           DEPLOY_BACKUP_BEFORE_RESET: "true"
           DEPLOY_REQUIRE_BACKUP: "true"
+          DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
         run: |
           ./scripts/deploy.sh
 

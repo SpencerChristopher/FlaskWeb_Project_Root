@@ -58,6 +58,7 @@ jobs:
         env:
           DEPLOY_CLEAN_START: "true"
           DEPLOY_RESET_VOLUMES: "false"
+          DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
         run: ./scripts/deploy.sh
 
       - name: Verify production health
