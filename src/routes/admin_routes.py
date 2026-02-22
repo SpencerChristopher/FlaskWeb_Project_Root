@@ -14,12 +14,13 @@ from mongoengine.errors import ValidationError
 from pydantic import ValidationError as PydanticValidationError
 
 from src.models.post import Post
-from src.models.user import User
+from src.repositories import get_post_repository, get_user_repository
 from src.schemas import BlogPostCreateUpdate
 from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException, UnauthorizedException
-from src.events import post_created, post_updated, post_deleted
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
+user_repository = get_user_repository()
+post_repository = get_post_repository()
 
 def admin_required(f: Callable) -> Callable:
     """
@@ -39,7 +40,7 @@ def admin_required(f: Callable) -> Callable:
         current_user_claims = get_jwt()
 
         # Enforce current user existence and role from the database
-        current_user = User.objects(id=current_user_id).first()
+        current_user = user_repository.get_by_id(current_user_id)
         if not current_user:
             raise UnauthorizedException("Authentication required or invalid credentials.")
 
@@ -68,7 +69,7 @@ def get_posts() -> Response:
     Returns:
         Response: A JSON array of post objects.
     """
-    posts = Post.objects()
+    posts = post_repository.list_all()
     return jsonify([post.to_dict() for post in posts])
 
 @bp.route('/posts', methods=['POST'])
@@ -93,11 +94,11 @@ def create_post() -> Response:
 
     post_slug = slugify(post_data.title)
 
-    if Post.objects(slug=post_slug).first():
+    if post_repository.get_by_slug(post_slug):
         raise ConflictException("A post with this title already exists")
 
     current_user_id = get_jwt_identity()
-    author_user = User.objects(id=current_user_id).first()
+    author_user = user_repository.get_by_id(current_user_id)
     if not author_user:
         # This case should ideally be caught by admin_required or JWT validation
         raise NotFoundException("Author not found.") 
@@ -111,7 +112,7 @@ def create_post() -> Response:
         is_published=post_data.is_published
     )
     try:
-        new_post.save()
+        post_repository.save(new_post)
     except ValidationError as e:
         # Convert MongoEngine validation error to a more structured format
         error_details = {field: message for field, message in e.errors.items()}
@@ -131,7 +132,7 @@ def get_post(post_id: str) -> Response:
     Returns:
         Response: The post object if found, or a 404 error.
     """
-    post = Post.objects(id=post_id).first()
+    post = post_repository.get_by_id(post_id)
     if not post:
         raise NotFoundException("Post not found")
     return jsonify(post.to_dict())
@@ -151,7 +152,7 @@ def update_post(post_id: str) -> Response:
     Returns:
         Response: The updated post object or an error message.
     """
-    post = Post.objects(id=post_id).first()
+    post = post_repository.get_by_id(post_id)
     if not post:
         raise NotFoundException("Post not found")
 
@@ -163,8 +164,8 @@ def update_post(post_id: str) -> Response:
     post_slug = slugify(post_data.title)
 
     # Check if another post with the new slug already exists
-    existing_post = Post.objects(slug=post_slug).first()
-    if existing_post and str(existing_post.id) != post_id:
+    existing_post = post_repository.get_by_slug_excluding_id(post_slug, post_id)
+    if existing_post:
         raise ConflictException("A post with this title already exists")
 
     post.title = post_data.title
@@ -173,7 +174,7 @@ def update_post(post_id: str) -> Response:
     post.summary = post_data.summary
     post.is_published = post_data.is_published
     try:
-        post.save()
+        post_repository.save(post)
     except ValidationError as e:
         # Convert MongoEngine validation error to a more structured format
         error_details = {field: message for field, message in e.errors.items()}
@@ -193,9 +194,9 @@ def delete_post(post_id: str) -> Response:
     Returns:
         Response: A success message or a 404 error if the post is not found.
     """
-    post = Post.objects(id=post_id).first()
+    post = post_repository.get_by_id(post_id)
     if post:
-        post.delete()
+        post_repository.delete(post)
         return jsonify({'message': 'Post deleted successfully'}), 200
     else:
         raise NotFoundException("Post not found")

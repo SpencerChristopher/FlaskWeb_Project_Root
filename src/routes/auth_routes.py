@@ -8,16 +8,17 @@ current authentication status.
 import datetime
 from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity, create_refresh_token, set_access_cookies, set_refresh_cookies, unset_jwt_cookies
-from src.models.user import User
 from typing import Dict, Any
 from src.events import user_logged_in
 from src.extensions import limiter # Import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
+from src.repositories import get_user_repository
 from src.schemas import UserRegistration, ChangePasswordRequest
 from pydantic import ValidationError as PydanticValidationError
 
 
 bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
+user_repository = get_user_repository()
 
 @bp.route('/login', methods=['POST'])
 @limiter.limit("5 per minute") # Apply rate limit
@@ -34,7 +35,7 @@ def login() -> Response:
 
     current_app.logger.debug(f"Login attempt for username: '{username}'")
 
-    user = User.objects(username=username).first()
+    user = user_repository.get_by_username(username)
     if user and user.check_password(password):
         token_claims = {"roles": [user.role], "tv": user.token_version}
         access_token = create_access_token(
@@ -100,7 +101,7 @@ def refresh() -> Response:
     """
     current_user_id = get_jwt_identity()
     current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
-    user = User.objects(id=current_user_id).first()
+    user = user_repository.get_by_id(current_user_id)
     if not user:
         raise UnauthorizedException("Invalid user")
     new_access_token = create_access_token(
@@ -120,7 +121,7 @@ def status() -> Response:
     """
     current_user_id = get_jwt_identity()
     if current_user_id:
-        user = User.objects(id=current_user_id).first()
+        user = user_repository.get_by_id(current_user_id)
         if user:
             return jsonify({
                 'logged_in': True,
@@ -147,13 +148,13 @@ def change_password() -> Response:
         current_app.logger.warning(f"Invalid data for change password: {error_messages}")
 
     user_id = get_jwt_identity()
-    user = User.objects(id=user_id).first()
+    user = user_repository.get_by_id(user_id)
 
     if not user or not user.check_password(data.current_password):
         raise UnauthorizedException("Invalid current password")
 
     user.set_password(data.new_password)
-    user.save()
+    user_repository.save(user)
     current_app.logger.info(f"Password successfully changed for user ID: {user_id} from IP: {request.remote_addr}")
 
     return jsonify({'message': 'Password updated successfully'}), 200

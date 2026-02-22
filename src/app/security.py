@@ -11,6 +11,7 @@ from flask_talisman import Talisman
 
 from src.exceptions import UnauthorizedException
 from src.extensions import jwt, limiter
+from src.repositories import get_user_repository
 
 
 def register_jwt_loaders(jwt_manager) -> None:
@@ -103,11 +104,11 @@ def configure_jwt(app: Flask) -> None:
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY")
     jwt.init_app(app)
     register_jwt_loaders(jwt)
+    user_repository = get_user_repository()
 
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         from src.models.token_blocklist import TokenBlocklist
-        from src.models.user import User
 
         jti = jwt_payload["jti"]
         user_id = jwt_payload.get("sub")
@@ -119,7 +120,7 @@ def configure_jwt(app: Flask) -> None:
 
         if not user_id:
             return True
-        user = User.objects(id=user_id).only("token_version").first()
+        user = user_repository.get_by_id(user_id)
         if not user:
             return True
         if token_version is None or user.token_version != token_version:
@@ -140,4 +141,3 @@ def configure_jwt(app: Flask) -> None:
 def configure_rate_limiter(app: Flask) -> None:
     """Initialize Flask-Limiter on the current app."""
     limiter.init_app(app)
-
