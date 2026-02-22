@@ -1,5 +1,6 @@
 import pytest
 
+from src.events import post_created
 from src.exceptions import ConflictException, ForbiddenException, UnauthorizedException
 from src.models.user import User
 from src.repositories.mongo_post_repository import MongoPostRepository
@@ -104,3 +105,40 @@ def test_post_service_list_published_filters_drafts(app):
         paginated = post_service.list_published_posts(page=1, per_page=10)
         assert paginated.total == 1
         assert paginated.items[0].slug == "published-via-service"
+
+
+def test_post_service_create_emits_single_event_with_metadata(app):
+    post_repository = MongoPostRepository()
+    post_service = PostService(post_repository)
+    received_events = []
+
+    def receiver(sender, **kwargs):
+        received_events.append(kwargs)
+
+    post_created.connect(receiver)
+    try:
+        with app.app_context():
+            author = User(
+                username="svc_emit_author",
+                email="svc_emit_author@example.com",
+                role="admin",
+            )
+            author.set_password("Password123!")
+            author.save()
+
+            created = post_service.create_post(
+                title="Service Event Post",
+                content="Service event content",
+                summary="Service event summary",
+                is_published=True,
+                author=author,
+            )
+
+            assert created is not None
+            assert len(received_events) == 1
+            assert received_events[0]["event_type"] == "post-created"
+            assert received_events[0]["post_id"] == str(created.id)
+            assert "event_id" in received_events[0]
+            assert "occurred_at" in received_events[0]
+    finally:
+        post_created.disconnect(receiver)

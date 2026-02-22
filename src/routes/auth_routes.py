@@ -17,7 +17,7 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
 )
 from typing import Dict, Any
-from src.events import user_logged_in
+from src.events import dispatch_event, user_logged_in
 from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
 from src.schemas import UserRegistration, ChangePasswordRequest
@@ -59,7 +59,7 @@ def login() -> Response:
         identity=str(user.id), additional_claims=token_claims
     )
 
-    user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
+    dispatch_event(user_logged_in, current_app._get_current_object(), user_id=str(user.id))
     current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
 
     response = jsonify({

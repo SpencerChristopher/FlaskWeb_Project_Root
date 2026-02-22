@@ -133,10 +133,10 @@ def test_auth_service_delete_user_removes_record(app):
 
 def test_auth_service_delete_user_emits_signal(app):
     auth_service = AuthService(MongoUserRepository())
-    received_user_ids = []
+    received_events = []
 
     def receiver(sender, **kwargs):
-        received_user_ids.append(kwargs.get("user_id"))
+        received_events.append(kwargs)
 
     user_deleted.connect(receiver)
     try:
@@ -151,6 +151,10 @@ def test_auth_service_delete_user_emits_signal(app):
             user_id = str(user.id)
 
             auth_service.delete_user(user_id=user_id)
-            assert received_user_ids[-1] == user_id
+            assert len(received_events) == 1
+            assert received_events[0]["user_id"] == user_id
+            assert received_events[0]["event_type"] == "user-deleted"
+            assert "event_id" in received_events[0]
+            assert "occurred_at" in received_events[0]
     finally:
         user_deleted.disconnect(receiver)

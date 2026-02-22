@@ -11,7 +11,7 @@ from mongoengine.errors import DoesNotExist
 from slugify import slugify
 
 from src.exceptions import ConflictException, NotFoundException
-from src.events import post_created, post_deleted, post_updated
+from src.events import dispatch_event, post_created, post_deleted, post_updated
 from src.models.post import Post
 from src.models.user import User
 from src.repositories.interfaces import PostRepository
@@ -110,7 +110,8 @@ class PostService:
         )
         self._prepare_for_save(new_post)
         created_post = self._post_repository.save(new_post)
-        post_created.send(
+        dispatch_event(
+            post_created,
             created_post,
             post_id=str(created_post.id),
             user_id=str(created_post.author.id),
@@ -140,7 +141,8 @@ class PostService:
         post.is_published = is_published
         self._prepare_for_save(post)
         updated_post = self._post_repository.save(post)
-        post_updated.send(
+        dispatch_event(
+            post_updated,
             updated_post,
             post_id=str(updated_post.id),
             user_id=str(updated_post.author.id),
@@ -158,7 +160,8 @@ class PostService:
         persisted_post_id = str(post.id)
         self._post_repository.delete(post)
         if post_author_id:
-            post_deleted.send(
+            dispatch_event(
+                post_deleted,
                 post,
                 post_id=persisted_post_id,
                 user_id=post_author_id,
