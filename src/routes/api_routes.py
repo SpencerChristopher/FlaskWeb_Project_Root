@@ -1,12 +1,12 @@
 import re
 from flask import Blueprint, jsonify, current_app, request, Response
-from src.models.post import Post
 from typing import List, Dict, Any
 from src.extensions import limiter
 from src.exceptions import NotFoundException, BadRequestException
-from mongoengine.errors import ValidationError
+from src.repositories import get_post_repository
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
+post_repository = get_post_repository()
 
 @bp.route('/home', methods=['GET'])
 def home_api() -> Response:
@@ -45,9 +45,7 @@ def blog_list_api() -> Response:
     if page < 1 or per_page < 1:
         raise BadRequestException("Page and per_page must be positive integers.")
 
-    paginated_posts = Post.objects(is_published=True).order_by(
-        '-publication_date'
-    ).paginate(page=page, per_page=per_page)
+    paginated_posts = post_repository.get_published_paginated(page=page, per_page=per_page)
 
     posts_summary: List[Dict[str, Any]] = [
         {
@@ -81,7 +79,7 @@ def blog_post_api(slug: str) -> Response:
     if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', slug):
         raise BadRequestException("Invalid slug format.")
 
-    post = Post.objects(slug=slug).first()
+    post = post_repository.get_by_slug(slug)
     if post:
         return jsonify(post.to_dict())
     raise NotFoundException("Post not found")
