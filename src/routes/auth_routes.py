@@ -7,18 +7,26 @@ current authentication status.
 
 import datetime
 from flask import Blueprint, request, jsonify, Response, current_app
-from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity, create_refresh_token, set_access_cookies, set_refresh_cookies, unset_jwt_cookies
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies,
+)
 from typing import Dict, Any
 from src.events import user_logged_in
-from src.extensions import limiter # Import limiter
+from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
-from src.repositories import get_user_repository
 from src.schemas import UserRegistration, ChangePasswordRequest
+from src.services import get_auth_service
 from pydantic import ValidationError as PydanticValidationError
 
 
 bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
-user_repository = get_user_repository()
+auth_service = get_auth_service()
 
 @bp.route('/login', methods=['POST'])
 @limiter.limit("5 per minute") # Apply rate limit
@@ -35,28 +43,31 @@ def login() -> Response:
 
     current_app.logger.debug(f"Login attempt for username: '{username}'")
 
-    user = user_repository.get_by_username(username)
-    if user and user.check_password(password):
-        token_claims = {"roles": [user.role], "tv": user.token_version}
-        access_token = create_access_token(
-            identity=str(user.id), additional_claims=token_claims
+    try:
+        user = auth_service.authenticate(username, password)
+    except UnauthorizedException:
+        current_app.logger.warning(
+            f"Failed login attempt for user: {username} from IP: {request.remote_addr}"
         )
-        refresh_token = create_refresh_token(
-            identity=str(user.id), additional_claims=token_claims
-        )
+        raise
 
-        user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
-        current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
+    token_claims = auth_service.build_token_claims(user)
+    access_token = create_access_token(
+        identity=str(user.id), additional_claims=token_claims
+    )
+    refresh_token = create_refresh_token(
+        identity=str(user.id), additional_claims=token_claims
+    )
 
-        response = jsonify({
-            'message': 'Login successful'
-        })
-        set_access_cookies(response, access_token)
-        set_refresh_cookies(response, refresh_token)
-        return response, 200
-    else:
-        current_app.logger.warning(f"Failed login attempt for user: {username} from IP: {request.remote_addr}")
-        raise UnauthorizedException("Invalid username or password")
+    user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
+    current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
+
+    response = jsonify({
+        'message': 'Login successful'
+    })
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 200
 
 @bp.route('/register', methods=['POST'])
 def register() -> Response:
@@ -101,12 +112,10 @@ def refresh() -> Response:
     """
     current_user_id = get_jwt_identity()
     current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
-    user = user_repository.get_by_id(current_user_id)
-    if not user:
-        raise UnauthorizedException("Invalid user")
+    user = auth_service.get_user_or_raise(current_user_id)
     new_access_token = create_access_token(
         identity=current_user_id,
-        additional_claims={"roles": [user.role], "tv": user.token_version}
+        additional_claims=auth_service.build_token_claims(user)
     )
     response = jsonify({'message': 'Token refreshed'})
     set_access_cookies(response, new_access_token)
@@ -121,7 +130,7 @@ def status() -> Response:
     """
     current_user_id = get_jwt_identity()
     if current_user_id:
-        user = user_repository.get_by_id(current_user_id)
+        user = auth_service.get_user(current_user_id)
         if user:
             return jsonify({
                 'logged_in': True,
@@ -145,16 +154,12 @@ def change_password() -> Response:
         # Extract just the messages for a cleaner response
         error_messages = [error['msg'] for error in e.errors()]
         raise BadRequestException("Invalid data", details=error_messages)
-        current_app.logger.warning(f"Invalid data for change password: {error_messages}")
-
     user_id = get_jwt_identity()
-    user = user_repository.get_by_id(user_id)
-
-    if not user or not user.check_password(data.current_password):
-        raise UnauthorizedException("Invalid current password")
-
-    user.set_password(data.new_password)
-    user_repository.save(user)
+    auth_service.change_password(
+        user_id=user_id,
+        current_password=data.current_password,
+        new_password=data.new_password,
+    )
     current_app.logger.info(f"Password successfully changed for user ID: {user_id} from IP: {request.remote_addr}")
 
     return jsonify({'message': 'Password updated successfully'}), 200
