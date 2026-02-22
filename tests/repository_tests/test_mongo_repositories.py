@@ -22,6 +22,9 @@ def test_user_repository_lookup_by_username_and_id(app):
         assert by_id is not None
         assert by_id.username == "repo_user"
 
+        user_repository.delete(user)
+        assert user_repository.get_by_id(str(user.id)) is None
+
 
 def test_post_repository_published_pagination_and_slug_helpers(app):
     post_repository = MongoPostRepository()

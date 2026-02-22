@@ -21,3 +21,6 @@ class MongoUserRepository(UserRepository):
 
     def save(self, user: User) -> User:
         return user.save()
+
+    def delete(self, user: User) -> None:
+        user.delete()

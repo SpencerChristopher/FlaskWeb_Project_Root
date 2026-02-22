@@ -1,5 +1,6 @@
 import pytest
 
+from src.events import user_deleted
 from src.exceptions import UnauthorizedException
 from src.models.user import User
 from src.repositories.mongo_user_repository import MongoUserRepository
@@ -111,3 +112,45 @@ def test_auth_service_change_role_same_value_no_version_bump(app):
         updated_user = auth_service.change_role(user_id=str(user.id), role="user")
         assert updated_user.role == "user"
         assert updated_user.token_version == initial_token_version
+
+
+def test_auth_service_delete_user_removes_record(app):
+    auth_service = AuthService(MongoUserRepository())
+
+    with app.app_context():
+        user = User(
+            username="auth_delete_user",
+            email="auth_delete_user@example.com",
+            role="user",
+        )
+        user.set_password("Password123!")
+        user.save()
+        user_id = str(user.id)
+
+        auth_service.delete_user(user_id=user_id)
+        assert User.objects(id=user_id).first() is None
+
+
+def test_auth_service_delete_user_emits_signal(app):
+    auth_service = AuthService(MongoUserRepository())
+    received_user_ids = []
+
+    def receiver(sender, **kwargs):
+        received_user_ids.append(kwargs.get("user_id"))
+
+    user_deleted.connect(receiver)
+    try:
+        with app.app_context():
+            user = User(
+                username="auth_delete_signal",
+                email="auth_delete_signal@example.com",
+                role="user",
+            )
+            user.set_password("Password123!")
+            user.save()
+            user_id = str(user.id)
+
+            auth_service.delete_user(user_id=user_id)
+            assert received_user_ids[-1] == user_id
+    finally:
+        user_deleted.disconnect(receiver)
