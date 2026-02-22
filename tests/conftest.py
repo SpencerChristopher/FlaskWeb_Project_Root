@@ -27,6 +27,9 @@ def _add_markers_by_path(item):
         item.add_marker(pytest.mark.security)
         item.add_marker(pytest.mark.integration)
         return
+    if "tests\\service_tests\\" in path or "tests/service_tests/" in path:
+        item.add_marker(pytest.mark.integration)
+        return
     if "tests\\routing_tests\\" in path or "tests/routing_tests/" in path:
         item.add_marker(pytest.mark.integration)
         return
