@@ -12,9 +12,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const mainContentElement = document.getElementById('main-content');
 
     // --- Helper Functions ---
+    function getCookie(name) {
+        const cookieString = `; ${document.cookie}`;
+        const parts = cookieString.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return null;
+    }
+
     async function fetchAPI(url, options = {}) {
         options.credentials = 'include'; // Include cookies in all fetch requests
         const headers = options.headers || {};
+        const method = (options.method || 'GET').toUpperCase();
+        if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+            const csrfToken = getCookie('csrf_access_token');
+            if (csrfToken && !headers['X-CSRF-TOKEN']) {
+                headers['X-CSRF-TOKEN'] = csrfToken;
+            }
+        }
         options.headers = headers;
 
         try {
@@ -268,11 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorDiv = document.getElementById('login-error');
         errorDiv.style.display = 'none';
         try {
-            const data = await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), suppressAuthRedirect: true });
-            userState.loggedIn = true;
-            const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-            const role = (payload.roles && Array.isArray(payload.roles) && payload.roles.length > 0) ? payload.roles[0] : 'user';
-            userState.user = { id: payload.sub, username: payload.username, role: role };
+            await fetchAPI('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }), suppressAuthRedirect: true });
+            const status = await fetchAPI('/api/auth/status', { suppressAuthRedirect: true });
+            userState.loggedIn = !!status.logged_in;
+            userState.user = status.logged_in ? status.user : null;
             updateNavUI();
             window.location.hash = '#admin';
         } catch (error) {
