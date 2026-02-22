@@ -1,0 +1,147 @@
+version: 1
+updated_for_phase: "Phase A - API contract freeze"
+
+endpoints:
+  - method: GET
+    path: /api/blog
+    status: 200
+    body:
+      required_top_level_keys:
+        - posts
+        - pagination
+      post_item_keys:
+        - title
+        - summary
+        - slug
+        - publication_date
+      pagination_keys:
+        - total_posts
+        - total_pages
+        - current_page
+        - per_page
+        - has_next
+        - has_prev
+
+  - method: GET
+    path: /api/blog/{slug}
+    status: 200
+    body:
+      required_top_level_keys:
+        - id
+        - title
+        - slug
+        - content
+        - summary
+        - author
+        - publication_date
+        - last_updated
+        - is_published
+      author_keys:
+        - id
+        - username
+
+  - method: GET
+    path: /api/auth/status
+    status: 200
+    body:
+      anonymous_shape:
+        - logged_in
+      authenticated_shape:
+        - logged_in
+        - user
+      user_keys:
+        - id
+        - username
+        - role
+
+  - method: POST
+    path: /api/auth/login
+    status: 200
+    body:
+      required_top_level_keys:
+        - message
+      disallowed_top_level_keys:
+        - access_token
+        - refresh_token
+    cookies:
+      required:
+        - access_token_cookie
+        - refresh_token_cookie
+
+  - method: GET
+    path: /api/admin/posts
+    status: 200
+    body:
+      type: array
+      item_required_keys:
+        - id
+        - title
+        - slug
+        - content
+        - summary
+        - author
+        - publication_date
+        - last_updated
+        - is_published
+      author_keys:
+        - id
+        - username
+
+  - method: GET
+    path: /api/admin/posts/{post_id}
+    status: 200
+    body:
+      required_top_level_keys:
+        - id
+        - title
+        - slug
+        - content
+        - summary
+        - author
+        - publication_date
+        - last_updated
+        - is_published
+      author_keys:
+        - id
+        - username
+
+  - method: POST
+    path: /api/admin/posts
+    status: 201
+    body:
+      required_top_level_keys:
+        - message
+        - id
+        - title
+        - slug
+        - content
+        - summary
+        - is_published
+        - author
+      author_keys:
+        - id
+        - username
+
+  - method: PUT
+    path: /api/admin/posts/{post_id}
+    status: 200
+    body:
+      required_top_level_keys:
+        - message
+        - id
+        - title
+        - slug
+        - content
+        - summary
+        - is_published
+        - author
+      author_keys:
+        - id
+        - username
+
+  - method: DELETE
+    path: /api/admin/posts/{post_id}
+    status: 200
+    body:
+      required_top_level_keys:
+        - message
