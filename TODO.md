@@ -14,3 +14,14 @@
    - Adapt `runner_bootstrap.sh` to dynamically detect ARM architecture.
    - Adjust `wsl_bootstrap.sh` (minor changes) for non-WSL environment.
    - Ensure it creates a robust environment for the production GitHub Actions runner.
+5. Defer production workflow runtime fixes (apply when prod env is live):
+   - Update `.github/workflows/production-deploy.yml` to use `/app/.venv/bin/python` for admin/seed scripts.
+   - Align prod deploy steps with staging compose flags (`--remove-orphans`, explicit compose files).
+6. Integrate Cloudflare Tunnel for production edge routing:
+   - Add a `cloudflared` endpoint container (prod compose override) and wire it to the app/nginx service.
+   - Store tunnel credentials/token in GitHub Actions secrets and inject only in prod jobs.
+   - Add smoke checks for tunnel reachability and upstream app health.
+7. Define TLS/cert mode when Cloudflare Tunnel is enabled:
+   - Keep self-signed certs for local/Wsl fallback only.
+   - Document tunnel mode where Cloudflare handles TLS termination, and internal traffic uses private network paths.
+   - Ensure app/proxy settings (`TALISMAN_FORCE_HTTPS`, forwarded headers) match tunnel behavior.
