@@ -6,6 +6,14 @@ using MongoEngine.
 from src.extensions import db, bcrypt
 import datetime
 
+from src.services.roles import (
+    ROLE_ADMIN,
+    ROLE_CONTENT_ADMIN,
+    ROLE_EDITOR,
+    ROLE_OPS_ADMIN,
+    ROLE_USER,
+)
+
 
 class User(db.Document):
     """
@@ -16,7 +24,10 @@ class User(db.Document):
     email = db.EmailField(required=True, unique=True)
     password_hash = db.StringField(required=True)
     created_at = db.DateTimeField(default=datetime.datetime.utcnow)
-    role = db.StringField(default='user', choices=['user', 'editor', 'admin'])
+    role = db.StringField(
+        default=ROLE_USER,
+        choices=[ROLE_USER, ROLE_EDITOR, ROLE_CONTENT_ADMIN, ROLE_OPS_ADMIN, ROLE_ADMIN],
+    )
     token_version = db.IntField(default=0)
 
     def set_password(self, password: str) -> None:

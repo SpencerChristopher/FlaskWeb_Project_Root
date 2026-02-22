@@ -10,6 +10,7 @@ from src.events import dispatch_event, user_deleted
 from src.exceptions import UnauthorizedException
 from src.models.user import User
 from src.repositories.interfaces import UserRepository
+from src.services.roles import build_claim_roles_for_role, get_capabilities_for_role
 
 
 class AuthService:
@@ -34,7 +35,12 @@ class AuthService:
         return user
 
     def build_token_claims(self, user: User) -> dict[str, Any]:
-        return {"roles": [user.role], "tv": user.token_version}
+        capabilities = sorted(get_capabilities_for_role(user.role))
+        return {
+            "roles": build_claim_roles_for_role(user.role),
+            "capabilities": capabilities,
+            "tv": user.token_version,
+        }
 
     def change_password(
         self, *, user_id: str, current_password: str, new_password: str

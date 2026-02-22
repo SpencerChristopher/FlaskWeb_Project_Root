@@ -114,6 +114,41 @@ def test_auth_service_change_role_same_value_no_version_bump(app):
         assert updated_user.token_version == initial_token_version
 
 
+def test_auth_service_build_token_claims_admin_transition_mapping(app):
+    auth_service = AuthService(MongoUserRepository())
+
+    with app.app_context():
+        user = User(
+            username="auth_claims_admin",
+            email="auth_claims_admin@example.com",
+            role="admin",
+        )
+        user.set_password("Password123!")
+        user.save()
+
+        claims = auth_service.build_token_claims(user)
+        assert claims["tv"] == user.token_version
+        assert set(claims["roles"]) == {"admin", "content_admin", "ops_admin"}
+        assert set(claims["capabilities"]) == {"content.manage", "ops.manage"}
+
+
+def test_auth_service_build_token_claims_content_admin_scope(app):
+    auth_service = AuthService(MongoUserRepository())
+
+    with app.app_context():
+        user = User(
+            username="auth_claims_content_admin",
+            email="auth_claims_content_admin@example.com",
+            role="content_admin",
+        )
+        user.set_password("Password123!")
+        user.save()
+
+        claims = auth_service.build_token_claims(user)
+        assert claims["roles"] == ["content_admin"]
+        assert claims["capabilities"] == ["content.manage"]
+
+
 def test_auth_service_delete_user_removes_record(app):
     auth_service = AuthService(MongoUserRepository())
 
