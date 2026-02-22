@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from src.events import user_deleted
+from src.events import dispatch_event, user_deleted
 from src.exceptions import UnauthorizedException
 from src.models.user import User
 from src.repositories.interfaces import UserRepository
@@ -58,4 +58,4 @@ class AuthService:
         user = self.get_user_or_raise(user_id)
         persisted_user_id = str(user.id)
         self._user_repository.delete(user)
-        user_deleted.send(user, user_id=persisted_user_id)
+        dispatch_event(user_deleted, user, user_id=persisted_user_id)
