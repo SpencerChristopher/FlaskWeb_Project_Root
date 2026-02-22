@@ -19,11 +19,16 @@ if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
   chmod 644 certs/server.crt
 fi
 
+if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
+  echo "Performing clean compose start..."
+  docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+fi
+
 echo "Starting Docker Compose services with override..."
 # docker-compose will automatically pick up docker-compose.override.yml
 # provided it's in the same directory.
 # We explicitly set RUN_MODE=https for the web service.
-docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build
+docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build --remove-orphans
 
 echo "Waiting for MongoDB to be healthy..."
 for i in {1..30}; do

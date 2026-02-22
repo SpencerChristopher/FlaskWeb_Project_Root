@@ -28,6 +28,9 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_ENV"
 
+      - name: Reset compose stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -127,7 +130,8 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_ENV"
 
-
+      - name: Reset staging compose stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
 
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
@@ -145,6 +149,8 @@ jobs:
           fi
 
       - name: Deploy to WSL
+        env:
+          DEPLOY_CLEAN_START: "true"
         run: |
           ./scripts/deploy.sh
 
