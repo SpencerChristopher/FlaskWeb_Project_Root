@@ -6,7 +6,6 @@ import sys
 import re
 from flask import Flask
 from dotenv import load_dotenv
-from urllib.parse import urlparse
 
 def get_flask_app_context():
     """
@@ -37,15 +36,9 @@ def get_flask_app_context():
     if not mongo_uri:
         raise ValueError("MONGO_URI must be set in the .env file.")
 
-    # Parse the MONGO_URI
-    parsed_uri = urlparse(mongo_uri)
-    if parsed_uri.scheme not in ['mongodb', 'mongodb+srv']:
-        raise ValueError("Invalid MONGO_URI scheme. Must be 'mongodb://' or 'mongodb+srv://'.")
-
     app.config['MONGODB_SETTINGS'] = {
-        'host': parsed_uri.hostname,
-        'port': parsed_uri.port or 27017, # Default MongoDB port
-        'db': parsed_uri.path[1:] or 'appdb' # Remove leading slash, default to 'appdb'
+        # Use the full URI so authSource, username/password, and query params are preserved.
+        'host': mongo_uri
     }
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
 

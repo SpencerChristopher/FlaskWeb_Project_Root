@@ -88,12 +88,16 @@ For local development, you will typically need a `.env` file to store sensitive 
     ```bash
     cp .env.template .env
     ```
-2.  **Edit the `.env` file:** Open the newly created `.env` file and fill in your specific values. **Ensure that `SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` are always set**, as these are critical for application functionality and security.
+2.  **Edit the `.env` file:** Open the newly created `.env` file and fill in your specific values. **Ensure that `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, and `MONGO_APP_PASSWORD` are always set**, as these are critical for application functionality and security.
 
 **Required `.env` values (minimum):**
 - `SECRET_KEY`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
+- `MONGO_ROOT_USER`
+- `MONGO_ROOT_PASSWORD`
+- `MONGO_APP_USER`
+- `MONGO_APP_PASSWORD`
 
 ### 3. Build and Run Containers
 
