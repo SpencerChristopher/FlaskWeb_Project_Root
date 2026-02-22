@@ -1,6 +1,6 @@
 import pytest
 from src.models.user import User
-from flask_jwt_extended import decode_token, create_refresh_token
+from flask_jwt_extended import decode_token
 from src.models.token_blocklist import TokenBlocklist
 import datetime
 
@@ -77,3 +77,28 @@ def test_blacklisted_refresh_token_rejected(client, app, test_admin_user, get_re
     data = response.get_json()
     assert data['error_code'] == 'UNAUTHORIZED'
     assert data['message'] == 'Token has been revoked.'
+
+
+def test_access_token_invalidated_after_role_change(client, app, login_user_fixture):
+    """
+    Tests that an existing access token is rejected after role change increments
+    the user's token_version in persistence.
+    """
+    user = User(username="rolechangeuser", email="rolechange@example.com", role="user")
+    user.set_password("RoleChangePass123")
+    user.save()
+
+    access_token = login_user_fixture("rolechangeuser", "RoleChangePass123")
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    with app.app_context():
+        persisted_user = User.objects(id=user.id).first()
+        persisted_user.role = "editor"
+        persisted_user.save()
+
+    # /api/auth/logout requires a valid non-revoked access token.
+    response = client.post("/api/auth/logout", headers=headers)
+    assert response.status_code == 401
+    data = response.get_json()
+    assert data["error_code"] == "UNAUTHORIZED"
+    assert data["message"] == "Token has been revoked."
