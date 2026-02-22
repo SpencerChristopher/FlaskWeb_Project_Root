@@ -1,5 +1,7 @@
 import pytest
 from src.models.user import User
+from src.repositories.mongo_user_repository import MongoUserRepository
+from src.services.auth_service import AuthService
 
 
 def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_fixture):
@@ -14,8 +16,8 @@ def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_f
     # Downgrade the admin user role in the database
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    admin_user.role = "user"
-    admin_user.save()
+    auth_service = AuthService(MongoUserRepository())
+    auth_service.change_role(user_id=str(admin_user.id), role="user")
 
     # Old token should no longer grant admin access
     response = client.get("/api/admin/posts", headers=headers)
@@ -54,8 +56,8 @@ def test_token_revoked_after_role_change_on_status(client, setup_users, login_us
 
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    admin_user.role = "user"
-    admin_user.save()
+    auth_service = AuthService(MongoUserRepository())
+    auth_service.change_role(user_id=str(admin_user.id), role="user")
 
     response = client.get("/api/auth/status", headers=headers)
     assert response.status_code == 401

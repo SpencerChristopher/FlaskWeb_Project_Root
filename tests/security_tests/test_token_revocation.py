@@ -3,6 +3,8 @@ from src.models.user import User
 from flask_jwt_extended import decode_token
 from src.models.token_blocklist import TokenBlocklist
 import datetime
+from src.services.auth_service import AuthService
+from src.repositories.mongo_user_repository import MongoUserRepository
 
 
 
@@ -92,9 +94,8 @@ def test_access_token_invalidated_after_role_change(client, app, login_user_fixt
     headers = {"Authorization": f"Bearer {access_token}"}
 
     with app.app_context():
-        persisted_user = User.objects(id=user.id).first()
-        persisted_user.role = "editor"
-        persisted_user.save()
+        auth_service = AuthService(MongoUserRepository())
+        auth_service.change_role(user_id=str(user.id), role="editor")
 
     # /api/auth/logout requires a valid non-revoked access token.
     response = client.post("/api/auth/logout", headers=headers)

@@ -44,3 +44,11 @@ class AuthService:
 
         user.set_password(new_password)
         self._user_repository.save(user)
+
+    def change_role(self, *, user_id: str, role: str) -> User:
+        user = self.get_user_or_raise(user_id)
+        if user.role != role:
+            user.role = role
+            user.token_version = (user.token_version or 0) + 1
+            self._user_repository.save(user)
+        return user
