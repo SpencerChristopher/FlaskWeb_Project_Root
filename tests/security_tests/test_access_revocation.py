@@ -38,7 +38,8 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
     # Delete the admin user from the database
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    admin_user.delete()
+    auth_service = AuthService(MongoUserRepository())
+    auth_service.delete_user(user_id=str(admin_user.id))
 
     # Old token should no longer authorize access
     response = client.get("/api/admin/posts", headers=headers)

@@ -25,6 +25,9 @@ class UserRepository(Protocol):
     def save(self, user: User) -> User:
         ...
 
+    def delete(self, user: User) -> None:
+        ...
+
 
 class PostRepository(Protocol):
     """Persistence contract for post queries and writes."""
