@@ -75,3 +75,39 @@ def test_auth_service_change_password_invalid_current_raises(app):
                 current_password="WrongCurrent123!",
                 new_password="NewPassword456!",
             )
+
+
+def test_auth_service_change_role_increments_token_version(app):
+    auth_service = AuthService(MongoUserRepository())
+
+    with app.app_context():
+        user = User(
+            username="auth_role_change",
+            email="auth_role_change@example.com",
+            role="user",
+        )
+        user.set_password("Password123!")
+        user.save()
+        initial_token_version = user.token_version
+
+        updated_user = auth_service.change_role(user_id=str(user.id), role="editor")
+        assert updated_user.role == "editor"
+        assert updated_user.token_version == initial_token_version + 1
+
+
+def test_auth_service_change_role_same_value_no_version_bump(app):
+    auth_service = AuthService(MongoUserRepository())
+
+    with app.app_context():
+        user = User(
+            username="auth_role_same",
+            email="auth_role_same@example.com",
+            role="user",
+        )
+        user.set_password("Password123!")
+        user.save()
+        initial_token_version = user.token_version
+
+        updated_user = auth_service.change_role(user_id=str(user.id), role="user")
+        assert updated_user.role == "user"
+        assert updated_user.token_version == initial_token_version
