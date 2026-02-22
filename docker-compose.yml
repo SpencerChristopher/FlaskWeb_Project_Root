@@ -17,7 +17,7 @@ services:
       DOCKER_CONTAINER: "true"
 
       # Infrastructure URIs
-      MONGO_URI: mongodb://mongo:27017/appdb
+      MONGO_URI: mongodb://${MONGO_APP_USER:-webserver}:${MONGO_APP_PASSWORD:-password}@mongo:27017/${MONGO_APP_DB:-appdb}?authSource=${MONGO_APP_DB:-appdb}
       RATELIMIT_STORAGE_URI: redis://redis:6379/0
 
       # Gunicorn
@@ -64,11 +64,23 @@ services:
     image: mongo:8.0
     container_name: mongodb
     restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
+      MONGO_APP_USER: ${MONGO_APP_USER:-webserver}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-password}
+      MONGO_APP_DB: ${MONGO_APP_DB:-appdb}
+      MONGO_TEST_DB: ${MONGO_TEST_DB:-pytest_appdb}
     volumes:
       - mongo_data:/data/db
       - ./docker/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

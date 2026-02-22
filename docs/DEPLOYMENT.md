@@ -13,13 +13,13 @@ This document covers the current deployment flow, CI/CD, runner expectations, an
 **Source of Configuration Values**
 Configuration values are sourced in a hierarchical manner:
 
-1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`). These are injected directly into the CI/CD environment and passed to containers.
+1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`). These are injected directly into the CI/CD environment and passed to containers.
 2.  **`docker-compose.yml`:** This is the primary source for all non-secret default environment variables (e.g., `LOG_LEVEL`, `GUNICORN_WORKERS`). It defines the base services and contains the `build: .` context for the `web` service for local development.
 3.  **`docker-compose.ci.yml`:** This is an override file used *only* in CI/CD. It overrides the `web` service definition from `docker-compose.yml` to specify `image: ${IMAGE_TAG}` and `build: null`, ensuring that CI/Staging pulls a pre-built image from the registry.
 4.  **`docker-compose.override.yml`:** This is an override file (generated from `docker-compose.override.yml.template`) used *only* for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
-5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, and any optional overrides. **It is NOT used in the CI/CD pipeline.**
+5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, and any optional overrides. **It is NOT used in the CI/CD pipeline.**
 6.  **`config.env` file (Local Development Reference):** Defines shared non-secret defaults. It is used as a reference for local `.env` files but is **not used by the CI/CD pipeline.**
-7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow (lowercased) and used by `docker-compose.ci.yml` and `scripts/deploy.sh` to pull the pre-built image.
+7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used by `docker-compose.ci.yml` and `scripts/deploy.sh` to pull the exact image built for that commit.
 
 ## CI Pipeline (dev branch)
 **Workflow:** `.github/workflows/test-deploy.yml`
@@ -31,7 +31,7 @@ Configuration values are sourced in a hierarchical manner:
 2.  **Setup QEMU & Docker Buildx:** Prepares the environment for multi-platform Docker builds.
 3.  **Login to GitHub Container Registry (`ghcr.io`):** Authenticates Docker with `ghcr.io` using `GITHUB_TOKEN` to allow pushing and pulling images.
 4.  **Generate Self-Signed Certificates (CI Only):** Creates temporary SSL certificates for the Nginx service within the CI environment.
-5.  **Build and Push Multi-platform Docker Image:** Builds the `web` service image for `linux/amd64` and `linux/arm64` platforms, then pushes the multi-architecture image manifest to `ghcr.io/<owner>/<repo>:latest` (derived from `IMAGE_TAG`).
+5.  **Build and Push Multi-platform Docker Image:** Builds the `web` service image for `linux/amd64` and `linux/arm64` platforms, then pushes the multi-architecture image manifest to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` (derived from `IMAGE_TAG`).
 6.  **Start Containers:** Uses `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build` to start `mongo`, `redis`, and `web`. It pulls the `web` image from `ghcr.io` (via `docker-compose.ci.yml`) and waits for all services (including the `web` service's health check) to become `healthy`.
 7.  **Seed Database:** Executes `scripts/seed_db.py` to populate the database with initial data.
 8.  **Inject and Run Tests:** Copies test files into the running `web` container and executes `pytest`.
@@ -47,8 +47,9 @@ Configuration values are sourced in a hierarchical manner:
 3.  **Validate Required Secrets:** Checks for the presence of necessary secrets.
 4.  **Deploy to WSL:** Executes `scripts/deploy.sh` which:
     *   Generates self-signed certificates.
-    *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the `web` image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
-    *   Waits for MongoDB service to be healthy.
+    *   Optionally performs a hard reset (`down -v`) when manually triggered with `workflow_dispatch` input `hard_rebuild=true`; before reset it attempts a MongoDB backup archive.
+    *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
+    *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
 5.  **Verify Staging Health:** Runs `curl -k -f` check against `https://localhost/` to ensure the application stack is responsive.
 6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data in the staging environment.
 
@@ -58,7 +59,17 @@ Configuration values are sourced in a hierarchical manner:
 *   **Flask App Env:** `FLASK_ENV` is set to `development` for CI/test and `production` for staging/deployment.
 *   **Talisman/HTTPS:** `TALISMAN_FORCE_HTTPS` is configured (default `true` for deployment).
 *   **ProxyFix:** `PROXY_FIX_X_FOR`, `PROXY_FIX_X_PROTO`, etc., are configured to handle reverse proxy headers.
-*   **Service Health Checks:** `mongo`, `redis`, and the `web` (Flask) services all have `healthcheck` definitions in `docker-compose.yml`.
+*   **Service Health Checks:** `mongo`, `redis`, and the `web` (Flask) services all have `healthcheck` definitions in `docker-compose.yml`. MongoDB healthcheck uses authenticated root credentials.
+*   **MongoDB Auth Mode:** `web` connects via authenticated `MONGO_URI` using the app user. Mongo init script provisions app-user roles for both `appdb` and `pytest_appdb`.
+
+## Required GitHub Secrets
+- `SECRET_KEY`
+- `ADMIN_USERNAME`
+- `ADMIN_PASSWORD`
+- `MONGO_ROOT_USER`
+- `MONGO_ROOT_PASSWORD`
+- `MONGO_APP_USER`
+- `MONGO_APP_PASSWORD`
 
 ## Certificates
 *   Nginx expects SSL certificates at `./certs/server.crt` and `./certs/server.key`.

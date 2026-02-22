@@ -5,34 +5,92 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   deploy-to-pi:
-    runs-on: self-hosted # This will use your pi-prod labeled runner
+    runs-on: [self-hosted, pi-prod]
+    timeout-minutes: 30
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      LOG_LEVEL: INFO
+      FLASK_ENV: production
+      TALISMAN_FORCE_HTTPS: "true"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set image tag
-        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:latest" >> "$GITHUB_ENV"
+        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
 
       - name: Deploy to Raspberry Pi
         env:
-          SECRET_KEY: ${{ secrets.SECRET_KEY }}
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
-          LOG_LEVEL: INFO
-          FLASK_ENV: production
+          DEPLOY_CLEAN_START: "true"
+          DEPLOY_RESET_VOLUMES: "false"
+        run: ./scripts/deploy.sh
+
+      - name: Verify production health
         run: |
-          ./scripts/deploy.sh
-          docker system prune -f
+          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
 
       - name: Create Admin User
-        env:
-          ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
-          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
-          echo "Attempting to create admin user..."
-          docker compose exec -T \
-            -e ADMIN_USERNAME="$ADMIN_USERNAME" \
-            -e ADMIN_PASSWORD="$ADMIN_PASSWORD" \
-            web python scripts/create_admin.py
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/create_admin.py
+
+      - name: Seed Database
+        run: |
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+
+      - name: Verify API after seed
+        run: |
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/blog
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/auth/status
+
+      - name: Capture deploy logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-prod.log
+
+      - name: Upload deploy logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-prod-logs
+          path: docker-compose-prod.log

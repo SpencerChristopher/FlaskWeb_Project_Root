@@ -2,17 +2,55 @@ import re
 import pytest
 import os
 from dotenv import load_dotenv
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 load_dotenv()
 # Ensure test env disables HTTPS redirects before app creation
 os.environ.setdefault('FLASK_ENV', 'development')
 os.environ['TALISMAN_FORCE_HTTPS'] = 'false'
 from src.server import create_app
-from mongoengine import get_db, disconnect, connect
+from mongoengine import disconnect, connect, get_db
 from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
 from src.models.post import Post
 from src.extensions import limiter
+
+
+def _clear_test_collections() -> None:
+    db = get_db()
+    db.get_collection(User._get_collection_name()).delete_many({})
+    db.get_collection(Post._get_collection_name()).delete_many({})
+    from src.models.token_blocklist import TokenBlocklist
+
+    db.get_collection(TokenBlocklist._get_collection_name()).delete_many({})
+
+def _build_test_mongo_uri(in_container: bool) -> str:
+    if in_container:
+        app_user = os.environ.get("MONGO_APP_USER")
+        app_password = os.environ.get("MONGO_APP_PASSWORD")
+        app_db = os.environ.get("MONGO_APP_DB", "appdb")
+        test_db = os.environ.get("MONGO_TEST_DB", "pytest_appdb")
+        base_mongo_uri = os.environ.get("MONGO_URI")
+
+        if app_user and app_password:
+            return f"mongodb://{app_user}:{app_password}@mongo:27017/{test_db}?authSource={app_db}"
+        if base_mongo_uri:
+            parsed = urlparse(base_mongo_uri)
+            query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+            query.setdefault("authSource", app_db)
+            return urlunparse(
+                (
+                    parsed.scheme,
+                    parsed.netloc,
+                    f"/{test_db}",
+                    parsed.params,
+                    urlencode(query),
+                    parsed.fragment,
+                )
+            )
+        return "mongodb://mongo:27017/pytest_appdb"
+
+    return os.environ.get("PYTEST_MONGO_URI", "mongodb://localhost:27017/pytest_appdb")
 
 def _add_markers_by_path(item):
     path = str(item.fspath)
@@ -50,10 +88,7 @@ def database_connection_check():
     """
     Gatekeeper fixture to check for database connection before running tests.
     """
-    if os.environ.get("DOCKER_CONTAINER"):
-        mongo_uri = "mongodb://mongo:27017/pytest_appdb"
-    else:
-        mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/pytest_appdb")
+    mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
 
     try:
         client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000)
@@ -67,10 +102,7 @@ def database_connection_check():
 def app():
     """Create and configure a new app instance for the test session."""
     # Determine MONGO_URI based on environment
-    if os.environ.get("DOCKER_CONTAINER"): # Check if running inside a Docker container
-        mongo_uri = "mongodb://mongo:27017/pytest_appdb"
-    else:
-        mongo_uri = "mongodb://localhost:27017/pytest_appdb"
+    mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
     os.environ['SECRET_KEY'] = 'test-secret-key'
     os.environ.setdefault('FLASK_ENV', 'production')
@@ -90,18 +122,16 @@ def app():
 
     # Establish an application context before yielding the app
     with app.app_context():
-        db = get_db()
         try:
-            db.client.drop_database(db.name) # Clean DB before tests
+            _clear_test_collections()
         except ServerSelectionTimeoutError:
             pass
 
     yield app
 
     with app.app_context():
-        db = get_db()
         try:
-            db.client.drop_database(db.name) # Clean DB after tests
+            _clear_test_collections()
         except ServerSelectionTimeoutError:
             pass
         disconnect()
@@ -135,13 +165,9 @@ def clean_collections_per_function(app):
     """Cleans up specific collections after each test function."""
     yield
     with app.app_context():
-        db = get_db()
         try:
             # Explicitly drop collections that are modified by tests
-            User.drop_collection()
-            Post.drop_collection()
-            from src.models.token_blocklist import TokenBlocklist # Import inside the function
-            TokenBlocklist.drop_collection()
+            _clear_test_collections()
             # Add other collections here if they are modified by tests
         except ServerSelectionTimeoutError:
             pass
