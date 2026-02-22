@@ -91,10 +91,21 @@ jobs:
       - name: Start containers
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml pull web
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --pull always --no-build
+
+      - name: Assert web healthy before seed
+        run: |
+          health_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app)"
+          echo "flask_web_app health status: ${health_status}"
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
+          if [ "${health_status}" != "healthy" ]; then
+            echo "flask_web_app did not reach healthy state."
+            docker logs --tail 200 flask_web_app || true
+            exit 1
+          fi
 
       - name: Seed Database (CI)
-        run: docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
+        run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
 
       - name: Inject tests into container
         run: |
