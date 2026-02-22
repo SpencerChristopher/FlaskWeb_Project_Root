@@ -32,6 +32,15 @@ class TestRBAC:
         response = client.get("/api/admin/posts", headers=admin_headers)
         assert response.status_code == 200
 
+    def test_content_admin_can_access_admin_route(self, client, content_admin_headers):
+        response = client.get("/api/admin/posts", headers=content_admin_headers)
+        assert response.status_code == 200
+
+    def test_ops_admin_cannot_access_content_admin_route(self, client, ops_admin_headers):
+        response = client.get("/api/admin/posts", headers=ops_admin_headers)
+        assert response.status_code == 403
+        assert response.get_json()["error_code"] == "FORBIDDEN"
+
     def test_user_cannot_access_admin_route(self, client, user_headers):
         response = client.get("/api/admin/posts", headers=user_headers)
         assert response.status_code == 403

@@ -49,6 +49,63 @@ def test_authz_service_require_admin_role_check(app):
             authz_service.require_admin(str(regular_user.id), {"roles": ["user"]})
 
 
+def test_authz_service_require_admin_allows_content_admin(app):
+    user_repository = MongoUserRepository()
+    authz_service = AuthzService(user_repository)
+
+    with app.app_context():
+        content_admin = User(
+            username="content_admin_user",
+            email="content_admin_user@example.com",
+            role="content_admin",
+        )
+        content_admin.set_password("Password123!")
+        content_admin.save()
+
+        resolved = authz_service.require_admin(
+            str(content_admin.id),
+            {"roles": ["content_admin"], "capabilities": ["content.manage"]},
+        )
+        assert resolved.id == content_admin.id
+
+
+def test_authz_service_require_admin_rejects_ops_admin(app):
+    user_repository = MongoUserRepository()
+    authz_service = AuthzService(user_repository)
+
+    with app.app_context():
+        ops_admin = User(
+            username="ops_admin_user",
+            email="ops_admin_user@example.com",
+            role="ops_admin",
+        )
+        ops_admin.set_password("Password123!")
+        ops_admin.save()
+
+        with pytest.raises(ForbiddenException):
+            authz_service.require_admin(
+                str(ops_admin.id),
+                {"roles": ["ops_admin"], "capabilities": ["ops.manage"]},
+            )
+
+
+def test_authz_service_require_admin_accepts_legacy_admin_claims(app):
+    user_repository = MongoUserRepository()
+    authz_service = AuthzService(user_repository)
+
+    with app.app_context():
+        admin_user = User(
+            username="legacy_admin_user",
+            email="legacy_admin_user@example.com",
+            role="admin",
+        )
+        admin_user.set_password("Password123!")
+        admin_user.save()
+
+        resolved = authz_service.require_admin(str(admin_user.id), {"roles": ["admin"]})
+        assert resolved.id == admin_user.id
+
+
 def test_post_service_create_update_conflict_path(app):
     post_repository = MongoPostRepository()
     post_service = PostService(post_repository)
