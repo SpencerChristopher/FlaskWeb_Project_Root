@@ -2,11 +2,11 @@ import re
 from flask import Blueprint, jsonify, current_app, request, Response
 from typing import List, Dict, Any
 from src.extensions import limiter
-from src.exceptions import NotFoundException, BadRequestException
-from src.repositories import get_post_repository
+from src.exceptions import BadRequestException
+from src.services import get_post_service
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
-post_repository = get_post_repository()
+post_service = get_post_service()
 
 @bp.route('/home', methods=['GET'])
 def home_api() -> Response:
@@ -45,7 +45,7 @@ def blog_list_api() -> Response:
     if page < 1 or per_page < 1:
         raise BadRequestException("Page and per_page must be positive integers.")
 
-    paginated_posts = post_repository.get_published_paginated(page=page, per_page=per_page)
+    paginated_posts = post_service.list_published_posts(page=page, per_page=per_page)
 
     posts_summary: List[Dict[str, Any]] = [
         {
@@ -79,10 +79,8 @@ def blog_post_api(slug: str) -> Response:
     if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', slug):
         raise BadRequestException("Invalid slug format.")
 
-    post = post_repository.get_by_slug(slug)
-    if post:
-        return jsonify(post.to_dict())
-    raise NotFoundException("Post not found")
+    post = post_service.get_post_by_slug_or_404(slug)
+    return jsonify(post.to_dict())
 
 @bp.route('/license', methods=['GET'])
 def license_api() -> Response:

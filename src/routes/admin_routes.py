@@ -7,20 +7,18 @@ All routes in this module require administrator privileges.
 from functools import wraps
 from typing import Callable, Any
 
-from flask import Blueprint, request, jsonify, Response, current_app # Removed current_app
+from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from slugify import slugify
 from mongoengine.errors import ValidationError
 from pydantic import ValidationError as PydanticValidationError
 
-from src.models.post import Post
-from src.repositories import get_post_repository, get_user_repository
+from src.services import get_authz_service, get_post_service
 from src.schemas import BlogPostCreateUpdate
-from src.exceptions import BadRequestException, NotFoundException, ConflictException, ForbiddenException, UnauthorizedException
+from src.exceptions import BadRequestException, UnauthorizedException
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
-user_repository = get_user_repository()
-post_repository = get_post_repository()
+authz_service = get_authz_service()
+post_service = get_post_service()
 
 def admin_required(f: Callable) -> Callable:
     """
@@ -39,24 +37,7 @@ def admin_required(f: Callable) -> Callable:
         current_user_id = get_jwt_identity()
         current_user_claims = get_jwt()
 
-        # Enforce current user existence and role from the database
-        current_user = user_repository.get_by_id(current_user_id)
-        if not current_user:
-            raise UnauthorizedException("Authentication required or invalid credentials.")
-
-        if current_user.role != "admin":
-            raise ForbiddenException("Admin access required.")
-
-        if "roles" not in current_user_claims or "admin" not in current_user_claims["roles"]:
-            current_app.logger.warning(
-                f"Unauthorized admin access attempt by user ID: {current_user_id} "
-                f"with roles: {current_user_claims.get('roles', 'N/A')} from IP: {request.remote_addr}"
-            )
-            raise ForbiddenException("Admin access required.")
-        
-        # Optionally, fetch the user object if needed in the view function
-        # request.current_user = User.objects(id=current_user_id).first()
-        
+        g.current_user = authz_service.require_admin(current_user_id, current_user_claims)
         return f(*args, **kwargs)
     return decorated_function
 
@@ -69,7 +50,7 @@ def get_posts() -> Response:
     Returns:
         Response: A JSON array of post objects.
     """
-    posts = post_repository.list_all()
+    posts = post_service.list_admin_posts()
     return jsonify([post.to_dict() for post in posts])
 
 @bp.route('/posts', methods=['POST'])
@@ -92,30 +73,24 @@ def create_post() -> Response:
     except PydanticValidationError as e:
         raise BadRequestException("Invalid post data", details=e.errors())
 
-    post_slug = slugify(post_data.title)
-
-    if post_repository.get_by_slug(post_slug):
-        raise ConflictException("A post with this title already exists")
-
-    current_user_id = get_jwt_identity()
-    author_user = user_repository.get_by_id(current_user_id)
+    author_user = getattr(g, "current_user", None)
     if not author_user:
-        # This case should ideally be caught by admin_required or JWT validation
-        raise NotFoundException("Author not found.") 
+        raise UnauthorizedException("Authentication required or invalid credentials.")
 
-    new_post = Post(
-        title=post_data.title,
-        slug=post_slug,
-        content=post_data.content,
-        summary=post_data.summary,
-        author=author_user,
-        is_published=post_data.is_published
-    )
     try:
-        post_repository.save(new_post)
+        new_post = post_service.create_post(
+            title=post_data.title,
+            content=post_data.content,
+            summary=post_data.summary,
+            is_published=post_data.is_published,
+            author=author_user,
+        )
     except ValidationError as e:
+        error_map = getattr(e, "errors", None)
+        if not isinstance(error_map, dict):
+            raise
         # Convert MongoEngine validation error to a more structured format
-        error_details = {field: message for field, message in e.errors.items()}
+        error_details = {field: message for field, message in error_map.items()}
         raise BadRequestException("Validation failed", details=error_details)
     
     return jsonify({'message': 'Post created successfully', 'id': str(new_post.id), 'title': new_post.title, 'slug': new_post.slug, 'content': new_post.content, 'summary': new_post.summary, 'is_published': new_post.is_published, 'author': {'id': str(new_post.author.id), 'username': new_post.author.username}}), 201
@@ -132,9 +107,7 @@ def get_post(post_id: str) -> Response:
     Returns:
         Response: The post object if found, or a 404 error.
     """
-    post = post_repository.get_by_id(post_id)
-    if not post:
-        raise NotFoundException("Post not found")
+    post = post_service.get_post_or_404(post_id)
     return jsonify(post.to_dict())
 
 @bp.route('/posts/<string:post_id>', methods=['PUT'])
@@ -152,32 +125,25 @@ def update_post(post_id: str) -> Response:
     Returns:
         Response: The updated post object or an error message.
     """
-    post = post_repository.get_by_id(post_id)
-    if not post:
-        raise NotFoundException("Post not found")
-
     try:
         post_data = BlogPostCreateUpdate(**request.get_json())
     except PydanticValidationError as e:
         raise BadRequestException("Invalid post data", details=e.errors())
 
-    post_slug = slugify(post_data.title)
-
-    # Check if another post with the new slug already exists
-    existing_post = post_repository.get_by_slug_excluding_id(post_slug, post_id)
-    if existing_post:
-        raise ConflictException("A post with this title already exists")
-
-    post.title = post_data.title
-    post.slug = post_slug
-    post.content = post_data.content
-    post.summary = post_data.summary
-    post.is_published = post_data.is_published
     try:
-        post_repository.save(post)
+        post = post_service.update_post(
+            post_id=post_id,
+            title=post_data.title,
+            content=post_data.content,
+            summary=post_data.summary,
+            is_published=post_data.is_published,
+        )
     except ValidationError as e:
+        error_map = getattr(e, "errors", None)
+        if not isinstance(error_map, dict):
+            raise
         # Convert MongoEngine validation error to a more structured format
-        error_details = {field: message for field, message in e.errors.items()}
+        error_details = {field: message for field, message in error_map.items()}
         raise BadRequestException("Validation failed", details=error_details)
     
     return jsonify({'message': 'Post updated successfully', 'id': str(post.id), 'title': post.title, 'slug': post.slug, 'content': post.content, 'summary': post.summary, 'is_published': post.is_published, 'author': {'id': str(post.author.id), 'username': post.author.username}}), 200
@@ -194,12 +160,8 @@ def delete_post(post_id: str) -> Response:
     Returns:
         Response: A success message or a 404 error if the post is not found.
     """
-    post = post_repository.get_by_id(post_id)
-    if post:
-        post_repository.delete(post)
-        return jsonify({'message': 'Post deleted successfully'}), 200
-    else:
-        raise NotFoundException("Post not found")
+    post_service.delete_post(post_id)
+    return jsonify({'message': 'Post deleted successfully'}), 200
 
 
 
