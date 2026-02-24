@@ -1,8 +1,11 @@
 import pytest
-from src.events import user_role_changed
+from src.events import user_role_changed, post_published
 from src.services.auth_service import AuthService
 from src.repositories.mongo_user_repository import MongoUserRepository
+from src.repositories.mongo_post_repository import MongoPostRepository
+from src.services.post_service import PostService
 from src.models.user import User
+from src.models.post import Post
 
 class TestEventSystem:
     """
@@ -37,3 +40,49 @@ class TestEventSystem:
 
             # Cleanup
             user.delete()
+
+    def test_post_published_emits_signal(self, app, signal_tracker):
+        """
+        Verify that PostService.update_post correctly emits the post_published signal
+        when a post's status is changed to published.
+        """
+        user_repository = MongoUserRepository()
+        auth_service = AuthService(user_repository)
+        post_repository = MongoPostRepository()
+        post_service = PostService(post_repository)
+
+        with app.app_context():
+            # 1. Setup: Create a draft post
+            author = User(username="post_event_author", email="post_event@test.com", role="admin")
+            author.set_password("Password123!")
+            author.save()
+
+            draft_post = post_service.create_post(
+                title="Draft Post for Event",
+                content="Content",
+                summary="Summary",
+                is_published=False,
+                author=author
+            )
+            post_id = str(draft_post.id)
+
+            # 2. Track Signal: Connect the tracker to post_published
+            from src.events import post_published
+            with signal_tracker(post_published) as tracker:
+                # 3. Action: Update the post to be published
+                post_service.update_post(
+                    post_id=post_id,
+                    title=draft_post.title,
+                    content=draft_post.content,
+                    summary=draft_post.summary,
+                    is_published=True
+                )
+
+                # 4. Assert: Verify the signal was received with the correct payload
+                assert tracker.called, "Signal 'post_published' was not emitted."
+                assert tracker.data["post_id"] == post_id
+                assert tracker.data["event_type"] == "post-published"
+            
+            # Cleanup
+            post_service.delete_post(post_id)
+            author.delete()
