@@ -41,11 +41,12 @@ class AuthService:
     def build_token_claims(self, user: User) -> dict[str, Any]:
         """
         Build the claims to be included in the JWT.
-        Includes minimal role and version info to enable stateless authorization
-        with backend-derived permissions.
+        Includes minimal role, username, and version info to enable stateless 
+        authorization with backend-derived permissions and display metadata.
         """
         return {
             "roles": build_claim_roles_for_role(user.role),
+            "un": user.username,
             "tv": user.token_version,
         }
 

@@ -10,6 +10,7 @@ from flask import current_app, request
 
 from src.exceptions import ForbiddenException, UnauthorizedException
 from src.repositories.interfaces import UserRepository
+from src.schemas import UserIdentity
 from src.services.roles import (
     Permissions,
     get_permissions_for_role,
@@ -36,23 +37,35 @@ class AuthzService:
         user_claims: dict[str, Any],
         permission: str,
         error_message: str = "Access denied: insufficient permissions.",
-    ):
+    ) -> UserIdentity:
         """
         Enforce a granular permission check.
-        Verifies both the database-stored role and the JWT claims.
+        Verifies the session validity and returns a lightweight UserIdentity DTO.
         """
-        current_user = self.get_authenticated_user(user_id)
-        
-        # 1. DB Role Check (Authoritative)
-        user_permissions = get_permissions_for_role(current_user.role)
+        # Fetch minimal identity fields from DB (Lazy Hydration)
+        user_doc = self._user_repository.get_identity(user_id)
+        if not user_doc:
+            raise UnauthorizedException("Authentication required or invalid credentials.")
+
+        # 1. Token Version Check (Live Revocation)
+        claim_version = user_claims.get("tv")
+        if claim_version is None or user_doc.token_version != claim_version:
+            current_app.logger.warning(
+                f"Security event: Token version mismatch for user {user_id}. "
+                f"DB: {user_doc.token_version}, JWT: {claim_version}. Access denied."
+            )
+            raise UnauthorizedException("Session has expired or been invalidated.")
+
+        # 2. DB Role Check (Authoritative)
+        user_permissions = get_permissions_for_role(user_doc.role)
         if permission not in user_permissions:
             current_app.logger.warning(
-                f"Permission mismatch: User {user_id} has role '{current_user.role}' "
+                f"Permission mismatch: User {user_id} has role '{user_doc.role}' "
                 f"which lacks required permission '{permission}'."
             )
             raise ForbiddenException(error_message)
 
-        # 2. JWT Claim Check (Revocation/State consistency)
+        # 3. JWT Claim Check (State consistency)
         claims_permissions = get_permissions_from_claims(user_claims)
         if permission not in claims_permissions:
             current_app.logger.warning(
@@ -62,9 +75,16 @@ class AuthzService:
             )
             raise ForbiddenException(error_message)
 
-        return current_user
+        # Return the lightweight DTO
+        # Extract username from claims ('un') to save a DB fetch of the full User object
+        return UserIdentity(
+            id=str(user_doc.id),
+            username=user_claims.get("un", "Unknown"),
+            role=user_doc.role,
+            token_version=user_doc.token_version
+        )
 
-    def require_admin(self, user_id: str, user_claims: dict[str, Any]):
+    def require_admin(self, user_id: str, user_claims: dict[str, Any]) -> UserIdentity:
         """Legacy helper for admin-level routes."""
         return self.require_permission(
             user_id=user_id,

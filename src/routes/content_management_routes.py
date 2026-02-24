@@ -9,13 +9,14 @@ from typing import Callable, Any
 from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
-from src.services import get_authz_service, get_post_service
+from src.services import get_authz_service, get_post_service, get_auth_service
 from src.services.roles import Permissions
 from src.schemas import BlogPostCreateUpdate
 from src.exceptions import UnauthorizedException
 
 bp = Blueprint('content_management_routes', __name__, url_prefix='/api/content')
 authz_service = get_authz_service()
+auth_service = get_auth_service()
 post_service = get_post_service()
 
 def permission_required(permission: str) -> Callable:
@@ -30,6 +31,7 @@ def permission_required(permission: str) -> Callable:
             current_user_claims = get_jwt()
 
             # Enforce permission check via AuthzService
+            # Returns a lightweight UserIdentity DTO
             g.current_user = authz_service.require_permission(
                 current_user_id, current_user_claims, permission
             )
@@ -54,9 +56,13 @@ def create_post() -> Response:
     """
     post_data = BlogPostCreateUpdate(**request.get_json())
 
-    author_user = getattr(g, "current_user", None)
-    if not author_user:
-        raise UnauthorizedException("Authentication required or invalid credentials.")
+    # g.current_user is a UserIdentity DTO (PII-clean)
+    author_identity = getattr(g, "current_user", None)
+    if not author_identity:
+        raise UnauthorizedException("Authentication required.")
+
+    # Hydrate full User document only for write operation
+    author_user = auth_service.get_user_or_raise(author_identity.id)
 
     new_post = post_service.create_post(
         title=post_data.title,
