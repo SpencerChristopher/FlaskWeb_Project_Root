@@ -10,10 +10,22 @@ if TYPE_CHECKING:
     from src.services.auth_service import AuthService
     from src.services.authz_service import AuthzService
     from src.services.post_service import PostService
+    from src.services.session_service import SessionService
 
 _auth_service = None
 _authz_service = None
 _post_service = None
+_session_service = None
+
+
+def get_session_service() -> "SessionService":
+    global _session_service
+    if _session_service is None:
+        from src.extensions import redis_client
+        from src.services.session_service import SessionService
+
+        _session_service = SessionService(redis_client)
+    return _session_service
 
 
 def get_auth_service() -> "AuthService":
@@ -22,7 +34,7 @@ def get_auth_service() -> "AuthService":
         from src.repositories import get_user_repository
         from src.services.auth_service import AuthService
 
-        _auth_service = AuthService(get_user_repository())
+        _auth_service = AuthService(get_user_repository(), get_session_service())
     return _auth_service
 
 
