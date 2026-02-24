@@ -1,5 +1,4 @@
 import pytest
-from mongoengine.connection import get_db
 from unittest.mock import patch
 from pymongo.errors import ConnectionFailure
 
@@ -12,17 +11,15 @@ class TestDatabaseChaos:
 
     def test_get_posts_during_db_outage(self, client):
         """
-        G4.1: If MongoDB is unreachable, the API must return 503.
+        G4.1: If MongoDB is unreachable during a blog listing, the API must return 503.
         """
-        # We patch the collection's 'find' method to simulate a connection loss
-        # This is a robust way to simulate chaos without stopping Docker.
-        with patch('mongoengine.queryset.QuerySet._cursor') as mocked_cursor:
-            mocked_cursor.side_effect = ConnectionFailure("Simulated MongoDB failure")
+        # Patch Post.objects to return a mock that raises ConnectionFailure when paginate is called.
+        # This accurately simulates a DB failure during the actual query execution.
+        with patch('src.models.post.Post.objects') as mocked_objects:
+            mocked_objects.return_value.order_by.return_value.paginate.side_effect = ConnectionFailure("Simulated MongoDB failure")
             
             resp = client.get("/api/blog")
             
-            # Currently this likely returns 500 (Unhandled Exception)
-            # Implementation goal is 503.
             assert resp.status_code == 503
             data = resp.get_json()
             assert data["error_code"] == "SERVICE_UNAVAILABLE"
@@ -30,7 +27,7 @@ class TestDatabaseChaos:
 
     def test_login_during_db_outage(self, client):
         """
-        Verify login flow handles DB failure gracefully.
+        G4.1: If MongoDB is unreachable during login, the API must return 503.
         """
         credentials = {"username": "admin", "password": "any"}
         
@@ -40,4 +37,5 @@ class TestDatabaseChaos:
             resp = client.post("/api/auth/login", json=credentials)
             
             assert resp.status_code == 503
-            assert resp.get_json()["error_code"] == "SERVICE_UNAVAILABLE"
+            data = resp.get_json()
+            assert data["error_code"] == "SERVICE_UNAVAILABLE"

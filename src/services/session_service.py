@@ -1,10 +1,8 @@
-"""
-Session service for managing stateful JWT session data in Redis.
-"""
-
 from __future__ import annotations
 from typing import Optional
 from redis import Redis
+from redis.exceptions import ConnectionError
+from src.exceptions import CacheConnectionException
 
 
 class SessionService:
@@ -23,26 +21,38 @@ class SessionService:
         Overwrites any previous session, effectively implementing 'session proofing'.
         """
         key = f"{self._prefix}{user_id}"
-        self._redis.set(key, jti, ex=ttl_seconds)
+        try:
+            self._redis.set(key, jti, ex=ttl_seconds)
+        except ConnectionError as e:
+            raise CacheConnectionException(f"Cache error while setting active refresh token: {e}") from e
 
     def get_active_refresh_token(self, user_id: str) -> Optional[str]:
         """
         Retrieve the JTI of the currently active refresh token for a user.
         """
         key = f"{self._prefix}{user_id}"
-        val = self._redis.get(key)
-        return val.decode("utf-8") if val else None
+        try:
+            val = self._redis.get(key)
+            return val.decode("utf-8") if val else None
+        except ConnectionError as e:
+            raise CacheConnectionException(f"Cache error while getting active refresh token: {e}") from e
 
     def invalidate_session(self, user_id: str) -> None:
         """
         Immediately invalidate a user's session by removing their active refresh token record.
         """
         key = f"{self._prefix}{user_id}"
-        self._redis.delete(key)
+        try:
+            self._redis.delete(key)
+        except ConnectionError as e:
+            raise CacheConnectionException(f"Cache error while invalidating session: {e}") from e
 
     def is_refresh_token_valid(self, user_id: str, jti: str) -> bool:
         """
         Verify if the provided JTI matches the currently active session for the user.
         """
-        active_jti = self.get_active_refresh_token(user_id)
-        return active_jti == jti
+        try:
+            active_jti = self.get_active_refresh_token(user_id)
+            return active_jti == jti
+        except ConnectionError as e:
+            raise CacheConnectionException(f"Cache error while validating refresh token: {e}") from e
