@@ -18,8 +18,8 @@ def admin_user(client):
 
 @pytest.fixture
 def regular_user(client):
-    """Create and return a regular user."""
-    user = User(username="testuser", email="user@test.com", role="user")
+    """Create and return a regular user (Member)."""
+    user = User(username="testuser", email="user@test.com", role="member")
     user.set_password("password")
     user.save()
     yield user
@@ -28,11 +28,11 @@ def regular_user(client):
 
 @pytest.fixture
 def content_admin_user(client):
-    """Create and return a content admin user."""
+    """Create and return a content-focused user (Author)."""
     user = User(
-        username="contentadmin",
-        email="contentadmin@test.com",
-        role="content_admin",
+        username="contentauthor",
+        email="author@test.com",
+        role="author",
     )
     user.set_password("password")
     user.save()
@@ -42,8 +42,8 @@ def content_admin_user(client):
 
 @pytest.fixture
 def ops_admin_user(client):
-    """Create and return an ops admin user."""
-    user = User(username="opsadmin", email="opsadmin@test.com", role="ops_admin")
+    """Create and return a user who used to be ops admin (now Member)."""
+    user = User(username="opsuser", email="opsuser@test.com", role="member")
     user.set_password("password")
     user.save()
     yield user
@@ -53,7 +53,8 @@ def ops_admin_user(client):
 @pytest.fixture
 def admin_headers(app, admin_user):
     """Return headers for an admin user."""
-    auth_service = AuthService(MongoUserRepository())
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(admin_user.id),
         additional_claims=auth_service.build_token_claims(admin_user),
@@ -64,7 +65,8 @@ def admin_headers(app, admin_user):
 @pytest.fixture
 def user_headers(app, regular_user):
     """Return headers for a regular user."""
-    auth_service = AuthService(MongoUserRepository())
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(regular_user.id),
         additional_claims=auth_service.build_token_claims(regular_user),
@@ -74,8 +76,9 @@ def user_headers(app, regular_user):
 
 @pytest.fixture
 def content_admin_headers(app, content_admin_user):
-    """Return headers for a content admin user."""
-    auth_service = AuthService(MongoUserRepository())
+    """Return headers for a content user (Author)."""
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(content_admin_user.id),
         additional_claims=auth_service.build_token_claims(content_admin_user),
@@ -85,8 +88,9 @@ def content_admin_headers(app, content_admin_user):
 
 @pytest.fixture
 def ops_admin_headers(app, ops_admin_user):
-    """Return headers for an ops admin user."""
-    auth_service = AuthService(MongoUserRepository())
+    """Return headers for an ops user (now Member)."""
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(ops_admin_user.id),
         additional_claims=auth_service.build_token_claims(ops_admin_user),

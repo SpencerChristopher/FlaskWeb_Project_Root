@@ -10,7 +10,7 @@ class TestErrorHandlingAndLogging:
 
         monkeypatch.setattr(Post, "objects", mock_objects)
 
-        response = client.get("/api/admin/posts", headers=admin_headers)
+        response = client.get("/api/content/posts", headers=admin_headers)
         assert response.status_code == 500
         assert response.headers["Content-Type"] == "application/json"
         assert response.json["error_code"] == "INTERNAL_SERVER_ERROR"
@@ -22,6 +22,6 @@ class TestErrorHandlingAndLogging:
 
         monkeypatch.setattr(Post, "objects", mock_objects)
 
-        response = client.get("/api/admin/posts", headers=admin_headers)
+        response = client.get("/api/content/posts", headers=admin_headers)
         assert response.status_code == 500
         assert b"Traceback" not in response.data

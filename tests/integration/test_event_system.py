@@ -17,12 +17,12 @@ class TestEventSystem:
         """
         Verify that AuthService.change_role correctly emits the user_role_changed signal.
         """
-        user_repository = MongoUserRepository()
-        auth_service = AuthService(user_repository)
+        from src.services import get_auth_service
+        auth_service = get_auth_service()
 
         with app.app_context():
             # 1. Setup: Create a test user
-            user = User(username="event_test_user", email="event@test.com", role="user")
+            user = User(username="event_test_user", email="event@test.com", role="member")
             user.set_password("Password123!")
             user.save()
             user_id = str(user.id)
@@ -46,10 +46,8 @@ class TestEventSystem:
         Verify that PostService.update_post correctly emits the post_published signal
         when a post's status is changed to published.
         """
-        user_repository = MongoUserRepository()
-        auth_service = AuthService(user_repository)
-        post_repository = MongoPostRepository()
-        post_service = PostService(post_repository)
+        from src.services import get_post_service
+        post_service = get_post_service()
 
         with app.app_context():
             # 1. Setup: Create a draft post

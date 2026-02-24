@@ -99,7 +99,7 @@ class TestRateLimiting:
 
         # Create a dummy user for this test
         from src.models.user import User
-        user = User(username=username, email=f"{username}@example.com", role="user")
+        user = User(username=username, email=f"{username}@example.com", role="member")
         user.set_password(password)
         user.save()
 

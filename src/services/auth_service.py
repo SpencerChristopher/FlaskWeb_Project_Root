@@ -10,7 +10,7 @@ from src.events import dispatch_event, user_deleted, user_role_changed
 from src.exceptions import UnauthorizedException
 from src.models.user import User
 from src.repositories.interfaces import UserRepository
-from src.services.roles import build_claim_roles_for_role, get_capabilities_for_role
+from src.services.roles import build_claim_roles_for_role
 
 if TYPE_CHECKING:
     from src.services.session_service import SessionService
@@ -39,10 +39,13 @@ class AuthService:
         return user
 
     def build_token_claims(self, user: User) -> dict[str, Any]:
-        capabilities = sorted(get_capabilities_for_role(user.role))
+        """
+        Build the claims to be included in the JWT.
+        Includes minimal role and version info to enable stateless authorization
+        with backend-derived permissions.
+        """
         return {
             "roles": build_claim_roles_for_role(user.role),
-            "capabilities": capabilities,
             "tv": user.token_version,
         }
 

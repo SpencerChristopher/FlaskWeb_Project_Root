@@ -9,7 +9,7 @@ def test_login_succeeds_when_login_listener_fails(client, app):
         user = User(
             username="listener_login_user",
             email="listener_login_user@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("Password123!")
         user.save()
@@ -41,12 +41,13 @@ def test_revocation_still_works_when_user_deleted_listener_fails(
     try:
         admin_user = User.objects(username="testadmin").first()
         assert admin_user is not None
-        auth_service = AuthService(MongoUserRepository())
+        from src.services import get_auth_service
+        auth_service = get_auth_service()
         auth_service.delete_user(user_id=str(admin_user.id))
     finally:
         user_deleted.disconnect(failing_listener)
 
-    response = client.get("/api/admin/posts", headers=headers)
+    response = client.get("/api/content/posts", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"

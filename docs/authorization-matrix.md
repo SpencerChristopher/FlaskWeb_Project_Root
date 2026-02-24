@@ -1,29 +1,24 @@
-# Authorization Matrix (RBAC v2 Transition)
+# Authorization Matrix (Modular Monolith v1)
 
 ## Purpose
-Define role-to-capability mapping during the transition from legacy `admin` checks to capability checks.
+Define the granular permission-based authorization model. This matrix serves as the "Contract" for `src/services/roles.py` and the `AuthzService`.
 
-## Roles
-- `user`: authenticated user with no administrative capabilities.
-- `editor`: reserved role with no administrative capabilities.
-- `content_admin`: can manage content APIs.
-- `ops_admin`: can manage operational APIs.
-- `admin`: transitional legacy role; granted both capability sets.
+## Permissions
+- `content:manage`: Full administrative control over all content (Create, Edit All, Delete All).
+- `content:author`: Control over personal content only (Create, Edit Own, Delete Own).
+- `users:manage`: Administrative control over user accounts and role assignments.
+- `system:view_logs`: Access to system diagnostics, audit trails, and application logs.
 
-## Capabilities
-- `content.manage`: create, update, delete, and view admin content routes.
-- `ops.manage`: operational maintenance and diagnostics routes (future phase).
+## Roles & Mapping
+The system maps roles to a set of granular permissions.
 
-## Mapping
-| Role | Capabilities |
-|---|---|
-| `user` | none |
-| `editor` | none |
-| `content_admin` | `content.manage` |
-| `ops_admin` | `ops.manage` |
-| `admin` | `content.manage`, `ops.manage` |
+| Role | Permissions | Description |
+| :--- | :--- | :--- |
+| **`admin`** | `content:manage`, `users:manage`, `system:view_logs` | System owner with total access. |
+| **`author`** | `content:author` | Trusted content creator. |
+| **`member`** | `none` | Standard authenticated user (Read-only access). |
 
-## Transition behavior
-- Tokens include `roles`, `capabilities`, and `tv` claims.
-- Legacy tokens that include only `roles` remain valid because capability checks derive capabilities from role claims.
-- Role changes increment `token_version` so old tokens are revoked.
+## Implementation Rules
+1. **Deny by Default:** If a permission check is required but the user role has no matching permission, access is denied.
+2. **Resource Focus:** Authorization is checked at the Service layer using the resource ID (e.g., `is_owner(user_id, post_id)` for authors).
+3. **Stateless Claims:** Permissions are derived from the `role` claim in the JWT to minimize database lookups, but verified against `token_version` for immediate revocation.

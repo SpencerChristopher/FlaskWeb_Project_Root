@@ -10,7 +10,7 @@ def test_user_repository_lookup_by_username_and_id(app):
     user_repository = MongoUserRepository()
 
     with app.app_context():
-        user = User(username="repo_user", email="repo_user@example.com", role="user")
+        user = User(username="repo_user", email="repo_user@example.com", role="member")
         user.set_password("Password123!")
         user.save()
 

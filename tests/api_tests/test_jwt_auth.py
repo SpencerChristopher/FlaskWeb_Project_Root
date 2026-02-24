@@ -25,7 +25,7 @@ def setup_users(app):
     admin_user.save()
 
     # Create a test regular user
-    regular_user = User(username="testuser", email="testuser@example.com", role="user")
+    regular_user = User(username="testuser", email="testuser@example.com", role="member")
     regular_user.set_password("testpassword")
     regular_user.save()
 
