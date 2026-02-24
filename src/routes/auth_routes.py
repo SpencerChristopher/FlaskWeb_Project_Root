@@ -15,6 +15,8 @@ from flask_jwt_extended import (
     set_access_cookies,
     set_refresh_cookies,
     unset_jwt_cookies,
+    decode_token,
+    get_jwt,
 )
 from typing import Dict, Any
 from src.events import dispatch_event, user_logged_in
@@ -58,6 +60,15 @@ def login() -> Response:
         identity=str(user.id), additional_claims=token_claims
     )
 
+    # Phase 3: Record active session in Redis
+    refresh_jti = decode_token(refresh_token)["jti"]
+    refresh_ttl = current_app.config["JWT_REFRESH_TOKEN_EXPIRES"]
+    auth_service._session_service.set_active_refresh_token(
+        user_id=str(user.id),
+        jti=refresh_jti,
+        ttl_seconds=int(refresh_ttl.total_seconds())
+    )
+
     dispatch_event(user_logged_in, current_app._get_current_object(), user_id=str(user.id))
     current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
 
@@ -84,10 +95,14 @@ def register() -> Response:
 @jwt_required()
 def logout() -> Response:
     """
-    Logs out the currently authenticated user.
+    Logs out the currently authenticated user and invalidates their session.
     """
-    from flask_jwt_extended import get_jwt
     from src.models.token_blocklist import TokenBlocklist
+
+    # Phase 3: Invalidate active session in Redis
+    current_user_id = get_jwt_identity()
+    if current_user_id:
+        auth_service._session_service.invalidate_session(current_user_id)
 
     jti = get_jwt()["jti"]
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -103,8 +118,19 @@ def logout() -> Response:
 def refresh() -> Response:
     """
     Refreshes an access token using a valid refresh token.
+    Validates the token's JTI against the active session in Redis.
     """
     current_user_id = get_jwt_identity()
+    refresh_jti = get_jwt()["jti"]
+
+    # Phase 3: Enforce session validity
+    if not auth_service._session_service.is_refresh_token_valid(current_user_id, refresh_jti):
+        current_app.logger.warning(
+            f"Invalid refresh attempt for user ID: {current_user_id} with JTI: {refresh_jti}. "
+            "Session likely invalidated by a newer login."
+        )
+        raise UnauthorizedException("Session has expired or been invalidated")
+
     current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
     user = auth_service.get_user_or_raise(current_user_id)
     new_access_token = create_access_token(

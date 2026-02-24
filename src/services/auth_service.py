@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class AuthService:
     """Application service for auth-related user workflows."""
 
-    def __init__(self, user_repository: UserRepository, session_service: SessionService):
+    def __init__(self, user_repository: UserRepository, session_service: SessionService | None = None):
         self._user_repository = user_repository
         self._session_service = session_service
 
