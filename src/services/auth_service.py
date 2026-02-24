@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from src.events import dispatch_event, user_deleted
+from src.events import dispatch_event, user_deleted, user_role_changed
 from src.exceptions import UnauthorizedException
 from src.models.user import User
 from src.repositories.interfaces import UserRepository
@@ -58,6 +58,7 @@ class AuthService:
             user.role = role
             user.token_version = (user.token_version or 0) + 1
             self._user_repository.save(user)
+            dispatch_event(user_role_changed, self, user_id=str(user.id), new_role=role)
         return user
 
     def delete_user(self, *, user_id: str) -> None:
