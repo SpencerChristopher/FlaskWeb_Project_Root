@@ -51,3 +51,17 @@ class ConflictException(APIException):
     status_code = 409
     error_code = "CONFLICT"
     message = "Resource already exists or conflicts with an existing resource."
+
+
+class InfrastructureException(APIException):
+    status_code = 503
+    error_code = "SERVICE_UNAVAILABLE"
+    message = "A required service is temporarily unavailable."
+
+class DatabaseConnectionException(InfrastructureException):
+    error_code = "DATABASE_UNAVAILABLE"
+    message = "The database is currently unreachable."
+
+class CacheConnectionException(InfrastructureException):
+    error_code = "CACHE_UNAVAILABLE"
+    message = "The cache service is currently unreachable."

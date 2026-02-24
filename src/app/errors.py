@@ -14,6 +14,7 @@ from src.exceptions import (
     ForbiddenException,
     NotFoundException,
     ConflictException,
+    InfrastructureException, # Import the new base infrastructure exception
 )
 
 
@@ -79,22 +80,13 @@ def register_error_handlers(app) -> None:
         app.logger.warning(log_message, exc_info=True if error.status_code == 500 else False)
         response = error.to_dict()
         return jsonify(response), error.status_code
-
-    @app.errorhandler(ConnectionFailure)
-    def handle_pymongo_connection_failure(error):
-        app.logger.error(f"Database Connection Failure: {error}", exc_info=True)
-        response = APIException("Database connection error", status_code=500, error_code="DATABASE_ERROR").to_dict()
-        return jsonify(response), 500
-
-    @app.errorhandler(ServerSelectionTimeoutError)
-    def handle_server_selection_timeout(error):
-        app.logger.error(f"Database connection timeout: {error}", exc_info=True)
-        response = APIException(
-            "Service temporarily unavailable, please try again later.",
-            status_code=503,
-            error_code="SERVICE_UNAVAILABLE",
-        ).to_dict()
-        return jsonify(response), 503
+    
+    @app.errorhandler(InfrastructureException)
+    def handle_infrastructure_exception(error):
+        app.logger.error(f"Infrastructure Exception: {error.status_code} - {error.error_code} - {error.message}. Method: {request.method}, Path: {request.path}, IP: {request.remote_addr}", exc_info=True)
+        response = error.to_dict()
+        response["error_code"] = "SERVICE_UNAVAILABLE" # Override to ensure consistency with API contract for 503
+        return jsonify(response), error.status_code
 
     @app.errorhandler(Exception)
     def internal_error(error):
@@ -111,4 +103,3 @@ def register_error_handlers(app) -> None:
         app.logger.warning(f"403 Forbidden: {error}")
         response = ForbiddenException(str(error)).to_dict()
         return jsonify(response), 403
-
