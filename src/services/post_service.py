@@ -11,7 +11,7 @@ from mongoengine.errors import DoesNotExist
 from slugify import slugify
 
 from src.exceptions import ConflictException, NotFoundException
-from src.events import dispatch_event, post_created, post_deleted, post_updated
+from src.events import dispatch_event, post_created, post_deleted, post_updated, post_published
 from src.models.post import Post
 from src.models.user import User
 from src.repositories.interfaces import PostRepository
@@ -134,20 +134,34 @@ class PostService:
         if existing_post:
             raise ConflictException("A post with this title already exists")
 
+        # Update all fields correctly
         post.title = title
         post.slug = post_slug
         post.content = content
         post.summary = summary
+        
+        # Check if the post is being newly published
+        was_draft = not post.is_published
         post.is_published = is_published
+
         self._prepare_for_save(post)
         updated_post = self._post_repository.save(post)
-        dispatch_event(
-            post_updated,
-            updated_post,
-            post_id=str(updated_post.id),
-            user_id=str(updated_post.author.id),
-            changes={},
-        )
+        
+        if was_draft and updated_post.is_published:
+            dispatch_event(
+                post_published,
+                updated_post,
+                post_id=str(updated_post.id),
+                user_id=str(updated_post.author.id),
+            )
+        else:
+            dispatch_event(
+                post_updated,
+                updated_post,
+                post_id=str(updated_post.id),
+                user_id=str(updated_post.author.id),
+                changes={},
+            )
         return updated_post
 
     def delete_post(self, post_id: str) -> None:
