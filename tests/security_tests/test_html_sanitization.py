@@ -6,7 +6,7 @@ from src.services.post_service import PostService
 
 @pytest.fixture
 def test_user(app):
-    user = User(username='testuser', email='test@example.com', role='user')
+    user = User(username='testuser', email='test@example.com', role='member')
     user.set_password('Password123')
     user.save()
     yield user

@@ -28,7 +28,7 @@ def test_blog_post_not_found_returns_404(client):
 
 def test_admin_route_is_unauthorized_without_login(client):
     """Ensures the admin API endpoints are properly protected."""
-    response = client.get('/api/admin/posts')
+    response = client.get('/api/content/posts')
     assert response.status_code == 401
     assert response.content_type == 'application/json'
     data = response.get_json()

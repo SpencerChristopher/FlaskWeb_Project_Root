@@ -6,7 +6,7 @@ import datetime
 # Fixture to create a test user (author for posts)
 @pytest.fixture
 def test_user(app):
-    user = User(username='testuser', email='test@example.com', role='user')
+    user = User(username='testuser', email='test@example.com', role='member')
     user.set_password('Password123')
     user.save()
     yield user

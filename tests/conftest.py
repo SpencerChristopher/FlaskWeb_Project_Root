@@ -154,7 +154,7 @@ def setup_users(app):
         admin_user.set_password('testpassword')
         admin_user.save()
 
-        regular_user = User(username='testuser', email='user@example.com', role='user')
+        regular_user = User(username='testuser', email='user@example.com', role='member')
         regular_user.set_password('testpassword')
         regular_user.save()
         yield admin_user, regular_user

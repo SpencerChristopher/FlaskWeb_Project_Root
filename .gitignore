@@ -128,3 +128,4 @@ docker-compose.override.yml
 Phased_plan_DEVOPs.md
 phased_plan_backend.md
 phased_plan_db_fix.md
+docs/phase5_domain_alignment.md

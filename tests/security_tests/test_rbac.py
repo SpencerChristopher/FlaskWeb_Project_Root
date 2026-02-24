@@ -26,29 +26,28 @@ def admin_post(app, admin_user):
 
 
 class TestRBAC:
-    """Tests for role-based access control."""
+    """Tests for resource-centric permission control."""
 
-    def test_admin_can_access_admin_route(self, client, admin_headers):
-        response = client.get("/api/admin/posts", headers=admin_headers)
+    def test_admin_can_access_content_management(self, client, admin_headers):
+        """Admins have content:manage permission."""
+        response = client.get("/api/content/posts", headers=admin_headers)
         assert response.status_code == 200
 
-    def test_content_admin_can_access_admin_route(self, client, content_admin_headers):
-        response = client.get("/api/admin/posts", headers=content_admin_headers)
+    def test_author_can_access_content_management(self, client, content_admin_headers):
+        """Authors have content:author permission (mapped to manage for now)."""
+        response = client.get("/api/content/posts", headers=content_admin_headers)
         assert response.status_code == 200
 
-    def test_ops_admin_cannot_access_content_admin_route(self, client, ops_admin_headers):
-        response = client.get("/api/admin/posts", headers=ops_admin_headers)
+    def test_member_cannot_access_management_route(self, client, user_headers):
+        """Members have no management permissions."""
+        response = client.get("/api/content/posts", headers=user_headers)
         assert response.status_code == 403
         assert response.get_json()["error_code"] == "FORBIDDEN"
 
-    def test_user_cannot_access_admin_route(self, client, user_headers):
-        response = client.get("/api/admin/posts", headers=user_headers)
-        assert response.status_code == 403
-        assert response.get_json()["error_code"] == "FORBIDDEN"
-
-    def test_user_cannot_create_admin_post(self, client, user_headers):
+    def test_member_cannot_create_post(self, client, user_headers):
+        """Members cannot create content."""
         response = client.post(
-            "/api/admin/posts",
+            "/api/content/posts",
             headers=user_headers,
             json={
                 "title": "No Access",
@@ -60,9 +59,10 @@ class TestRBAC:
         assert response.status_code == 403
         assert response.get_json()["error_code"] == "FORBIDDEN"
 
-    def test_user_cannot_update_admin_post(self, client, user_headers, admin_post):
+    def test_member_cannot_update_post(self, client, user_headers, admin_post):
+        """Members cannot update content."""
         response = client.put(
-            f"/api/admin/posts/{admin_post}",
+            f"/api/content/posts/{admin_post}",
             headers=user_headers,
             json={
                 "title": "No Access Update",
@@ -74,7 +74,8 @@ class TestRBAC:
         assert response.status_code == 403
         assert response.get_json()["error_code"] == "FORBIDDEN"
 
-    def test_user_cannot_delete_admin_post(self, client, user_headers, admin_post):
-        response = client.delete(f"/api/admin/posts/{admin_post}", headers=user_headers)
+    def test_member_cannot_delete_post(self, client, user_headers, admin_post):
+        """Members cannot delete content."""
+        response = client.delete(f"/api/content/posts/{admin_post}", headers=user_headers)
         assert response.status_code == 403
         assert response.get_json()["error_code"] == "FORBIDDEN"

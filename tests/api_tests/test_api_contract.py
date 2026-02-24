@@ -8,7 +8,7 @@ from src.models.user import User
 
 @pytest.fixture
 def contract_user(app):
-    user = User(username="contractuser", email="contract@example.com", role="user")
+    user = User(username="contractuser", email="contract@example.com", role="member")
     user.set_password("Password123!")
     user.save()
     yield user
@@ -160,7 +160,7 @@ def test_contract_admin_post_crud_shapes(client, admin_headers):
         "summary": "Contract admin summary",
         "is_published": True,
     }
-    create_response = client.post("/api/admin/posts", headers=admin_headers, json=create_payload)
+    create_response = client.post("/api/content/posts", headers=admin_headers, json=create_payload)
     assert create_response.status_code == 201
     created = create_response.get_json()
     assert {
@@ -177,7 +177,7 @@ def test_contract_admin_post_crud_shapes(client, admin_headers):
 
     post_id = created["id"]
 
-    get_response = client.get(f"/api/admin/posts/{post_id}", headers=admin_headers)
+    get_response = client.get(f"/api/content/posts/{post_id}", headers=admin_headers)
     assert get_response.status_code == 200
     fetched = get_response.get_json()
     assert {
@@ -193,7 +193,7 @@ def test_contract_admin_post_crud_shapes(client, admin_headers):
     } <= set(fetched.keys())
     _assert_author_contract(fetched["author"])
 
-    list_response = client.get("/api/admin/posts", headers=admin_headers)
+    list_response = client.get("/api/content/posts", headers=admin_headers)
     assert list_response.status_code == 200
     listed = list_response.get_json()
     assert isinstance(listed, list)
@@ -207,7 +207,7 @@ def test_contract_admin_post_crud_shapes(client, admin_headers):
         "is_published": False,
     }
     update_response = client.put(
-        f"/api/admin/posts/{post_id}",
+        f"/api/content/posts/{post_id}",
         headers=admin_headers,
         json=update_payload,
     )
@@ -225,6 +225,6 @@ def test_contract_admin_post_crud_shapes(client, admin_headers):
     } <= set(updated.keys())
     _assert_author_contract(updated["author"])
 
-    delete_response = client.delete(f"/api/admin/posts/{post_id}", headers=admin_headers)
+    delete_response = client.delete(f"/api/content/posts/{post_id}", headers=admin_headers)
     assert delete_response.status_code == 200
     assert delete_response.get_json() == {"message": "Post deleted successfully"}

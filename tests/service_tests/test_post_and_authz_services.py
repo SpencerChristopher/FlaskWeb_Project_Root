@@ -14,7 +14,7 @@ def test_authz_service_get_authenticated_user_success(app):
     authz_service = AuthzService(user_repository)
 
     with app.app_context():
-        user = User(username="authz_user", email="authz_user@example.com", role="user")
+        user = User(username="authz_user", email="authz_user@example.com", role="member")
         user.set_password("Password123!")
         user.save()
 
@@ -40,13 +40,13 @@ def test_authz_service_require_admin_role_check(app):
         regular_user = User(
             username="non_admin",
             email="non_admin@example.com",
-            role="user",
+            role="member",
         )
         regular_user.set_password("Password123!")
         regular_user.save()
 
         with pytest.raises(ForbiddenException):
-            authz_service.require_admin(str(regular_user.id), {"roles": ["user"]})
+            authz_service.require_admin(str(regular_user.id), {"roles": ["member"]})
 
 
 def test_authz_service_require_admin_allows_content_admin(app):
@@ -57,14 +57,14 @@ def test_authz_service_require_admin_allows_content_admin(app):
         content_admin = User(
             username="content_admin_user",
             email="content_admin_user@example.com",
-            role="content_admin",
+            role="author",
         )
         content_admin.set_password("Password123!")
         content_admin.save()
 
         resolved = authz_service.require_admin(
             str(content_admin.id),
-            {"roles": ["content_admin"], "capabilities": ["content.manage"]},
+            {"roles": ["author"]},
         )
         assert resolved.id == content_admin.id
 
@@ -77,7 +77,7 @@ def test_authz_service_require_admin_rejects_ops_admin(app):
         ops_admin = User(
             username="ops_admin_user",
             email="ops_admin_user@example.com",
-            role="ops_admin",
+            role="member",
         )
         ops_admin.set_password("Password123!")
         ops_admin.save()
@@ -85,7 +85,7 @@ def test_authz_service_require_admin_rejects_ops_admin(app):
         with pytest.raises(ForbiddenException):
             authz_service.require_admin(
                 str(ops_admin.id),
-                {"roles": ["ops_admin"], "capabilities": ["ops.manage"]},
+                {"roles": ["member"]},
             )
 
 

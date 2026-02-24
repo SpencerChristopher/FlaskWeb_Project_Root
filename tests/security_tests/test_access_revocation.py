@@ -16,11 +16,12 @@ def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_f
     # Downgrade the admin user role in the database
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    auth_service = AuthService(MongoUserRepository())
-    auth_service.change_role(user_id=str(admin_user.id), role="user")
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
+    auth_service.change_role(user_id=str(admin_user.id), role="member")
 
     # Old token should no longer grant admin access
-    response = client.get("/api/admin/posts", headers=headers)
+    response = client.get("/api/content/posts", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"
@@ -38,11 +39,12 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
     # Delete the admin user from the database
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    auth_service = AuthService(MongoUserRepository())
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
     auth_service.delete_user(user_id=str(admin_user.id))
 
     # Old token should no longer authorize access
-    response = client.get("/api/admin/posts", headers=headers)
+    response = client.get("/api/content/posts", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"
@@ -57,8 +59,9 @@ def test_token_revoked_after_role_change_on_status(client, setup_users, login_us
 
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
-    auth_service = AuthService(MongoUserRepository())
-    auth_service.change_role(user_id=str(admin_user.id), role="user")
+    from src.services import get_auth_service
+    auth_service = get_auth_service()
+    auth_service.change_role(user_id=str(admin_user.id), role="member")
 
     response = client.get("/api/auth/status", headers=headers)
     assert response.status_code == 401

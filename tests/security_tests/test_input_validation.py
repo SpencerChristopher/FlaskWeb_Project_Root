@@ -3,7 +3,7 @@ class TestInputValidation:
 
     def test_create_post_invalid_payload(self, client, admin_headers):
         payload = {"title": "Invalid Post"}
-        response = client.post("/api/admin/posts", headers=admin_headers, json=payload)
+        response = client.post("/api/content/posts", headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json["error_code"] == "BAD_REQUEST"
         assert response.json["message"] == "Invalid data"
@@ -23,7 +23,7 @@ class TestInputValidation:
             "content": "This is the content.",
             "summary": "This is the summary.",
         }
-        response = client.post("/api/admin/posts", headers=admin_headers, json=payload)
+        response = client.post("/api/content/posts", headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json["error_code"] == "BAD_REQUEST"
         assert response.json["message"] == "Invalid data"
@@ -39,6 +39,6 @@ class TestInputValidation:
             "content": '<script>alert("xss")</script>',
             "summary": "This is a summary.",
         }
-        response = client.post("/api/admin/posts", headers=admin_headers, json=payload)
+        response = client.post("/api/content/posts", headers=admin_headers, json=payload)
         assert response.status_code == 201
         assert response.json["content"] == '&lt;script&gt;alert("xss")&lt;/script&gt;'

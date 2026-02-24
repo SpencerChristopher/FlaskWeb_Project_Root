@@ -11,7 +11,7 @@ def test_auth_service_authenticate_success(app):
     auth_service = AuthService(MongoUserRepository())
 
     with app.app_context():
-        user = User(username="auth_user", email="auth_user@example.com", role="user")
+        user = User(username="auth_user", email="auth_user@example.com", role="member")
         user.set_password("Password123!")
         user.save()
 
@@ -26,7 +26,7 @@ def test_auth_service_authenticate_invalid_password_raises(app):
         user = User(
             username="auth_invalid",
             email="auth_invalid@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("Password123!")
         user.save()
@@ -42,7 +42,7 @@ def test_auth_service_change_password_success(app):
         user = User(
             username="auth_change_pw",
             email="auth_change_pw@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("OldPassword123!")
         user.save()
@@ -65,7 +65,7 @@ def test_auth_service_change_password_invalid_current_raises(app):
         user = User(
             username="auth_bad_current",
             email="auth_bad_current@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("OldPassword123!")
         user.save()
@@ -85,14 +85,14 @@ def test_auth_service_change_role_increments_token_version(app):
         user = User(
             username="auth_role_change",
             email="auth_role_change@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("Password123!")
         user.save()
         initial_token_version = user.token_version
 
-        updated_user = auth_service.change_role(user_id=str(user.id), role="editor")
-        assert updated_user.role == "editor"
+        updated_user = auth_service.change_role(user_id=str(user.id), role="author")
+        assert updated_user.role == "author"
         assert updated_user.token_version == initial_token_version + 1
 
 
@@ -103,14 +103,14 @@ def test_auth_service_change_role_same_value_no_version_bump(app):
         user = User(
             username="auth_role_same",
             email="auth_role_same@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("Password123!")
         user.save()
         initial_token_version = user.token_version
 
-        updated_user = auth_service.change_role(user_id=str(user.id), role="user")
-        assert updated_user.role == "user"
+        updated_user = auth_service.change_role(user_id=str(user.id), role="member")
+        assert updated_user.role == "member"
         assert updated_user.token_version == initial_token_version
 
 
@@ -128,8 +128,8 @@ def test_auth_service_build_token_claims_admin_transition_mapping(app):
 
         claims = auth_service.build_token_claims(user)
         assert claims["tv"] == user.token_version
-        assert set(claims["roles"]) == {"admin", "content_admin", "ops_admin"}
-        assert set(claims["capabilities"]) == {"content.manage", "ops.manage"}
+        assert claims["roles"] == ["admin"]
+        assert "capabilities" not in claims
 
 
 def test_auth_service_build_token_claims_content_admin_scope(app):
@@ -139,14 +139,14 @@ def test_auth_service_build_token_claims_content_admin_scope(app):
         user = User(
             username="auth_claims_content_admin",
             email="auth_claims_content_admin@example.com",
-            role="content_admin",
+            role="author",
         )
         user.set_password("Password123!")
         user.save()
 
         claims = auth_service.build_token_claims(user)
-        assert claims["roles"] == ["content_admin"]
-        assert claims["capabilities"] == ["content.manage"]
+        assert claims["roles"] == ["author"]
+        assert "capabilities" not in claims
 
 
 def test_auth_service_delete_user_removes_record(app):
@@ -156,7 +156,7 @@ def test_auth_service_delete_user_removes_record(app):
         user = User(
             username="auth_delete_user",
             email="auth_delete_user@example.com",
-            role="user",
+            role="member",
         )
         user.set_password("Password123!")
         user.save()
@@ -179,7 +179,7 @@ def test_auth_service_delete_user_emits_signal(app):
             user = User(
                 username="auth_delete_signal",
                 email="auth_delete_signal@example.com",
-                role="user",
+                role="member",
             )
             user.set_password("Password123!")
             user.save()

@@ -45,8 +45,8 @@ def test_admin_access_after_user_deletion(client, app, test_admin_user, login_us
     blocklisted_token = TokenBlocklist(jti=jti, expires_at=expires)
     blocklisted_token.save()
 
-    # 3. Attempt to access an admin-protected endpoint with the token of the deleted user
-    response = client.get('/api/admin/posts', headers=headers)
+    # 3. Attempt to access a content-protected endpoint with the token of the deleted user
+    response = client.get('/api/content/posts', headers=headers)
     
     # 4. Assert that access is denied (401 Unauthorized) and token is revoked
     assert response.status_code == 401
@@ -87,7 +87,7 @@ def test_access_token_invalidated_after_role_change(client, app, login_user_fixt
     Tests that an existing access token is rejected after role change increments
     the user's token_version in persistence.
     """
-    user = User(username="rolechangeuser", email="rolechange@example.com", role="user")
+    user = User(username="rolechangeuser", email="rolechange@example.com", role="member")
     user.set_password("RoleChangePass123")
     user.save()
 
@@ -95,8 +95,9 @@ def test_access_token_invalidated_after_role_change(client, app, login_user_fixt
     headers = {"Authorization": f"Bearer {access_token}"}
 
     with app.app_context():
-        auth_service = AuthService(MongoUserRepository())
-        auth_service.change_role(user_id=str(user.id), role="editor")
+        from src.services import get_auth_service
+        auth_service = get_auth_service()
+        auth_service.change_role(user_id=str(user.id), role="author")
 
     # /api/auth/logout requires a valid non-revoked access token.
     response = client.post("/api/auth/logout", headers=headers)
