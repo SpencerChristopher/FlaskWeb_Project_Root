@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 post_created = NamedSignal('post-created')
 post_updated = NamedSignal('post-updated')
 post_deleted = NamedSignal('post-deleted')
+post_published = NamedSignal('post-published')
 user_logged_in = NamedSignal('user-logged-in')
 user_deleted = NamedSignal('user-deleted')
+user_role_changed = NamedSignal('user-role-changed')
 
 
 def dispatch_event(signal: NamedSignal, sender: Any, **payload: Any) -> dict[str, Any]:

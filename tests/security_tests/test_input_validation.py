@@ -6,7 +6,7 @@ class TestInputValidation:
         response = client.post("/api/admin/posts", headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json["error_code"] == "BAD_REQUEST"
-        assert response.json["message"] == "Invalid post data"
+        assert response.json["message"] == "Invalid data"
         assert isinstance(response.json["details"], list)
         assert any(
             err["loc"] == ["summary"] and err["msg"] == "Field required"
@@ -26,7 +26,7 @@ class TestInputValidation:
         response = client.post("/api/admin/posts", headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json["error_code"] == "BAD_REQUEST"
-        assert response.json["message"] == "Invalid post data"
+        assert response.json["message"] == "Invalid data"
         assert isinstance(response.json["details"], list)
         assert any(
             err["loc"] == ["title"] and "at most 200 characters" in err["msg"]

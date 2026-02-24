@@ -41,6 +41,51 @@ def _assert_author_contract(author_payload):
     assert set(author_payload.keys()) == {"id", "username"}
 
 
+def _assert_error_contract(data, expect_details=False):
+    """
+    Helper to assert that an error response adheres to the global error contract.
+    """
+    assert "error_code" in data
+    assert "message" in data
+    # Current code includes 'status_code' in the body, which violates our new contract.
+    assert "status_code" not in data
+    
+    if expect_details:
+        assert "details" in data
+        assert isinstance(data["details"], list)
+        if len(data["details"]) > 0:
+            # We expect structured objects (e.g. from Pydantic)
+            assert isinstance(data["details"][0], dict)
+            assert "loc" in data["details"][0]
+            assert "msg" in data["details"][0]
+
+
+def test_contract_error_shape_on_404(client):
+    """
+    Verify that a 404 error response follows the standard error contract.
+    """
+    response = client.get("/api/non-existent-route")
+    assert response.status_code == 404
+    data = response.get_json()
+    _assert_error_contract(data)
+
+
+def test_contract_error_shape_on_invalid_password_change(client, setup_users, login_user_fixture):
+    """
+    Verify that validation errors follow the standard error contract.
+    Current code returns a list of strings in 'details', which violates the contract.
+    """
+    admin_user, _ = setup_users
+    token = login_user_fixture(admin_user.username, "testpassword")
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Send missing fields to trigger Pydantic validation error
+    response = client.post("/api/auth/change-password", json={}, headers=headers)
+    assert response.status_code == 400
+    data = response.get_json()
+    _assert_error_contract(data, expect_details=True)
+
+
 def test_contract_blog_list_shape(client, contract_post):
     response = client.get("/api/blog")
     assert response.status_code == 200

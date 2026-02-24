@@ -15,7 +15,6 @@ class APIException(Exception):
 
     def to_dict(self):
         rv = {
-            "status_code": self.status_code,
             "error_code": self.error_code,
             "message": self.message
         }

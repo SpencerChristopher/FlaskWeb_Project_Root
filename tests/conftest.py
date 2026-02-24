@@ -206,3 +206,38 @@ def get_refresh_token_fixture(client):
                 return match.group(1)
         raise Exception("Refresh token cookie not found in response headers")
     return _get_refresh_token
+
+
+@pytest.fixture
+def signal_tracker():
+    """
+    A fixture that allows capturing and tracking emitted Blinker signals.
+    Usage:
+        with signal_tracker(my_signal) as tracker:
+            call_business_logic()
+            assert tracker.called
+            assert tracker.data['key'] == 'value'
+    """
+    from contextlib import contextmanager
+
+    class Tracker:
+        def __init__(self):
+            self.called = False
+            self.calls = []
+            self.data = None
+
+        def handler(self, sender, **kwargs):
+            self.called = True
+            self.calls.append(kwargs)
+            self.data = kwargs
+
+    @contextmanager
+    def _tracker(signal):
+        t = Tracker()
+        signal.connect(t.handler, weak=False)
+        try:
+            yield t
+        finally:
+            signal.disconnect(t.handler)
+
+    return _tracker
