@@ -4,7 +4,7 @@ Auth service for user credential and profile operations.
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, TYPE_CHECKING
 
 from src.events import dispatch_event, user_deleted, user_role_changed
 from src.exceptions import UnauthorizedException
@@ -12,12 +12,16 @@ from src.models.user import User
 from src.repositories.interfaces import UserRepository
 from src.services.roles import build_claim_roles_for_role, get_capabilities_for_role
 
+if TYPE_CHECKING:
+    from src.services.session_service import SessionService
+
 
 class AuthService:
     """Application service for auth-related user workflows."""
 
-    def __init__(self, user_repository: UserRepository):
+    def __init__(self, user_repository: UserRepository, session_service: SessionService):
         self._user_repository = user_repository
+        self._session_service = session_service
 
     def authenticate(self, username: str, password: str) -> User:
         user = self._user_repository.get_by_username(username)

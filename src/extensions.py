@@ -10,6 +10,7 @@ from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter # Add this import
 from flask_limiter.util import get_remote_address # Add this import
 import os
+import redis
 
 db = MongoEngine()
 bcrypt = Bcrypt()
@@ -19,3 +20,7 @@ limiter = Limiter(
     storage_uri=os.environ.get("RATELIMIT_STORAGE_URI"),
     strategy="fixed-window" # Explicitly set strategy
 )
+
+# Redis client for session and token management
+# Sourced from the same URI as limiter for infrastructure consolidation
+redis_client = redis.from_url(os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"))
