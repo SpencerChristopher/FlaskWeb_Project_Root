@@ -110,9 +110,11 @@ class PostService:
         )
         self._prepare_for_save(new_post)
         created_post = self._post_repository.save(new_post)
+        
+        # Stage 3: ID-based signaling
         dispatch_event(
             post_created,
-            created_post,
+            "post_service",
             post_id=str(created_post.id),
             user_id=str(created_post.author.id),
         )
@@ -134,6 +136,15 @@ class PostService:
         if existing_post:
             raise ConflictException("A post with this title already exists")
 
+        # Stage 3: Change Tracking
+        # Capture old values before they are modified
+        old_values = {
+            "title": post.title,
+            "content": post.content,
+            "summary": post.summary,
+            "is_published": post.is_published,
+        }
+
         # Update all fields correctly
         post.title = title
         post.slug = post_slug
@@ -147,20 +158,27 @@ class PostService:
         self._prepare_for_save(post)
         updated_post = self._post_repository.save(post)
         
+        # Calculate changes for the signal
+        changes = {
+            k: {"old": v, "new": getattr(updated_post, k)}
+            for k, v in old_values.items()
+            if v != getattr(updated_post, k)
+        }
+
         if was_draft and updated_post.is_published:
             dispatch_event(
                 post_published,
-                updated_post,
+                "post_service",
                 post_id=str(updated_post.id),
                 user_id=str(updated_post.author.id),
             )
-        else:
+        elif changes: # Only dispatch post_updated if something actually changed
             dispatch_event(
                 post_updated,
-                updated_post,
+                "post_service",
                 post_id=str(updated_post.id),
-                user_id=str(updated_post.author.id),
-                changes={},
+                user_id=str(updated_user_id := str(updated_post.author.id)),
+                changes=changes,
             )
         return updated_post
 
@@ -174,9 +192,10 @@ class PostService:
         persisted_post_id = str(post.id)
         self._post_repository.delete(post)
         if post_author_id:
+            # Stage 3: ID-based signaling
             dispatch_event(
                 post_deleted,
-                post,
+                "post_service",
                 post_id=persisted_post_id,
                 user_id=post_author_id,
             )

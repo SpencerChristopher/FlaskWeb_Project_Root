@@ -66,11 +66,13 @@ class AuthService:
             user.role = role
             user.token_version = (user.token_version or 0) + 1
             self._user_repository.save(user)
-            dispatch_event(user_role_changed, self, user_id=str(user.id), new_role=role)
+            # Stage 3: ID-based signaling
+            dispatch_event(user_role_changed, "auth_service", user_id=str(user.id), new_role=role)
         return user
 
     def delete_user(self, *, user_id: str) -> None:
         user = self.get_user_or_raise(user_id)
         persisted_user_id = str(user.id)
         self._user_repository.delete(user)
-        dispatch_event(user_deleted, user, user_id=persisted_user_id)
+        # Stage 3: ID-based signaling
+        dispatch_event(user_deleted, "auth_service", user_id=persisted_user_id)

@@ -225,9 +225,11 @@ def signal_tracker():
             self.called = False
             self.calls = []
             self.data = None
+            self.sender = None
 
         def handler(self, sender, **kwargs):
             self.called = True
+            self.sender = sender
             self.calls.append(kwargs)
             self.data = kwargs
 
