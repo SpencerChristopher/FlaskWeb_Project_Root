@@ -9,12 +9,10 @@ from typing import Callable, Any
 
 from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
-from mongoengine.errors import ValidationError
-from pydantic import ValidationError as PydanticValidationError
 
 from src.services import get_authz_service, get_post_service
 from src.schemas import BlogPostCreateUpdate
-from src.exceptions import BadRequestException, UnauthorizedException
+from src.exceptions import UnauthorizedException
 
 bp = Blueprint('admin_routes', __name__, url_prefix='/api/admin')
 authz_service = get_authz_service()
@@ -68,32 +66,23 @@ def create_post() -> Response:
     Returns:
         Response: The newly created post object (201) or an error message.
     """
-    try:
-        post_data = BlogPostCreateUpdate(**request.get_json())
-    except PydanticValidationError as e:
-        raise BadRequestException("Invalid post data", details=e.errors())
+    post_data = BlogPostCreateUpdate(**request.get_json())
 
     author_user = getattr(g, "current_user", None)
     if not author_user:
         raise UnauthorizedException("Authentication required or invalid credentials.")
 
-    try:
-        new_post = post_service.create_post(
-            title=post_data.title,
-            content=post_data.content,
-            summary=post_data.summary,
-            is_published=post_data.is_published,
-            author=author_user,
-        )
-    except ValidationError as e:
-        error_map = getattr(e, "errors", None)
-        if not isinstance(error_map, dict):
-            raise
-        # Convert MongoEngine validation error to a more structured format
-        error_details = {field: message for field, message in error_map.items()}
-        raise BadRequestException("Validation failed", details=error_details)
+    new_post = post_service.create_post(
+        title=post_data.title,
+        content=post_data.content,
+        summary=post_data.summary,
+        is_published=post_data.is_published,
+        author=author_user,
+    )
     
-    return jsonify({'message': 'Post created successfully', 'id': str(new_post.id), 'title': new_post.title, 'slug': new_post.slug, 'content': new_post.content, 'summary': new_post.summary, 'is_published': new_post.is_published, 'author': {'id': str(new_post.author.id), 'username': new_post.author.username}}), 201
+    response_data = new_post.to_dict()
+    response_data['message'] = 'Post created successfully'
+    return jsonify(response_data), 201
 
 @bp.route('/posts/<string:post_id>', methods=['GET'])
 @admin_required
@@ -125,28 +114,19 @@ def update_post(post_id: str) -> Response:
     Returns:
         Response: The updated post object or an error message.
     """
-    try:
-        post_data = BlogPostCreateUpdate(**request.get_json())
-    except PydanticValidationError as e:
-        raise BadRequestException("Invalid post data", details=e.errors())
+    post_data = BlogPostCreateUpdate(**request.get_json())
 
-    try:
-        post = post_service.update_post(
-            post_id=post_id,
-            title=post_data.title,
-            content=post_data.content,
-            summary=post_data.summary,
-            is_published=post_data.is_published,
-        )
-    except ValidationError as e:
-        error_map = getattr(e, "errors", None)
-        if not isinstance(error_map, dict):
-            raise
-        # Convert MongoEngine validation error to a more structured format
-        error_details = {field: message for field, message in error_map.items()}
-        raise BadRequestException("Validation failed", details=error_details)
+    post = post_service.update_post(
+        post_id=post_id,
+        title=post_data.title,
+        content=post_data.content,
+        summary=post_data.summary,
+        is_published=post_data.is_published,
+    )
     
-    return jsonify({'message': 'Post updated successfully', 'id': str(post.id), 'title': post.title, 'slug': post.slug, 'content': post.content, 'summary': post.summary, 'is_published': post.is_published, 'author': {'id': str(post.author.id), 'username': post.author.username}}), 200
+    response_data = post.to_dict()
+    response_data['message'] = 'Post updated successfully'
+    return jsonify(response_data), 200
 
 @bp.route('/posts/<string:post_id>', methods=['DELETE'])
 @admin_required

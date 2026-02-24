@@ -6,12 +6,14 @@ from flask import jsonify, request
 from flask_limiter.errors import RateLimitExceeded
 from mongoengine.errors import NotUniqueError, ValidationError as MongoEngineValidationError
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from pydantic import ValidationError as PydanticValidationError
 
 from src.exceptions import (
     APIException,
     BadRequestException,
     ForbiddenException,
     NotFoundException,
+    ConflictException,
 )
 
 
@@ -27,39 +29,39 @@ def register_error_handlers(app) -> None:
     @app.errorhandler(RateLimitExceeded)
     def ratelimit_handler(error):
         app.logger.warning(f"Rate Limit Exceeded for IP: {request.remote_addr} - {error.description}")
-        return (
-            jsonify(
-                {
-                    "error_code": "TOO_MANY_REQUESTS",
-                    "message": "Too Many Requests",
-                    "details": error.description,
-                }
-            ),
-            429,
-        )
+        response = {
+            "error_code": "TOO_MANY_REQUESTS",
+            "message": "Too Many Requests",
+            "details": [{"loc": [], "msg": error.description, "type": "rate_limit_exceeded"}]
+        }
+        return jsonify(response), 429
+
+    @app.errorhandler(PydanticValidationError)
+    def handle_pydantic_validation_error(error):
+        # Pydantic v2 .errors() returns exactly what we want: list of dicts with loc, msg, type
+        details = error.errors()
+        app.logger.warning(f"Pydantic Validation Error: {details}")
+        response = BadRequestException("Invalid data", details=details).to_dict()
+        return jsonify(response), 400
 
     @app.errorhandler(MongoEngineValidationError)
     def handle_mongoengine_validation_error(error):
         details_list = []
         if hasattr(error, "errors") and isinstance(error.errors, dict):
             for field, err_obj in error.errors.items():
-                if hasattr(err_obj, "message"):
-                    msg = err_obj.message
-                else:
-                    msg = str(err_obj)
-                details_list.append({"loc": [field], "msg": msg})
+                msg = getattr(err_obj, "message", str(err_obj))
+                details_list.append({"loc": [field], "msg": msg, "type": "value_error.mongoengine"})
         else:
-            details_list.append({"loc": [], "msg": str(error)})
-        details = details_list
+            details_list.append({"loc": [], "msg": str(error), "type": "value_error.mongoengine"})
 
-        app.logger.warning(f"MongoEngine Validation Error: {details}")
-        response = BadRequestException("Validation error", details=details).to_dict()
+        app.logger.warning(f"MongoEngine Validation Error: {details_list}")
+        response = BadRequestException("Validation error", details=details_list).to_dict()
         return jsonify(response), 400
 
     @app.errorhandler(NotUniqueError)
     def handle_not_unique_error(error):
         app.logger.warning(f"Not Unique Error: {error}")
-        response = ConflictException(str(error)).to_dict()
+        response = ConflictException("A resource with this identifier already exists.").to_dict()
         return jsonify(response), 409
 
     @app.errorhandler(APIException)

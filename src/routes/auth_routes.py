@@ -22,7 +22,6 @@ from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
 from src.schemas import UserRegistration, ChangePasswordRequest
 from src.services import get_auth_service
-from pydantic import ValidationError as PydanticValidationError
 
 
 bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
@@ -74,12 +73,7 @@ def register() -> Response:
     """
     Registers a new user.
     """
-    try:
-        user_data = UserRegistration(**request.get_json())
-    except PydanticValidationError as e:
-        # Extract just the messages for a cleaner response
-        error_messages = [error['msg'] for error in e.errors()]
-        raise BadRequestException("Invalid registration data", details=error_messages)
+    user_data = UserRegistration(**request.get_json())
 
     # Placeholder for actual user registration logic
     current_app.logger.info(f"New user registration for: {user_data.username} from IP: {request.remote_addr}")
@@ -148,12 +142,7 @@ def change_password() -> Response:
     """
     Allows a logged-in user to change their password.
     """
-    try:
-        data = ChangePasswordRequest(**request.get_json())
-    except PydanticValidationError as e:
-        # Extract just the messages for a cleaner response
-        error_messages = [error['msg'] for error in e.errors()]
-        raise BadRequestException("Invalid data", details=error_messages)
+    data = ChangePasswordRequest(**request.get_json())
     user_id = get_jwt_identity()
     auth_service.change_password(
         user_id=user_id,

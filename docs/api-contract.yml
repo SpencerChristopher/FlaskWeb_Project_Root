@@ -1,6 +1,17 @@
 version: 1
 updated_for_phase: "Phase A - API contract freeze"
 
+error_response_shape:
+  required_top_level_keys:
+    - error_code
+    - message
+  optional_top_level_keys:
+    - details
+  details_item_keys:
+    - loc
+    - msg
+    - type
+
 endpoints:
   - method: GET
     path: /api/blog
