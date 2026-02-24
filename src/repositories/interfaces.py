@@ -19,6 +19,9 @@ class UserRepository(Protocol):
     def get_by_id(self, user_id: str) -> Optional[User]:
         ...
 
+    def get_identity(self, user_id: str) -> Optional[User]:
+        ...
+
     def get_by_username(self, username: str) -> Optional[User]:
         ...
 

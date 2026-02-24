@@ -78,3 +78,14 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
     _validate_new_password = field_validator('new_password')(password_strength_validator)
+
+
+class UserIdentity(BaseModel):
+    """
+    PII-clean Data Transfer Object representing the authenticated requester.
+    Used in g.current_user to avoid object bloat and PII leakage in the app context.
+    """
+    id: str
+    username: str
+    role: str
+    token_version: int

@@ -46,7 +46,7 @@ def test_authz_service_require_admin_role_check(app):
         regular_user.save()
 
         with pytest.raises(ForbiddenException):
-            authz_service.require_admin(str(regular_user.id), {"roles": ["member"]})
+            authz_service.require_admin(str(regular_user.id), {"roles": ["member"], "tv": 0})
 
 
 def test_authz_service_require_admin_allows_content_admin(app):
@@ -64,9 +64,9 @@ def test_authz_service_require_admin_allows_content_admin(app):
 
         resolved = authz_service.require_admin(
             str(content_admin.id),
-            {"roles": ["author"]},
+            {"roles": ["author"], "tv": 0},
         )
-        assert resolved.id == content_admin.id
+        assert str(resolved.id) == str(content_admin.id)
 
 
 def test_authz_service_require_admin_rejects_ops_admin(app):
@@ -85,7 +85,7 @@ def test_authz_service_require_admin_rejects_ops_admin(app):
         with pytest.raises(ForbiddenException):
             authz_service.require_admin(
                 str(ops_admin.id),
-                {"roles": ["member"]},
+                {"roles": ["member"], "tv": 0},
             )
 
 
@@ -102,9 +102,8 @@ def test_authz_service_require_admin_accepts_legacy_admin_claims(app):
         admin_user.set_password("Password123!")
         admin_user.save()
 
-        resolved = authz_service.require_admin(str(admin_user.id), {"roles": ["admin"]})
-        assert resolved.id == admin_user.id
-
+        resolved = authz_service.require_admin(str(admin_user.id), {"roles": ["admin"], "tv": 0})
+        assert str(resolved.id) == str(admin_user.id)
 
 def test_post_service_create_update_conflict_path(app):
     post_repository = MongoPostRepository()

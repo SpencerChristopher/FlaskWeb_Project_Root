@@ -23,6 +23,13 @@ class MongoUserRepository(UserRepository):
         except PyMongoError as e:
             raise DatabaseConnectionException(f"Database error while fetching user by ID: {e}") from e
 
+    def get_identity(self, user_id: str) -> Optional[User]:
+        try:
+            # Use projection to fetch only minimal fields required for UserIdentity DTO
+            return User.objects(id=user_id).only('id', 'role', 'token_version').first()
+        except PyMongoError as e:
+            raise DatabaseConnectionException(f"Database error while fetching user identity: {e}") from e
+
     def get_by_username(self, username: str) -> Optional[User]:
         try:
             return User.objects(username=username).first()
