@@ -1,5 +1,5 @@
 import pytest
-from src.events import user_role_changed, post_published
+from src.events import user_role_changed, post_published, post_created, post_updated, post_deleted
 from src.services.auth_service import AuthService
 from src.repositories.mongo_user_repository import MongoUserRepository
 from src.repositories.mongo_post_repository import MongoPostRepository
@@ -34,6 +34,7 @@ class TestEventSystem:
 
                 # 4. Assert: Verify the signal was received with the correct payload
                 assert tracker.called, "Signal 'user_role_changed' was not emitted."
+                assert tracker.sender == "auth_service"
                 assert tracker.data["user_id"] == user_id
                 assert tracker.data["new_role"] == "admin"
                 assert tracker.data["event_type"] == "user-role-changed"
@@ -65,7 +66,6 @@ class TestEventSystem:
             post_id = str(draft_post.id)
 
             # 2. Track Signal: Connect the tracker to post_published
-            from src.events import post_published
             with signal_tracker(post_published) as tracker:
                 # 3. Action: Update the post to be published
                 post_service.update_post(
@@ -78,9 +78,62 @@ class TestEventSystem:
 
                 # 4. Assert: Verify the signal was received with the correct payload
                 assert tracker.called, "Signal 'post_published' was not emitted."
+                assert tracker.sender == "post_service"
                 assert tracker.data["post_id"] == post_id
                 assert tracker.data["event_type"] == "post-published"
             
+            # Cleanup
+            post_service.delete_post(post_id)
+            author.delete()
+
+    def test_signal_payloads_are_pii_clean_and_optimized(self, app, signal_tracker):
+        """
+        Gate 5.3: Verify that signals carry only IDs and primitive types.
+        Passing full MongoEngine documents is forbidden due to memory and PII risks.
+        """
+        from src.services import get_post_service
+        post_service = get_post_service()
+
+        with app.app_context():
+            author = User(username="clean_author", email="clean@test.com", role="admin")
+            author.set_password("password")
+            author.save()
+
+            # 1. Test post_created payload
+            with signal_tracker(post_created) as tracker:
+                new_post = post_service.create_post(
+                    title="Clean Payload Post",
+                    content="Content",
+                    summary="Summary",
+                    is_published=True,
+                    author=author
+                )
+                post_id = str(new_post.id)
+
+                assert tracker.called
+                assert tracker.sender == "post_service"
+                
+                # Verify payload contents are primitive types only
+                for key, value in tracker.data.items():
+                    allowed_types = (str, int, bool, dict, type(None))
+                    assert isinstance(value, allowed_types), f"Forbidden type {type(value)} in key '{key}'"
+                    assert not isinstance(value, (User, Post)), f"DB Document in key '{key}'"
+
+            # 2. Test post_updated payload and change tracking
+            with signal_tracker(post_updated) as tracker:
+                post_service.update_post(
+                    post_id=post_id,
+                    title="Changed Title",
+                    content="Content",
+                    summary="Summary",
+                    is_published=True
+                )
+                assert tracker.called
+                assert tracker.sender == "post_service"
+                assert "title" in tracker.data["changes"]
+                assert tracker.data["changes"]["title"]["old"] == "Clean Payload Post"
+                assert tracker.data["changes"]["title"]["new"] == "Changed Title"
+
             # Cleanup
             post_service.delete_post(post_id)
             author.delete()
