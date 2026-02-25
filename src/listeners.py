@@ -11,6 +11,28 @@ from src.events import post_created, post_updated, post_deleted, user_logged_in,
 
 logger = logging.getLogger(__name__)
 
+def cleanup_comments_on_post_delete(sender, **kwargs):
+    """
+    Listener that deletes all comments associated with a deleted post.
+    """
+    post_id = kwargs.get("post_id")
+    if not post_id:
+        return
+
+    from src.models.comment import Comment
+    try:
+        delete_result = Comment.objects(post=post_id).delete()
+        current_app.logger.info(
+            f"Cleanup: Deleted {delete_result} comments for post_id={post_id}"
+        )
+    except Exception as e:
+        logger.error(
+            "Cleanup failed for post_id %s: %s",
+            post_id,
+            e,
+            exc_info=True,
+        )
+
 def log_blinker_event(sender, **kwargs):
     """A generic listener that logs all dispatched Blinker events."""
     event_name = kwargs.get("event_type", "unknown_signal")
@@ -34,5 +56,6 @@ def log_blinker_event(sender, **kwargs):
 post_created.connect(log_blinker_event)
 post_updated.connect(log_blinker_event)
 post_deleted.connect(log_blinker_event)
+post_deleted.connect(cleanup_comments_on_post_delete)
 user_logged_in.connect(log_blinker_event)
 user_deleted.connect(log_blinker_event)
