@@ -151,12 +151,16 @@ def status() -> Response:
     if current_user_id:
         user = auth_service.get_user(current_user_id)
         if user:
+            from src.services import get_authz_service
+            authz_service = get_authz_service()
+            
             return jsonify({
                 'logged_in': True,
                 'user': {
                     'username': user.username,
                     'id': str(user.id),
-                    'role': user.role
+                    'role': user.role,
+                    'capabilities': authz_service.get_user_capabilities(get_jwt())
                 }
             }), 200
     return jsonify({'logged_in': False}), 200

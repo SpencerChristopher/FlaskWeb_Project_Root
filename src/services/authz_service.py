@@ -101,3 +101,10 @@ class AuthzService:
             permission=Permissions.CONTENT_MANAGE,
             error_message="Content management access required.",
         )
+
+    def get_user_capabilities(self, user_claims: dict[str, Any]) -> list[str]:
+        """
+        Extract the list of granular permissions available to the user.
+        Used for dynamic frontend UI discovery.
+        """
+        return sorted(list(get_permissions_from_claims(user_claims)))

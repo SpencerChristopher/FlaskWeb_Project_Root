@@ -11,11 +11,15 @@ if TYPE_CHECKING:
     from src.services.authz_service import AuthzService
     from src.services.post_service import PostService
     from src.services.session_service import SessionService
+    from src.services.profile_service import ProfileService
+    from src.services.media_service import MediaService
 
 _auth_service = None
 _authz_service = None
 _post_service = None
 _session_service = None
+_profile_service = None
+_media_service = None
 
 
 def get_session_service() -> "SessionService":
@@ -65,3 +69,25 @@ def get_post_service() -> "PostService":
 
         _post_service = PostService(get_post_repository())
     return _post_service
+
+
+def get_profile_service() -> "ProfileService":
+    global _profile_service
+    if _profile_service is None:
+        from src.repositories import get_profile_repository
+        from src.services.profile_service import ProfileService
+
+        _profile_service = ProfileService(get_profile_repository())
+    return _profile_service
+
+
+def get_media_service() -> "MediaService":
+    global _media_service
+    if _media_service is None:
+        import os
+        from src.services.media_service import MediaService
+
+        # Path inside the container
+        upload_dir = os.path.join(os.getcwd(), "static", "uploads")
+        _media_service = MediaService(upload_dir)
+    return _media_service

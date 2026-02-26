@@ -13,6 +13,7 @@ from src.models.post import Post
 from src.models.user import User
 from src.models.comment import Comment
 from src.models.token_blocklist import TokenBlocklist
+from src.models.profile import Profile
 
 
 class UserRepository(Protocol):
@@ -51,6 +52,16 @@ class TokenRepository(Protocol):
         ...
 
     def add_to_blocklist(self, jti: str, expires_at: datetime.datetime, ttl: Optional[int] = None) -> None:
+        ...
+
+
+class ProfileRepository(Protocol):
+    """Persistence contract for profile operations."""
+
+    def get_profile(self) -> Optional[Profile]:
+        ...
+
+    def save(self, profile: Profile) -> Profile:
         ...
 
 
