@@ -3,12 +3,11 @@ import pytest
 from src.events import user_deleted
 from src.exceptions import UnauthorizedException
 from src.models.user import User
-from src.repositories.mongo_user_repository import MongoUserRepository
-from src.services.auth_service import AuthService
+from src.services import get_auth_service
 
 
 def test_auth_service_authenticate_success(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(username="auth_user", email="auth_user@example.com", role="member")
@@ -20,7 +19,7 @@ def test_auth_service_authenticate_success(app):
 
 
 def test_auth_service_authenticate_invalid_password_raises(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -36,7 +35,7 @@ def test_auth_service_authenticate_invalid_password_raises(app):
 
 
 def test_auth_service_change_password_success(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -59,7 +58,7 @@ def test_auth_service_change_password_success(app):
 
 
 def test_auth_service_change_password_invalid_current_raises(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -79,7 +78,7 @@ def test_auth_service_change_password_invalid_current_raises(app):
 
 
 def test_auth_service_change_role_increments_token_version(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -97,7 +96,7 @@ def test_auth_service_change_role_increments_token_version(app):
 
 
 def test_auth_service_change_role_same_value_no_version_bump(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -115,7 +114,7 @@ def test_auth_service_change_role_same_value_no_version_bump(app):
 
 
 def test_auth_service_build_token_claims_admin_transition_mapping(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -133,7 +132,7 @@ def test_auth_service_build_token_claims_admin_transition_mapping(app):
 
 
 def test_auth_service_build_token_claims_content_admin_scope(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -150,7 +149,7 @@ def test_auth_service_build_token_claims_content_admin_scope(app):
 
 
 def test_auth_service_delete_user_removes_record(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
 
     with app.app_context():
         user = User(
@@ -167,7 +166,7 @@ def test_auth_service_delete_user_removes_record(app):
 
 
 def test_auth_service_delete_user_emits_signal(app):
-    auth_service = AuthService(MongoUserRepository())
+    auth_service = get_auth_service()
     received_events = []
 
     def receiver(sender, **kwargs):

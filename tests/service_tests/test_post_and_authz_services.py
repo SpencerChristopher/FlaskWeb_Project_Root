@@ -3,15 +3,11 @@ import pytest
 from src.events import post_created
 from src.exceptions import ConflictException, ForbiddenException, UnauthorizedException
 from src.models.user import User
-from src.repositories.mongo_post_repository import MongoPostRepository
-from src.repositories.mongo_user_repository import MongoUserRepository
-from src.services.authz_service import AuthzService
-from src.services.post_service import PostService
+from src.services import get_authz_service, get_post_service
 
 
 def test_authz_service_get_authenticated_user_success(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         user = User(username="authz_user", email="authz_user@example.com", role="member")
@@ -24,8 +20,7 @@ def test_authz_service_get_authenticated_user_success(app):
 
 
 def test_authz_service_get_authenticated_user_missing_raises(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         with pytest.raises(UnauthorizedException):
@@ -33,8 +28,7 @@ def test_authz_service_get_authenticated_user_missing_raises(app):
 
 
 def test_authz_service_require_admin_role_check(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         regular_user = User(
@@ -50,8 +44,7 @@ def test_authz_service_require_admin_role_check(app):
 
 
 def test_authz_service_require_admin_allows_content_admin(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         content_admin = User(
@@ -70,8 +63,7 @@ def test_authz_service_require_admin_allows_content_admin(app):
 
 
 def test_authz_service_require_admin_rejects_ops_admin(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         ops_admin = User(
@@ -90,8 +82,7 @@ def test_authz_service_require_admin_rejects_ops_admin(app):
 
 
 def test_authz_service_require_admin_accepts_legacy_admin_claims(app):
-    user_repository = MongoUserRepository()
-    authz_service = AuthzService(user_repository)
+    authz_service = get_authz_service()
 
     with app.app_context():
         admin_user = User(
@@ -106,8 +97,7 @@ def test_authz_service_require_admin_accepts_legacy_admin_claims(app):
         assert str(resolved.id) == str(admin_user.id)
 
 def test_post_service_create_update_conflict_path(app):
-    post_repository = MongoPostRepository()
-    post_service = PostService(post_repository)
+    post_service = get_post_service()
 
     with app.app_context():
         author = User(username="svc_admin", email="svc_admin@example.com", role="admin")
@@ -135,8 +125,7 @@ def test_post_service_create_update_conflict_path(app):
 
 
 def test_post_service_list_published_filters_drafts(app):
-    post_repository = MongoPostRepository()
-    post_service = PostService(post_repository)
+    post_service = get_post_service()
 
     with app.app_context():
         author = User(username="svc_writer", email="svc_writer@example.com", role="admin")
@@ -164,8 +153,7 @@ def test_post_service_list_published_filters_drafts(app):
 
 
 def test_post_service_create_emits_single_event_with_metadata(app):
-    post_repository = MongoPostRepository()
-    post_service = PostService(post_repository)
+    post_service = get_post_service()
     received_events = []
 
     def receiver(sender, **kwargs):

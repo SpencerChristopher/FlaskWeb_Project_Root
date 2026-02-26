@@ -104,29 +104,13 @@ def configure_jwt(app: Flask) -> None:
     app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY")
     jwt.init_app(app)
     register_jwt_loaders(jwt)
-    user_repository = get_user_repository()
 
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
-        from src.models.token_blocklist import TokenBlocklist
+        from src.services import get_auth_service
 
-        jti = jwt_payload["jti"]
-        user_id = jwt_payload.get("sub")
-        token_version = jwt_payload.get("tv")
-
-        token = TokenBlocklist.objects(jti=jti).first()
-        if token is not None:
-            return True
-
-        if not user_id:
-            return True
-        user = user_repository.get_by_id(user_id)
-        if not user:
-            return True
-        if token_version is None or user.token_version != token_version:
-            return True
-
-        return False
+        auth_service = get_auth_service()
+        return auth_service.is_token_revoked(jwt_payload)
 
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
     app.config["JWT_COOKIE_SECURE"] = os.environ.get("JWT_COOKIE_SECURE", "true").lower() == "true"

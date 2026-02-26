@@ -31,10 +31,12 @@ def get_session_service() -> "SessionService":
 def get_auth_service() -> "AuthService":
     global _auth_service
     if _auth_service is None:
-        from src.repositories import get_user_repository
+        from src.repositories import get_user_repository, get_token_repository
         from src.services.auth_service import AuthService
 
-        _auth_service = AuthService(get_user_repository(), get_session_service())
+        _auth_service = AuthService(
+            get_user_repository(), get_token_repository(), get_session_service()
+        )
     return _auth_service
 
 

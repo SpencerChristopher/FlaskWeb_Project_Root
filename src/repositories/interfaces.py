@@ -11,6 +11,8 @@ from typing import Optional, Protocol
 
 from src.models.post import Post
 from src.models.user import User
+from src.models.comment import Comment
+from src.models.token_blocklist import TokenBlocklist
 
 
 class UserRepository(Protocol):
@@ -29,6 +31,26 @@ class UserRepository(Protocol):
         ...
 
     def delete(self, user: User) -> None:
+        ...
+
+
+class CommentRepository(Protocol):
+    """Persistence contract for comment operations."""
+
+    def delete_by_post_id(self, post_id: str) -> int:
+        ...
+
+    def save(self, comment: Comment) -> Comment:
+        ...
+
+
+class TokenRepository(Protocol):
+    """Persistence contract for token revocation tracking."""
+
+    def is_jti_revoked(self, jti: str) -> bool:
+        ...
+
+    def add_to_blocklist(self, jti: str, expires_at: datetime.datetime) -> None:
         ...
 
 

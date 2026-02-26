@@ -19,9 +19,10 @@ def cleanup_comments_on_post_delete(sender, **kwargs):
     if not post_id:
         return
 
-    from src.models.comment import Comment
+    from src.repositories import get_comment_repository
+    comment_repo = get_comment_repository()
     try:
-        delete_result = Comment.objects(post=post_id).delete()
+        delete_result = comment_repo.delete_by_post_id(post_id)
         current_app.logger.info(
             f"Cleanup: Deleted {delete_result} comments for post_id={post_id}"
         )
