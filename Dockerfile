@@ -26,9 +26,8 @@ WORKDIR /app
 
 # Create a non-root user to run the application
 RUN useradd --create-home appuser
-RUN chown -R appuser:appuser /app
-# Create logs directory and set permissions for appuser
-RUN mkdir -p logs && chown -R appuser:appuser logs
+# Create necessary directories and set permissions for appuser
+RUN mkdir -p logs static/uploads && chown -R appuser:appuser /app
 USER appuser
 
 ARG LOG_LEVEL=INFO

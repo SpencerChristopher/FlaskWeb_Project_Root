@@ -14,6 +14,7 @@ sys.path.insert(0, project_root)
 
 from src.models.user import User
 from src.models.post import Post
+from src.models.profile import Profile, WorkHistoryItem
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
 # Set up Flask app context (this also loads .env)
@@ -94,6 +95,48 @@ else:
     )
     post2.save()
     print(f"Added blog post: {post2_slug}")
+
+# --- Seed Profile ---
+if Profile.objects.first():
+    print("Developer profile already exists. Skipping.")
+else:
+    work_history = [
+        WorkHistoryItem(
+            company="Global Tech Solutions",
+            role="Senior Systems Architect",
+            start_date="2021-06",
+            end_date="Present",
+            location="Remote / London",
+            description="Leading the transition to a decoupled modular monolith architecture on Raspberry Pi hardware.",
+            skills=["Python", "Flask", "Docker", "Raspberry Pi"]
+        ),
+        WorkHistoryItem(
+            company="Innovative Startups Inc",
+            role="Full Stack Developer",
+            start_date="2018-01",
+            end_date="2021-05",
+            location="Manchester, UK",
+            description="Developed high-traffic SPAs using modern JavaScript frameworks and Flask backends.",
+            skills=["JavaScript", "REST APIs", "MongoDB"]
+        )
+    ]
+    
+    profile = Profile(
+        name="Chris Developer",
+        location="United Kingdom",
+        statement="Passionate Senior Developer focused on building high-performance, secure, and resource-efficient web applications. Expert in Python, Flask, and IoT deployments.",
+        interests=["Cloud Computing", "Cybersecurity", "Embedded Systems", "Home Automation"],
+        skills=["Python", "Flask", "Docker", "MongoDB", "Linux Admin", "CI/CD"],
+        social_links={
+            "github": "https://github.com/chris",
+            "linkedin": "https://linkedin.com/in/chris",
+            "leetcode": "https://leetcode.com/chris",
+            "hackthebox": "https://app.hackthebox.com/profile/chris"
+        },
+        work_history=work_history
+    )
+    profile.save()
+    print("Added developer profile singleton.")
 
 print("Database seeding complete.")
 

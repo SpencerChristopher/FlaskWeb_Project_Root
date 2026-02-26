@@ -351,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const errorDiv = document.getElementById('form-error');
         errorDiv.style.display = 'none';
         const postData = { title: document.getElementById('title').value, summary: document.getElementById('summary').value, content: document.getElementById('content').value, is_published: document.getElementById('is_published').checked };
-        const url = postId ? `/api/admin/posts/${postId}` : '/api/admin/posts';
+        const url = postId ? `/api/content/posts/${postId}` : '/api/content/posts';
         const method = postId ? 'PUT' : 'POST';
         try {
             await fetchAPI(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(postData) });
@@ -368,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = event.target.closest('tr');
         const postId = row.dataset.postId;
         try {
-            const post = await fetchAPI(`/api/admin/posts/${postId}`);
+            const post = await fetchAPI(`/api/content/posts/${postId}`);
             document.getElementById('title').value = post.title;
             document.getElementById('summary').value = post.summary;
             document.getElementById('content').value = post.content;
@@ -390,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const postId = row.dataset.postId;
         if (confirm('Are you sure you want to delete this post?')) {
             try {
-                await fetchAPI(`/api/admin/posts/${postId}`, { method: 'DELETE' });
+                await fetchAPI(`/api/content/posts/${postId}`, { method: 'DELETE' });
                 row.remove();
             } catch (error) {
                 alert('Failed to delete post: ' + error.message);
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
         '#admin': async () => {
             if (!userState.loggedIn) { window.location.hash = '#login'; return; }
             try {
-                const posts = await fetchAPI('/api/admin/posts');
+                const posts = await fetchAPI('/api/content/posts');
                 mainContentElement.innerHTML = templates.adminDashboard(posts);
                 document.getElementById('postForm').addEventListener('submit', handlePostFormSubmit);
                 document.getElementById('dashboard-tbody').addEventListener('click', (event) => {

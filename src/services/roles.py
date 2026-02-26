@@ -14,12 +14,14 @@ ROLE_MEMBER = "member"
 class Permissions:
     CONTENT_MANAGE = "content:manage" # Full CRUD on all content
     CONTENT_AUTHOR = "content:author" # Full CRUD on personal content
+    PROFILE_MANAGE = "profile:manage" # Manage developer profile/socials
     USERS_MANAGE = "users:manage"     # User management and roles
     SYSTEM_VIEW_LOGS = "system:view_logs" # Diagnostic access
 
 ROLE_PERMISSIONS = {
     ROLE_ADMIN: frozenset({
         Permissions.CONTENT_MANAGE,
+        Permissions.PROFILE_MANAGE,
         Permissions.USERS_MANAGE,
         Permissions.SYSTEM_VIEW_LOGS
     }),

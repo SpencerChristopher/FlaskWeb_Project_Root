@@ -21,8 +21,10 @@ def _clear_test_collections() -> None:
     db.get_collection(User._get_collection_name()).delete_many({})
     db.get_collection(Post._get_collection_name()).delete_many({})
     from src.models.token_blocklist import TokenBlocklist
+    from src.models.profile import Profile
 
     db.get_collection(TokenBlocklist._get_collection_name()).delete_many({})
+    db.get_collection(Profile._get_collection_name()).delete_many({})
 
 def _build_test_mongo_uri(in_container: bool) -> str:
     if in_container:

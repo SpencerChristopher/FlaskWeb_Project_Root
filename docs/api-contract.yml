@@ -80,7 +80,7 @@ endpoints:
         - refresh_token_cookie
 
   - method: GET
-    path: /api/admin/posts
+    path: /api/content/posts
     status: 200
     body:
       type: array
@@ -99,7 +99,7 @@ endpoints:
         - username
 
   - method: GET
-    path: /api/admin/posts/{post_id}
+    path: /api/content/posts/{post_id}
     status: 200
     body:
       required_top_level_keys:
@@ -117,7 +117,7 @@ endpoints:
         - username
 
   - method: POST
-    path: /api/admin/posts
+    path: /api/content/posts
     status: 201
     body:
       required_top_level_keys:
@@ -134,7 +134,7 @@ endpoints:
         - username
 
   - method: PUT
-    path: /api/admin/posts/{post_id}
+    path: /api/content/posts/{post_id}
     status: 200
     body:
       required_top_level_keys:
@@ -151,7 +151,7 @@ endpoints:
         - username
 
   - method: DELETE
-    path: /api/admin/posts/{post_id}
+    path: /api/content/posts/{post_id}
     status: 200
     body:
       required_top_level_keys:

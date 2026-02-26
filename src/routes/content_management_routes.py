@@ -9,15 +9,17 @@ from typing import Callable, Any
 from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
-from src.services import get_authz_service, get_post_service, get_auth_service
+from src.services import get_authz_service, get_post_service, get_auth_service, get_profile_service, get_media_service
 from src.services.roles import Permissions
-from src.schemas import BlogPostCreateUpdate
-from src.exceptions import UnauthorizedException
+from src.schemas import BlogPostCreateUpdate, ProfileSchema
+from src.exceptions import UnauthorizedException, BadRequestException
 
 bp = Blueprint('content_management_routes', __name__, url_prefix='/api/content')
 authz_service = get_authz_service()
 auth_service = get_auth_service()
 post_service = get_post_service()
+profile_service = get_profile_service()
+media_service = get_media_service()
 
 def permission_required(permission: str) -> Callable:
     """
@@ -113,6 +115,45 @@ def delete_post(post_id: str) -> Response:
     """
     post_service.delete_post(post_id)
     return jsonify({'message': 'Post deleted successfully'}), 200
+
+
+@bp.route('/profile', methods=['GET'])
+def get_profile() -> Response:
+    """
+    Publicly accessible developer profile.
+    """
+    return jsonify(profile_service.get_profile().model_dump())
+
+
+@bp.route('/profile', methods=['PUT'])
+@permission_required(Permissions.PROFILE_MANAGE)
+def update_profile() -> Response:
+    """
+    Updates the site-wide developer profile.
+    """
+    profile_data = ProfileSchema(**request.get_json())
+    updated_profile = profile_service.update_profile(profile_data)
+    return jsonify(updated_profile.model_dump()), 200
+
+
+@bp.route('/media', methods=['POST'])
+@permission_required(Permissions.PROFILE_MANAGE)
+def upload_media() -> Response:
+    """
+    Handles image uploads for content.
+    """
+    if 'file' not in request.files:
+        raise BadRequestException("No file part in the request.")
+    
+    file = request.files['file']
+    if file.filename == '':
+        raise BadRequestException("No selected file.")
+
+    try:
+        url = media_service.save_image(file.stream, file.filename)
+        return jsonify({"url": url, "message": "Upload successful"}), 201
+    except ValueError as e:
+        raise BadRequestException(str(e))
 
 
 

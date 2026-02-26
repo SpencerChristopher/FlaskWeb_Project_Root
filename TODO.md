@@ -25,3 +25,6 @@
    - Keep self-signed certs for local/Wsl fallback only.
    - Document tunnel mode where Cloudflare handles TLS termination, and internal traffic uses private network paths.
    - Ensure app/proxy settings (`TALISMAN_FORCE_HTTPS`, forwarded headers) match tunnel behavior.
+8. Optimize Test Suite for CI/Pi:
+   - Evaluate moving high-payload integration tests (Profile API, Media) to a post-deploy smoke suite.
+   - Keep core CI lightweight to reduce log bloat and save resources on Raspberry Pi.

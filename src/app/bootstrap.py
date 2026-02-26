@@ -94,3 +94,7 @@ def configure_core_runtime(app: Flask) -> None:
         app.logger.critical("Failed to connect to MongoDB after multiple retries. Exiting application.")
         raise ConnectionError("Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status.")
 
+    # Ensure media upload directory exists
+    upload_dir = os.path.join(app.static_folder, "uploads")
+    os.makedirs(upload_dir, mode=0o755, exist_ok=True)
+
