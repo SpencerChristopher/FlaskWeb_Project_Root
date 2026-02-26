@@ -97,17 +97,16 @@ def logout() -> Response:
     """
     Logs out the currently authenticated user and invalidates their session.
     """
-    from src.models.token_blocklist import TokenBlocklist
-
     # Phase 3: Invalidate active session in Redis
     current_user_id = get_jwt_identity()
     if current_user_id:
         auth_service._session_service.invalidate_session(current_user_id)
 
-    jti = get_jwt()["jti"]
-    now = datetime.datetime.now(datetime.timezone.utc)
-    blocklisted_token = TokenBlocklist(jti=jti, expires_at=now + datetime.timedelta(minutes=15)) # Block for access token expiry
-    blocklisted_token.save(write_concern={'w': 1})
+    jwt_payload = get_jwt()
+    jti = jwt_payload["jti"]
+    # Block for access token expiry (typically 15 minutes)
+    expires_at = datetime.datetime.fromtimestamp(jwt_payload["exp"], datetime.timezone.utc)
+    auth_service.revoke_token(jti, expires_at)
 
     response = jsonify({'message': 'Logged out successfully'})
     unset_jwt_cookies(response)

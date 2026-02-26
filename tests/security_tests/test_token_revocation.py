@@ -1,7 +1,6 @@
 import pytest
 from src.models.user import User
 from flask_jwt_extended import decode_token
-from src.models.token_blocklist import TokenBlocklist
 import datetime
 from src.services.auth_service import AuthService
 from src.repositories.mongo_user_repository import MongoUserRepository
@@ -42,9 +41,8 @@ def test_admin_access_after_user_deletion(client, app, test_admin_user, login_us
     # Explicitly blacklist the admin_token
     decoded_token = decode_token(admin_token)
     jti = decoded_token["jti"]
-    expires = datetime.datetime.fromtimestamp(decoded_token["exp"])
-    blocklisted_token = TokenBlocklist(jti=jti, expires_at=expires)
-    blocklisted_token.save()
+    expires = datetime.datetime.fromtimestamp(decoded_token["exp"], datetime.timezone.utc)
+    auth_service.revoke_token(jti, expires)
 
     # 3. Attempt to access a content-protected endpoint with the token of the deleted user
     response = client.get('/api/content/posts', headers=headers)
@@ -61,14 +59,15 @@ def test_blacklisted_refresh_token_rejected(client, app, test_admin_user, get_re
     """
     # 1. Log in as admin to get a refresh token
     refresh_token = get_refresh_token_fixture('adminuser', 'AdminPassword123')
-    
+
     # 2. Blacklist the refresh token
     with app.app_context():
         decoded_token = decode_token(refresh_token)
         jti = decoded_token["jti"]
-        expires = datetime.datetime.fromtimestamp(decoded_token["exp"])
-        blocklisted_token = TokenBlocklist(jti=jti, expires_at=expires)
-        blocklisted_token.save()
+        expires = datetime.datetime.fromtimestamp(decoded_token["exp"], datetime.timezone.utc)
+
+        from src.services import get_auth_service
+        get_auth_service().revoke_token(jti, expires)
 
     # 3. Attempt to use the blacklisted refresh token to get a new access token
     headers = {
