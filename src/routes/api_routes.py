@@ -81,10 +81,18 @@ def blog_post_api(slug: str) -> Response:
 
     post = post_service.get_post_by_slug_or_404(slug)
     return jsonify({
+        'id': str(post.id),
         'title': post.title,
         'content': post.content,
+        'summary': post.summary,
         'slug': post.slug,
-        'publication_date': post.publication_date.isoformat() if post.publication_date else None
+        'is_published': post.is_published,
+        'publication_date': post.publication_date.isoformat() if post.publication_date else None,
+        'last_updated': post.last_updated.isoformat() if post.last_updated else None,
+        'author': {
+            'id': str(post.author.id),
+            'username': post.author.username
+        }
     })
 
 @bp.route('/license', methods=['GET'])

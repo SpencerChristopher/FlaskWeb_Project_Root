@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      run_heavy_tests:
+        description: "Include performance-heavy/media tests in this run"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -115,7 +120,11 @@ jobs:
           docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
 
       - name: Run tests
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+        env:
+          OPT_IN_HEAVY_TESTS: ${{ github.event.inputs.run_heavy_tests || 'false' }}
+        run: |
+          chmod +x ./scripts/run_ci_tests.sh
+          ./scripts/run_ci_tests.sh
 
       - name: Capture logs on failure
         if: failure()
@@ -194,7 +203,7 @@ jobs:
       - name: Verify staging health
         run: |
           curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/content/profile
 
       - name: Create Admin User
         run: |
