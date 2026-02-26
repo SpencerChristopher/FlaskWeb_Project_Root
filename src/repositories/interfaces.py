@@ -50,7 +50,7 @@ class TokenRepository(Protocol):
     def is_jti_revoked(self, jti: str) -> bool:
         ...
 
-    def add_to_blocklist(self, jti: str, expires_at: datetime.datetime) -> None:
+    def add_to_blocklist(self, jti: str, expires_at: datetime.datetime, ttl: Optional[int] = None) -> None:
         ...
 
 

@@ -1,8 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask_jwt_extended import create_access_token, decode_token
-
-from src.models.token_blocklist import TokenBlocklist
+from src.services import get_auth_service
 
 
 class TestJWTAuthentication:
@@ -36,9 +35,10 @@ class TestJWTAuthentication:
             )
             decoded_token = decode_token(access_token)
             jti = decoded_token["jti"]
-            expires = datetime.fromtimestamp(decoded_token["exp"])
-            blocklisted_token = TokenBlocklist(jti=jti, expires_at=expires)
-            blocklisted_token.save()
+            expires = datetime.fromtimestamp(decoded_token["exp"], tz=timezone.utc)
+            
+            from src.services import get_auth_service
+            get_auth_service().revoke_token(jti, expires)
 
         headers = {"Authorization": f"Bearer {access_token}"}
         response = client.get("/api/content/posts", headers=headers)

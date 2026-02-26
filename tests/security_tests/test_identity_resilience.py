@@ -26,8 +26,9 @@ class TestIdentityResilience:
 
         # 3. Next request with OLD token must fail
         resp = client.get("/api/content/posts", headers=admin_headers)
-        
+
         assert resp.status_code == 401
         assert resp.get_json()["error_code"] == "UNAUTHORIZED"
-        # The JWT loader in security.py catches this first and returns "revoked"
-        assert "revoked" in resp.get_json()["message"].lower()
+        # Match message from AuthzService
+        assert "session has expired or been invalidated" in resp.get_json()["message"].lower()
+        
