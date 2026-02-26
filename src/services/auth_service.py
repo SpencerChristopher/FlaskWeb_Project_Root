@@ -9,7 +9,7 @@ from typing import Any, Optional, TYPE_CHECKING
 from src.events import dispatch_event, user_deleted, user_role_changed
 from src.exceptions import UnauthorizedException
 from src.models.user import User
-from src.repositories.interfaces import UserRepository
+from src.repositories.interfaces import UserRepository, TokenRepository
 from src.services.roles import build_claim_roles_for_role
 
 if TYPE_CHECKING:
@@ -19,8 +19,14 @@ if TYPE_CHECKING:
 class AuthService:
     """Application service for auth-related user workflows."""
 
-    def __init__(self, user_repository: UserRepository, session_service: SessionService | None = None):
+    def __init__(
+        self,
+        user_repository: UserRepository,
+        token_repository: TokenRepository,
+        session_service: SessionService | None = None,
+    ):
         self._user_repository = user_repository
+        self._token_repository = token_repository
         self._session_service = session_service
 
     def authenticate(self, username: str, password: str) -> User:
@@ -76,3 +82,28 @@ class AuthService:
         self._user_repository.delete(user)
         # Stage 3: ID-based signaling
         dispatch_event(user_deleted, "auth_service", user_id=persisted_user_id)
+
+    def is_token_revoked(self, jwt_payload: dict) -> bool:
+        """
+        Comprehensive check for token revocation.
+        Checks blocklist, user existence, and token version.
+        """
+        jti = jwt_payload.get("jti")
+        user_id = jwt_payload.get("sub")
+        token_version = jwt_payload.get("tv")
+
+        if not jti or self._token_repository.is_jti_revoked(jti):
+            return True
+
+        if not user_id:
+            return True
+
+        user = self._user_repository.get_by_id(user_id)
+        if not user:
+            return True
+
+        # If user has a token version, it must match the token's version
+        if token_version is not None and user.token_version != token_version:
+            return True
+
+        return False

@@ -1,8 +1,7 @@
 import pytest
 from src.models.post import Post
 from src.models.user import User
-from src.repositories.mongo_post_repository import MongoPostRepository
-from src.services.post_service import PostService
+from src.services import get_post_service
 
 @pytest.fixture
 def test_user(app):
@@ -15,7 +14,7 @@ def test_user(app):
 
 @pytest.fixture
 def post_service():
-    return PostService(MongoPostRepository())
+    return get_post_service()
 
 
 class TestHtmlSanitization:

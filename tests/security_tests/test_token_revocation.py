@@ -32,7 +32,8 @@ def test_admin_access_after_user_deletion(client, app, test_admin_user, login_us
     # 2. Delete the admin user from the database
     user_to_delete = User.objects(username='adminuser').first()
     if user_to_delete:
-        auth_service = AuthService(MongoUserRepository())
+        from src.services import get_auth_service
+        auth_service = get_auth_service()
         auth_service.delete_user(user_id=str(user_to_delete.id))
 
     # Ensure the user is actually deleted
