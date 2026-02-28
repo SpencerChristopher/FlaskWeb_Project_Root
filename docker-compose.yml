@@ -23,6 +23,7 @@ services:
       # Gunicorn
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-30}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
 
       # Security & Cookies
       JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-true}
