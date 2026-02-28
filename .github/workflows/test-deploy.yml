@@ -37,7 +37,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies for audit
-        run: pip install pip-audit poetry
+        run: |
+          pip install pip-audit poetry
+          poetry self add poetry-plugin-export
 
       - name: Security Audit (pip-audit)
         run: |
@@ -172,7 +174,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install dependencies for audit
-        run: pip install pip-audit poetry
+        run: |
+          pip install pip-audit poetry
+          poetry self add poetry-plugin-export
 
       - name: Security Audit (pip-audit)
         run: |
