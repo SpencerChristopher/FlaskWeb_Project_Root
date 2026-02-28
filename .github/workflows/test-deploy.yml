@@ -36,6 +36,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install dependencies for audit
+        run: pip install pip-audit poetry
+
+      - name: Security Audit (pip-audit)
+        run: |
+          poetry export --format=constraints.txt --output=constraints.txt --without-hashes
+          pip-audit -r constraints.txt
+          rm constraints.txt
+
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
@@ -151,6 +160,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Install dependencies for audit
+        run: pip install pip-audit poetry
+
+      - name: Security Audit (pip-audit)
+        run: |
+          poetry export --format=constraints.txt --output=constraints.txt --without-hashes
+          pip-audit -r constraints.txt
+          rm constraints.txt
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
