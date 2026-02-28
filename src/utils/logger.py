@@ -7,6 +7,7 @@ including file rotation and console output.
 import logging
 import os
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
 def setup_logging(app):
     """
@@ -26,10 +27,10 @@ def setup_logging(app):
     numeric_level = getattr(logging, log_level, logging.INFO)
 
     # Ensure the logs directory exists
-    log_dir = os.path.join(app.root_path, '..', 'logs')
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir = Path(app.root_path).parent / 'logs'
+    log_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
 
-    log_file = os.path.join(log_dir, 'app.log')
+    log_file = log_dir / 'app.log'
 
     # Create a logger
     logger = logging.getLogger() # Get the root logger

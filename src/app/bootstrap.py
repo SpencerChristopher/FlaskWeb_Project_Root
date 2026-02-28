@@ -4,6 +4,7 @@ Bootstrap and runtime configuration helpers for the Flask app factory.
 
 import os
 import time
+from pathlib import Path
 
 from dotenv import load_dotenv
 from flask import Flask
@@ -22,11 +23,11 @@ def load_environment() -> None:
 
 def create_flask_app(import_name: str) -> Flask:
     """Create the base Flask app with project-level static/template paths."""
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    project_root = Path(__file__).resolve().parent.parent.parent
     return Flask(
         import_name,
-        template_folder=os.path.join(project_root, "templates"),
-        static_folder=os.path.join(project_root, "static"),
+        template_folder=str(project_root / "templates"),
+        static_folder=str(project_root / "static"),
     )
 
 
@@ -56,10 +57,23 @@ def configure_core_runtime(app: Flask) -> None:
     setup_logging(app)
     app.logger.info("Flask application starting up...")
 
-    mongo_uri = os.environ.get("MONGO_URI")
-    if not mongo_uri:
-        app.logger.error("MONGO_URI environment variable not set!")
-        raise ValueError("MONGO_URI environment variable not set!")
+    # Build MONGO_URI dynamically
+    mongo_user = os.environ.get("MONGO_APP_USER", "webserver")
+    mongo_pass = os.environ.get("MONGO_APP_PASSWORD", "password")
+    mongo_host = os.environ.get("MONGO_HOST", "mongo")
+    mongo_db = os.environ.get("MONGO_APP_DB", "appdb")
+    
+    # Check if testing mode is active to use test database
+    if app.config.get("TESTING"):
+        mongo_db = os.environ.get("MONGO_TEST_DB", "pytest_appdb")
+
+    mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/{mongo_db}?authSource={os.environ.get('MONGO_APP_DB', 'appdb')}"
+    
+    # Configure Redis URL
+    redis_host = os.environ.get("REDIS_HOST", "redis")
+    redis_uri = f"redis://{redis_host}:6379/0"
+    app.config["RATELIMIT_STORAGE_URI"] = redis_uri
+    os.environ["RATELIMIT_STORAGE_URI"] = redis_uri
 
     app.config["MONGODB_SETTINGS"] = {
         "host": mongo_uri,
@@ -95,6 +109,6 @@ def configure_core_runtime(app: Flask) -> None:
         raise ConnectionError("Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status.")
 
     # Ensure media upload directory exists
-    upload_dir = os.path.join(app.static_folder, "uploads")
-    os.makedirs(upload_dir, mode=0o755, exist_ok=True)
+    upload_dir = Path(app.static_folder) / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
 

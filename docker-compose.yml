@@ -16,9 +16,12 @@ services:
       FLASK_APP: main.py
       DOCKER_CONTAINER: "true"
 
-      # Infrastructure URIs
-      MONGO_URI: mongodb://${MONGO_APP_USER:-webserver}:${MONGO_APP_PASSWORD:-password}@mongo:27017/${MONGO_APP_DB:-appdb}?authSource=${MONGO_APP_DB:-appdb}
-      RATELIMIT_STORAGE_URI: redis://redis:6379/0
+      # Infrastructure Components
+      MONGO_APP_USER: ${MONGO_APP_USER:-webserver}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-password}
+      MONGO_APP_DB: ${MONGO_APP_DB:-appdb}
+      MONGO_HOST: mongo
+      REDIS_HOST: redis
 
       # Gunicorn
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}

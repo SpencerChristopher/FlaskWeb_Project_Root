@@ -52,7 +52,7 @@ def _build_test_mongo_uri(in_container: bool) -> str:
             )
         return "mongodb://mongo:27017/pytest_appdb"
 
-    return os.environ.get("PYTEST_MONGO_URI", "mongodb://localhost:27017/pytest_appdb")
+    return os.environ.get("PYTEST_MONGO_URI", "mongodb://mongo:27017/pytest_appdb")
 
 def _add_markers_by_path(item):
     path = str(item.fspath)
