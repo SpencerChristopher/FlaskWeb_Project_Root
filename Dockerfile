@@ -1,6 +1,6 @@
 # --- Builder Stage ---
 # This stage installs dependencies using Poetry
-FROM python:3.11-slim-buster AS builder
+FROM python:3.11-slim-bookworm AS builder
 
 # Set the working directory
 WORKDIR /app
@@ -19,7 +19,7 @@ RUN poetry install --no-root
 
 # --- Final Stage ---
 # This stage creates the final, lean production image
-FROM python:3.11-slim-buster
+FROM python:3.11-slim-bookworm
 
 # Set the working directory
 WORKDIR /app
