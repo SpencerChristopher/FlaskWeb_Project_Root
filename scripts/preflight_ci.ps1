@@ -1,7 +1,8 @@
 param(
     [switch]$RunAct,
     [switch]$SkipAudit,
-    [switch]$SkipCloud
+    [switch]$SkipCloud,
+    [switch]$Verbose
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,22 +20,16 @@ function Require-Command($name, [switch]$Optional) {
 
 Write-Host "`n--- Preflight Security & Integrity Checks (PowerShell) ---" -ForegroundColor Cyan
 
-# [1/7] Tool Check
-Write-Host "[1/7] Verifying required tools..."
-$tools = @("poetry", "docker", "gh")
+# [1/6] Tool Check
+Write-Host "[1/6] Verifying required tools..."
+$tools = @("poetry", "docker")
 foreach ($tool in $tools) {
-    if (-not (Require-Command $tool)) { 
-        if ($tool -eq "gh") {
-            Write-Host "Warning: GitHub CLI (gh) not found. Cloud-aware checks will be skipped." -ForegroundColor Yellow
-        } else {
-            exit 1 
-        }
-    }
+    if (-not (Require-Command $tool)) { exit 1 }
 }
 
-# [2/7] Cloud State Validation (GitHub CLI)
+# [2/6] Cloud State Validation (GitHub CLI)
 if (-not $SkipCloud -and (Require-Command "gh" -Optional)) {
-    Write-Host "[2/7] Validating Cloud State (GitHub)..."
+    Write-Host "[2/6] Validating Cloud State (GitHub)..."
     
     # Check Runner Status
     try {
@@ -56,11 +51,11 @@ if (-not $SkipCloud -and (Require-Command "gh" -Optional)) {
         Write-Host "Warning: Could not fetch runner status. Are you logged in to 'gh'?" -ForegroundColor Yellow
     }
 
-    # Check Secret Existence (Names only)
+    # Check Secret Existence
     try {
         $remoteSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
         $requiredSecrets = @("SECRET_KEY", "ADMIN_USERNAME", "ADMIN_PASSWORD", "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_USER", "MONGO_APP_PASSWORD")
-        
+        $missingSecret = $false
         foreach ($s in $requiredSecrets) {
             if ($s -notin $remoteSecrets) {
                 Write-Host "MISSING SECRET: '$s' is required by CI but not found in GitHub." -ForegroundColor Red
@@ -72,58 +67,58 @@ if (-not $SkipCloud -and (Require-Command "gh" -Optional)) {
         Write-Host "Warning: Could not fetch secret list." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[2/7] Skipping Cloud State Validation." -ForegroundColor Yellow
+    Write-Host "[2/6] Skipping Cloud State Validation." -ForegroundColor Yellow
 }
 
-# [3/7] Security Audit (pip-audit)
-Write-Host "[3/7] Running security audit..."
+# [3/6] Containerized Validation (Lint & Audit)
+Write-Host "[3/6] Running containerized lints and security audits (Silent)..."
 if ($SkipAudit) {
-    Write-Host "Skipping audit as requested." -ForegroundColor Yellow
-} elseif (Require-Command "pip-audit" -Optional) {
-    poetry export --format=constraints.txt --output=constraints.txt --without-hashes
-    try {
-        pip-audit -r constraints.txt
-        Write-Host "Security audit passed: No known vulnerabilities." -ForegroundColor Green
-    } finally {
-        if (Test-Path constraints.txt) { Remove-Item constraints.txt }
-    }
+    Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
-    Write-Host "Warning: pip-audit not found. Skipping local dependency scan." -ForegroundColor Yellow
+    # Run docker build quietly, only showing error output unless -Verbose is passed
+    if ($Verbose) {
+        docker build --target validate .
+    } else {
+        docker build --target validate --quiet . > $null
+    }
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Containerized validation (lint/audit) failed. Run with -Verbose for details." -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "Containerized validation passed." -ForegroundColor Green
 }
 
-# [4/7] Lockfile Freshness
-Write-Host "[4/7] Ensuring poetry.lock is up to date..."
-poetry lock
+# [4/6] Lockfile Freshness
+Write-Host "[4/6] Ensuring poetry.lock is up to date..."
+poetry lock --quiet
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: poetry lock failed." -ForegroundColor Red
     exit 1
 }
 
-# [5/7] GitHub Actions Linting
-Write-Host "[5/7] Linting GitHub Actions workflows..."
-if (Require-Command "actionlint" -Optional) {
-    & actionlint -color -format '{{.Filepath}}:{{.Line}}:{{.Column}}: {{.Message}}' ".github/workflows/*.yml"
-} else {
-    Write-Host "Warning: actionlint not found. Skipping workflow linting." -ForegroundColor Yellow
-}
-
-# [6/7] Local CI Simulation (Optional)
+# [5/6] Local CI Simulation (Optional)
 if ($RunAct) {
-    Write-Host "[6/7] Running local workflow simulation (act)..."
+    Write-Host "[5/6] Running local workflow simulation (act)..."
     if (Require-Command "act" -Optional) {
-        act -W .github/workflows/test-deploy.yml
+        & act -W .github/workflows/test-deploy.yml
     } else {
         Write-Host "Install act to run workflows locally, then re-run with -RunAct." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[6/7] Skipping local workflow simulation."
+    Write-Host "[5/6] Skipping local workflow simulation."
 }
 
-# [7/7] Docker Stack Build
-Write-Host "[7/7] Verifying Docker stack build..."
-docker compose --env-file .env build
+# [6/6] Docker Stack Build
+Write-Host "[6/6] Verifying final Docker stack build (Silent)..."
+if ($Verbose) {
+    docker compose --env-file .env build
+} else {
+    docker compose --env-file .env build --quiet
+}
+
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Docker build failed." -ForegroundColor Red
+    Write-Host "Error: Final Docker build failed. Run with -Verbose for details." -ForegroundColor Red
     exit 1
 }
 
