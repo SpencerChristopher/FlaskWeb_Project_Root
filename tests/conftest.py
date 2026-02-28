@@ -93,7 +93,7 @@ def database_connection_check():
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
 
     try:
-        client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000)
+        client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000, uuidRepresentation='standard')
         client.server_info()
         disconnect()
     except ServerSelectionTimeoutError as e:
