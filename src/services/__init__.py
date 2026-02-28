@@ -76,8 +76,7 @@ def get_profile_service() -> "ProfileService":
     if _profile_service is None:
         from src.repositories import get_profile_repository
         from src.services.profile_service import ProfileService
-
-        _profile_service = ProfileService(get_profile_repository())
+        _profile_service = ProfileService(get_profile_repository(), get_media_service())
     return _profile_service
 
 

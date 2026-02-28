@@ -10,12 +10,14 @@ from typing import TYPE_CHECKING
 from src.models.profile import Profile, WorkHistoryItem as WorkHistoryModel
 from src.repositories.interfaces import ProfileRepository
 from src.schemas import ProfilePublic, ProfileSchema, WorkHistoryItem as WorkHistorySchema
+from typing import BinaryIO
 
 class ProfileService:
     """Application service for developer profile orchestration."""
 
-    def __init__(self, profile_repository: ProfileRepository):
+    def __init__(self, profile_repository: ProfileRepository, media_service: "MediaService"):
         self._profile_repository = profile_repository
+        self._media_service = media_service
 
     def _map_work_history_to_dto(self, history: list) -> list[WorkHistorySchema]:
         return [
@@ -108,3 +110,32 @@ class ProfileService:
         saved_profile = self._profile_repository.save(profile)
         
         return self.get_profile() # Returns the hydrated Public DTO
+
+    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str) -> str:
+        """
+        Specialized method to replace the existing profile photo with a new one.
+        Ensures only one photo exists by deleting the previous file.
+        """
+        profile_doc = self._profile_repository.get_profile()
+        
+        # 1. Cleanup old photo if it exists
+        if profile_doc and profile_doc.image_url:
+            self._media_service.delete_image(profile_doc.image_url)
+
+        # 2. Save new photo
+        new_url = self._media_service.save_image(file_stream, original_filename)
+
+        # 3. Update Profile reference (or create if missing)
+        if not profile_doc:
+            profile_doc = Profile(
+                name="Developer Name",
+                location="Remote / City",
+                statement="Welcome to my developer profile.",
+                image_url=new_url
+            )
+        else:
+            profile_doc.image_url = new_url
+            profile_doc.last_updated = datetime.datetime.now(datetime.timezone.utc)
+
+        self._profile_repository.save(profile_doc)
+        return new_url
