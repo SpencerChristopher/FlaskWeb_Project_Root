@@ -88,7 +88,12 @@ def register() -> Response:
 
     # Placeholder for actual user registration logic
     current_app.logger.info(f"New user registration for: {user_data.username} from IP: {request.remote_addr}")
-    return jsonify({'message': 'User registration endpoint (placeholder)', 'received_data': user_data.model_dump()}), 200
+    
+    # Return PII-clean response with 201 Created
+    return jsonify({
+        "message": "User registration successful (Placeholder)",
+        "username": user_data.username
+    }), 201
 
 
 @bp.route('/logout', methods=['POST'])
