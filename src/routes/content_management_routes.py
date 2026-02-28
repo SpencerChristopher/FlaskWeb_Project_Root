@@ -9,6 +9,7 @@ from typing import Callable, Any
 from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
+from werkzeug.utils import secure_filename
 from src.services import get_authz_service, get_post_service, get_auth_service, get_profile_service, get_media_service
 from src.services.roles import Permissions
 from src.schemas import BlogPostCreateUpdate, ProfileSchema
@@ -151,7 +152,8 @@ def upload_media() -> Response:
 
     try:
         # Use generic media service for non-singleton assets
-        url = media_service.save_image(file.stream, file.filename)
+        safe_filename = secure_filename(file.filename)
+        url = media_service.save_image(file.stream, safe_filename)
         return jsonify({"url": url, "message": "Content image uploaded successfully"}), 201
     except ValueError as e:
         raise BadRequestException(str(e))
@@ -172,7 +174,8 @@ def upload_profile_photo() -> Response:
         raise BadRequestException("No selected file.")
 
     try:
-        url = profile_service.update_profile_photo(file.stream, file.filename)
+        safe_filename = secure_filename(file.filename)
+        url = profile_service.update_profile_photo(file.stream, safe_filename)
         return jsonify({
             "url": url, 
             "message": "Profile photo replaced successfully. Old file deleted."
