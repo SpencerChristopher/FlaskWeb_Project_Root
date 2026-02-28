@@ -34,8 +34,9 @@ Configuration values are sourced in a hierarchical manner:
 5.  **Build and Push Multi-platform Docker Image:** Builds the `web` service image for `linux/amd64` and `linux/arm64` platforms, then pushes the multi-architecture image manifest to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` (derived from `IMAGE_TAG`).
 6.  **Start Containers:** Uses `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build` to start `mongo`, `redis`, and `web`. It pulls the `web` image from `ghcr.io` (via `docker-compose.ci.yml`) and waits for all services (including the `web` service's health check) to become `healthy`.
 7.  **Seed Database:** Executes `scripts/seed_db.py` to populate the database with initial data.
-8.  **Inject and Run Tests:** Copies test files into the running `web` container and executes `pytest`.
-9.  **Teardown:** Stops and removes all services created by Docker Compose.
+8.  **Inject and Run Tests:** Copies test files into the running `web` container and executes `pytest`. By default, performance-intensive tests (marked `@pytest.mark.heavy`) are skipped for Pi optimization.
+9.  **Heavy Test Opt-in:** These can be manually triggered via `workflow_dispatch` by setting `run_heavy_tests: true`.
+10. **Teardown:** Stops and removes all services created by Docker Compose.
 
 ## Staging Deployment (WSL Runner)
 **Triggered by:** Runs after the `build-and-test` job successfully completes.
