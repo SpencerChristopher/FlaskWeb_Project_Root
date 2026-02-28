@@ -17,10 +17,11 @@ bcrypt = Bcrypt()
 jwt = JWTManager()
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI"),
-    strategy="fixed-window" # Explicitly set strategy
+    strategy="fixed-window"
 )
 
 # Redis client for session and token management
 # Sourced from the same URI as limiter for infrastructure consolidation
-redis_client = redis.from_url(os.environ.get("RATELIMIT_STORAGE_URI", "redis://redis:6379/0"))
+redis_pass = os.environ.get("REDIS_PASSWORD", "changeme")
+redis_host = os.environ.get("REDIS_HOST", "redis")
+redis_client = redis.from_url(os.environ.get("RATELIMIT_STORAGE_URI", f"redis://:{redis_pass}@{redis_host}:6379/0"))

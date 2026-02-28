@@ -20,6 +20,8 @@ def test_database_connection(caplog, monkeypatch): # Removed 'app' fixture
             'db': 'appdb',
             'serverSelectionTimeoutMS': 2000
         }
+        # Silence Limiter warnings in temp app
+        temp_app.config['RATELIMIT_STORAGE_URI'] = os.environ.get('RATELIMIT_STORAGE_URI', 'redis://redis:6379/0')
         from src.extensions import db as test_db_extension, limiter as test_limiter_extension
         test_db_extension.init_app(temp_app)
         test_limiter_extension.init_app(temp_app)

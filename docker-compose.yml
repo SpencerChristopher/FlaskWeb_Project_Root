@@ -22,6 +22,7 @@ services:
       MONGO_APP_DB: ${MONGO_APP_DB:-appdb}
       MONGO_HOST: mongo
       REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
 
       # Gunicorn
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
@@ -104,11 +105,11 @@ services:
     image: "redis:alpine"
     container_name: redis
     restart: always
-    command: redis-server --maxmemory 50mb --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 50mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
