@@ -5,8 +5,8 @@ FROM python:3.11-slim-bookworm AS builder
 # Set the working directory
 WORKDIR /app
 
-# Install poetry
-RUN pip install poetry
+# Install poetry and secure system tools
+RUN pip install --upgrade pip setuptools wheel && pip install poetry
 
 # Copy only the dependency definition files to leverage Docker cache
 COPY poetry.lock pyproject.toml ./
@@ -28,6 +28,10 @@ WORKDIR /app
 RUN useradd --create-home appuser
 # Create necessary directories and set permissions for appuser
 RUN mkdir -p logs static/uploads && chown -R appuser:appuser /app
+
+# Upgrade system tools to secure versions
+USER root
+RUN pip install --upgrade pip setuptools wheel
 USER appuser
 
 ARG LOG_LEVEL=INFO
