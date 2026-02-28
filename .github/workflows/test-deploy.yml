@@ -36,16 +36,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Security Audit (pip-audit)
-        run: |
-          python3 -m venv audit-venv
-          source audit-venv/bin/activate
-          pip install pip-audit poetry poetry-plugin-export
-          poetry export --format=constraints.txt --output=constraints.txt --without-hashes
-          pip-audit -r constraints.txt
-          rm constraints.txt
-          deactivate
-          rm -rf audit-venv
+      - name: Containerized Audit & Lint
+        run: docker build --target validate .
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
@@ -173,16 +165,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Security Audit (pip-audit)
-        run: |
-          python3 -m venv audit-venv
-          source audit-venv/bin/activate
-          pip install pip-audit poetry poetry-plugin-export
-          poetry export --format=constraints.txt --output=constraints.txt --without-hashes
-          pip-audit -r constraints.txt
-          rm constraints.txt
-          deactivate
-          rm -rf audit-venv
+      - name: Containerized Audit & Lint
+        run: docker build --target validate .
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
