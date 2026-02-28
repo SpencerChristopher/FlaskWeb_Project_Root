@@ -85,13 +85,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push Docker Image
+      - name: Build Image Locally (for Testing)
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          load: true
           tags: ${{ env.IMAGE_TAG }}
-          platforms: linux/amd64,linux/arm64
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
           cache-from: type=gha
@@ -99,8 +98,7 @@ jobs:
 
       - name: Start containers
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml pull web
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --pull always --no-build
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
 
       - name: Assert web healthy before seed
         run: |
@@ -125,6 +123,18 @@ jobs:
 
       - name: Run tests
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+
+      - name: Push Verified Multi-platform Image
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.IMAGE_TAG }}
+          build-args: |
+            LOG_LEVEL=${{ env.LOG_LEVEL }}
+          cache-from: type=gha
 
       - name: Capture logs on failure
         if: failure()
