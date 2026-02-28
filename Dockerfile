@@ -57,4 +57,4 @@ EXPOSE 8000
 
 # Define the command to run the application
 # We use the full path to the gunicorn executable in the virtual environment
-CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --timeout ${GUNICORN_TIMEOUT} --log-level ${LOG_LEVEL} --limit-request-line 4094 --limit-request-fields 100 --max-requests 1000 --forwarded-allow-ips="${FORWARDED_ALLOW_IPS}" --access-logfile - 'main:create_app()'
+CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --timeout ${GUNICORN_TIMEOUT} --log-level ${LOG_LEVEL} --limit-request-line 4094 --limit-request-fields 100 --max-requests 1000 --forwarded-allow-ips="${FORWARDED_ALLOW_IPS}" --preload --access-logfile - 'main:create_app()'
