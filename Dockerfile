@@ -6,7 +6,8 @@ FROM python:3.11-slim-bookworm AS builder
 WORKDIR /app
 
 # Install poetry and secure system tools
-RUN pip install --upgrade pip setuptools wheel && pip install poetry
+RUN pip install --upgrade pip setuptools wheel && pip install poetry && \
+    poetry self add poetry-plugin-export
 
 # Copy only the dependency definition files to leverage Docker cache
 COPY poetry.lock pyproject.toml ./
@@ -16,6 +17,21 @@ COPY poetry.lock pyproject.toml ./
 # --no-dev is used to skip development dependencies in the final image
 ENV POETRY_VIRTUALENVS_IN_PROJECT=true
 RUN poetry install --no-root
+
+# --- Validation Stage ---
+# This stage runs security audits and lints before final image creation
+FROM builder AS validate
+WORKDIR /app
+COPY . .
+# Install validation tools (silently)
+RUN apt-get update -qq && apt-get install -y -qq wget curl ca-certificates > /dev/null && \
+    wget -qO- https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- latest /usr/local/bin/ && \
+    ./.venv/bin/pip install --quiet pip-audit
+# Execute lints and audits (reporting only errors)
+RUN /usr/local/bin/actionlint .github/workflows/*.yml && \
+    poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
+    ./.venv/bin/pip-audit -r constraints.txt && \
+    rm constraints.txt
 
 # --- Final Stage ---
 # This stage creates the final, lean production image

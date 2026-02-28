@@ -1,0 +1,7 @@
+# .github/actionlint.yaml
+# Configuration for actionlint to recognize custom self-hosted runner labels
+
+self-hosted-runner:
+  labels:
+    - pi-prod
+    - wsl-staging
