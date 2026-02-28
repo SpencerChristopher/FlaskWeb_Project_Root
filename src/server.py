@@ -31,11 +31,11 @@ def create_app():
 
     app = create_flask_app(__name__)
     configure_proxy_fix(app)
+    configure_core_runtime(app)
     configure_http_security(app)
     configure_cors(app)
     configure_jwt(app)
     configure_rate_limiter(app)
-    configure_core_runtime(app)
     register_blueprints(app)
     register_error_handlers(app)
 

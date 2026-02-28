@@ -124,4 +124,8 @@ def configure_jwt(app: Flask) -> None:
 
 def configure_rate_limiter(app: Flask) -> None:
     """Initialize Flask-Limiter on the current app."""
+    # Ensure storage_uri is set in app config before calling init_app
+    storage_uri = app.config.get("RATELIMIT_STORAGE_URI")
+    if storage_uri:
+        app.config["RATELIMIT_STORAGE_URI"] = storage_uri
     limiter.init_app(app)
