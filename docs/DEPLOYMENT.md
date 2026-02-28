@@ -58,6 +58,7 @@ Configuration values are sourced in a hierarchical manner:
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
 *   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` provides a safe default (e.g., `3`) via `GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}`.
+*   **Gunicorn Hardening:** Gunicorn is configured with `--limit-request-line 4094`, `--limit-request-fields 100`, and `--max-requests 1000`. `FORWARDED_ALLOW_IPS` is used to restrict which IPs the WSGI server trusts for proxy headers (defaults to `*` for Docker network compatibility but should be restricted in high-security environments).
 *   **Flask App Env:** `FLASK_ENV` is set to `development` for CI/test and `production` for staging/deployment.
 *   **Talisman/HTTPS:** `TALISMAN_FORCE_HTTPS` is configured (default `true` for deployment).
 *   **ProxyFix:** `PROXY_FIX_X_FOR`, `PROXY_FIX_X_PROTO`, etc., are configured to handle reverse proxy headers.
