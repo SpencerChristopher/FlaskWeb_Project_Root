@@ -78,6 +78,7 @@ def configure_core_runtime(app: Flask) -> None:
 
     app.config["MONGODB_SETTINGS"] = {
         "host": mongo_uri,
+        "uuidRepresentation": "standard",
         "serverSelectionTimeoutMS": int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", 10000)),
         "connectTimeoutMS": int(os.environ.get("MONGO_CONNECT_TIMEOUT_MS", 10000)),
         "socketTimeoutMS": int(os.environ.get("MONGO_SOCKET_TIMEOUT_MS", 10000)),
