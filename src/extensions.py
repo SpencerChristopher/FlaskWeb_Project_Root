@@ -23,4 +23,4 @@ limiter = Limiter(
 
 # Redis client for session and token management
 # Sourced from the same URI as limiter for infrastructure consolidation
-redis_client = redis.from_url(os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"))
+redis_client = redis.from_url(os.environ.get("RATELIMIT_STORAGE_URI", "redis://redis:6379/0"))
