@@ -93,7 +93,15 @@ def get_post(post_id: str) -> Response:
 def update_post(post_id: str) -> Response:
     """
     Updates an existing post.
+    Enforces ownership check: Only the author can update.
     """
+    post = post_service.get_post_or_404(post_id)
+    
+    # Ownership Check
+    author_identity = getattr(g, "current_user", None)
+    if str(post.author.id) != author_identity.id:
+        raise UnauthorizedException("You do not have permission to modify this post.")
+
     post_data = BlogPostCreateUpdate(**request.get_json())
 
     post = post_service.update_post(
@@ -113,7 +121,15 @@ def update_post(post_id: str) -> Response:
 def delete_post(post_id: str) -> Response:
     """
     Deletes a post.
+    Enforces ownership check: Only the author can delete.
     """
+    post = post_service.get_post_or_404(post_id)
+
+    # Ownership Check
+    author_identity = getattr(g, "current_user", None)
+    if str(post.author.id) != author_identity.id:
+        raise UnauthorizedException("You do not have permission to delete this post.")
+
     post_service.delete_post(post_id)
     return jsonify({'message': 'Post deleted successfully'}), 200
 
