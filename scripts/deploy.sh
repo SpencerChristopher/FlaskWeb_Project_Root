@@ -65,10 +65,9 @@ verify_mongo_auth_ping() {
 }
 
 perform_mongo_auth_recovery() {
-  echo "Detected MongoDB auth health drift. Performing one-time hard reset recovery."
-  backup_before_reset_optional
-  docker compose "${COMPOSE_ARGS[@]}" down -v --remove-orphans || true
-  start_compose_stack
+  echo "Detected MongoDB auth health drift. Aborting destructive auto-recovery."
+  echo "Manual intervention required. Check volume permissions or auth credentials."
+  return 1
 }
 
 # Ensure image tag is provided by CI/CD
