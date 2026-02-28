@@ -121,6 +121,8 @@ tests/__pycache__/
 tests/*.log
 # local certs for https
 /certs
+# Local uploads
+static/uploads/
 # Temporary commit message file
 commit_message.txt
 
