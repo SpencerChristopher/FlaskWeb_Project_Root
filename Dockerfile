@@ -47,6 +47,7 @@ COPY --chown=appuser:appuser ./scripts ./scripts
 COPY --chown=appuser:appuser ./static ./static
 COPY --chown=appuser:appuser ./templates ./templates
 COPY --chown=appuser:appuser ./main.py ./
+COPY --chown=appuser:appuser ./pytest.ini ./
 
 EXPOSE 8000
 
