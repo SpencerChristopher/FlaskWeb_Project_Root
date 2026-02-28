@@ -36,8 +36,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Containerized Audit & Lint
-        run: docker build --target validate .
+      - name: Security Audit (pip-audit)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
+            pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
+            poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
+            pip-audit -r constraints.txt && \
+            bandit -r src/ -ll"
+
+      - name: Workflow Lint (actionlint)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
@@ -164,9 +173,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Containerized Audit & Lint
-        run: docker build --target validate .
+        with:
+          sparse-checkout: |
+            scripts
+            docker
+            docker-compose.yml
+            docker-compose.ci.yml
+            config.env
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
