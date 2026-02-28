@@ -140,7 +140,7 @@ def update_profile() -> Response:
 @permission_required(Permissions.PROFILE_MANAGE)
 def upload_media() -> Response:
     """
-    Handles image uploads for content.
+    Handles generic image uploads for blog content.
     """
     if 'file' not in request.files:
         raise BadRequestException("No file part in the request.")
@@ -150,8 +150,33 @@ def upload_media() -> Response:
         raise BadRequestException("No selected file.")
 
     try:
+        # Use generic media service for non-singleton assets
         url = media_service.save_image(file.stream, file.filename)
-        return jsonify({"url": url, "message": "Upload successful"}), 201
+        return jsonify({"url": url, "message": "Content image uploaded successfully"}), 201
+    except ValueError as e:
+        raise BadRequestException(str(e))
+
+
+@bp.route('/profile/photo', methods=['POST'])
+@permission_required(Permissions.PROFILE_MANAGE)
+def upload_profile_photo() -> Response:
+    """
+    Specialized route for updating the singleton profile photo.
+    Automatically deletes the old photo from the filesystem.
+    """
+    if 'file' not in request.files:
+        raise BadRequestException("No file part in the request.")
+    
+    file = request.files['file']
+    if file.filename == '':
+        raise BadRequestException("No selected file.")
+
+    try:
+        url = profile_service.update_profile_photo(file.stream, file.filename)
+        return jsonify({
+            "url": url, 
+            "message": "Profile photo replaced successfully. Old file deleted."
+        }), 200
     except ValueError as e:
         raise BadRequestException(str(e))
 
