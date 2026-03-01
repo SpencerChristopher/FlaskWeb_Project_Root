@@ -6,8 +6,8 @@ from __future__ import annotations
 
 from typing import Any, Optional, TYPE_CHECKING
 
-from src.events import dispatch_event, user_deleted, user_role_changed
-from src.exceptions import UnauthorizedException
+from src.events import dispatch_event, user_deleted, user_role_changed, user_created
+from src.exceptions import UnauthorizedException, ConflictException
 from src.models.user import User
 from src.repositories.interfaces import UserRepository, TokenRepository
 from src.services.roles import build_claim_roles_for_role
@@ -36,6 +36,35 @@ class AuthService:
         if not user or not user.check_password(password):
             raise UnauthorizedException("Invalid username or password")
         return user
+
+    def register_user(self, *, username: str, email: str, password: str, role: str = "member") -> User:
+        """
+        Registers a new user in the system.
+        Only allowed for administrative users (enforced at route level).
+        """
+        if self._user_repository.get_by_username(username):
+            raise ConflictException(f"Username '{username}' is already taken.")
+        
+        # In a real system, we'd also check email uniqueness if mandated
+        
+        new_user = User(
+            username=username,
+            email=email,
+            role=role,
+            token_version=0
+        )
+        new_user.set_password(password)
+        created_user = self._user_repository.save(new_user)
+        
+        # Stage 3: ID-based signaling
+        dispatch_event(
+            user_created, 
+            "auth_service", 
+            user_id=str(created_user.id), 
+            username=created_user.username,
+            role=created_user.role
+        )
+        return created_user
 
     def get_user(self, user_id: str) -> Optional[User]:
         return self._user_repository.get_by_id(user_id)

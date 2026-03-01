@@ -1,5 +1,5 @@
 version: 1
-updated_for_phase: "Phase A - API contract freeze"
+updated_for_phase: "Phase B - Full API Documentation"
 
 error_response_shape:
   required_top_level_keys:
@@ -13,146 +13,174 @@ error_response_shape:
     - type
 
 endpoints:
+  # --- Public Utility Routes ---
   - method: GET
-    path: /api/blog
+    path: /api/home
     status: 200
+    description: Public landing page metadata.
     body:
-      required_top_level_keys:
-        - posts
-        - pagination
-      post_item_keys:
-        - title
-        - summary
-        - slug
-        - publication_date
-      pagination_keys:
-        - total_posts
-        - total_pages
-        - current_page
-        - per_page
-        - has_next
-        - has_prev
+      keys: [title, tagline, button_text, button_link]
 
   - method: GET
-    path: /api/blog/{slug}
+    path: /api/about
     status: 200
+    description: Public about section content.
     body:
-      required_top_level_keys:
-        - id
-        - title
-        - slug
-        - content
-        - summary
-        - author
-        - publication_date
-        - last_updated
-        - is_published
-      author_keys:
-        - id
-        - username
+      keys: [title, content, button_text, button_link]
 
+  - method: GET
+    path: /api/license
+    status: 200
+    description: Public license and attribution info.
+    body:
+      keys: [title, content, copyright, distributed_by, distributed_by_link]
+
+  - method: POST
+    path: /api/contact
+    status: 200
+    description: Public contact form submission (Rate-limited: 5/min).
+    request_body:
+      required: [name, email, message]
+    body:
+      required: [message]
+
+  # --- Authentication Lifecycle ---
   - method: GET
     path: /api/auth/status
     status: 200
+    description: Check current session validity and user capabilities.
     body:
-      anonymous_shape:
-        - logged_in
-      authenticated_shape:
-        - logged_in
-        - user
-      user_keys:
-        - id
-        - username
-        - role
+      anonymous_shape: [logged_in]
+      authenticated_shape: [logged_in, user]
+      user_keys: [id, username, role, capabilities]
 
   - method: POST
     path: /api/auth/login
     status: 200
+    description: Login and receive JWT cookies (Rate-limited: 5/min).
+    request_body:
+      required: [username, password]
     body:
-      required_top_level_keys:
-        - message
-      disallowed_top_level_keys:
-        - access_token
-        - refresh_token
+      required: [message]
     cookies:
-      required:
-        - access_token_cookie
-        - refresh_token_cookie
+      required: [access_token_cookie, refresh_token_cookie]
 
+  - method: POST
+    path: /api/auth/register
+    status: 201
+    security: [jwt_required, "permission: users:manage"]
+    description: Register a new user (Restricted to Admins).
+    request_body:
+      required: [username, email, password]
+    body:
+      required: [message, username]
+
+  - method: POST
+    path: /api/auth/logout
+    status: 200
+    security: jwt_required
+    description: Invalidate tokens and clear cookies.
+    body:
+      required: [message]
+
+  - method: POST
+    path: /api/auth/refresh
+    status: 200
+    security: jwt_refresh_required
+    description: Get a new access token using a valid refresh token.
+    body:
+      required: [message]
+
+  - method: POST
+    path: /api/auth/change-password
+    status: 200
+    security: jwt_required
+    description: Change password for current user.
+    request_body:
+      required: [current_password, new_password]
+    body:
+      required: [message]
+
+  # --- Public Blog Content ---
+  - method: GET
+    path: /api/blog
+    status: 200
+    description: Paginated list of published posts.
+    body:
+      required_top_level_keys: [posts, pagination]
+      post_item_keys: [title, summary, slug, publication_date]
+      pagination_keys: [total_posts, total_pages, current_page, per_page, has_next, has_prev]
+
+  - method: GET
+    path: /api/blog/{slug}
+    status: 200
+    description: Full content of a single published post.
+    body:
+      required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
+      author_keys: [id, username]
+
+  # --- Developer Profile (Singleton) ---
+  - method: GET
+    path: /api/content/profile
+    status: 200
+    description: Publicly accessible developer profile.
+    body:
+      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+
+  - method: PUT
+    path: /api/content/profile
+    status: 200
+    security: [jwt_required, "permission: profile:manage"]
+    description: Update the developer profile.
+    body:
+      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+
+  - method: POST
+    path: /api/content/profile/photo
+    status: 200
+    security: [jwt_required, "permission: profile:manage"]
+    description: Replace the singleton profile photo (Atomic replacement).
+    body:
+      required_keys: [url, message]
+
+  # --- Content Management (Admin/Author) ---
   - method: GET
     path: /api/content/posts
     status: 200
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: List posts for management (Admins see all; Authors see own).
     body:
       type: array
-      item_required_keys:
-        - id
-        - title
-        - slug
-        - content
-        - summary
-        - author
-        - publication_date
-        - last_updated
-        - is_published
-      author_keys:
-        - id
-        - username
-
-  - method: GET
-    path: /api/content/posts/{post_id}
-    status: 200
-    body:
-      required_top_level_keys:
-        - id
-        - title
-        - slug
-        - content
-        - summary
-        - author
-        - publication_date
-        - last_updated
-        - is_published
-      author_keys:
-        - id
-        - username
+      item_required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
 
   - method: POST
     path: /api/content/posts
     status: 201
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: Create a new blog post.
     body:
-      required_top_level_keys:
-        - message
-        - id
-        - title
-        - slug
-        - content
-        - summary
-        - is_published
-        - author
-      author_keys:
-        - id
-        - username
+      required_keys: [message, id, title, slug, content, summary, is_published, author]
 
   - method: PUT
     path: /api/content/posts/{post_id}
     status: 200
+    security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
+    description: Update an existing post.
     body:
-      required_top_level_keys:
-        - message
-        - id
-        - title
-        - slug
-        - content
-        - summary
-        - is_published
-        - author
-      author_keys:
-        - id
-        - username
+      required_keys: [message, id, title, slug, content, summary, is_published, author]
 
   - method: DELETE
     path: /api/content/posts/{post_id}
     status: 200
+    security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
+    description: Delete a post (Atomic cleanup of assets and comments).
     body:
-      required_top_level_keys:
-        - message
+      required_keys: [message]
+
+  - method: POST
+    path: /api/content/media
+    status: 201
+    security: [jwt_required, "permission: profile:manage"]
+    description: Upload generic media for blog posts.
+    body:
+      required_keys: [url, message]
