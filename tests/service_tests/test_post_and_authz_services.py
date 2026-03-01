@@ -42,24 +42,25 @@ def test_authz_service_require_admin_role_check(app):
         with pytest.raises(ForbiddenException):
             authz_service.require_admin(str(regular_user.id), {"roles": ["member"], "tv": 0})
 
-
-def test_authz_service_require_admin_allows_content_admin(app):
+def test_authz_service_require_admin_rejects_author(app):
     authz_service = get_authz_service()
 
     with app.app_context():
-        content_admin = User(
-            username="content_admin_user",
-            email="content_admin_user@example.com",
+        author_user = User(
+            username="author_user",
+            email="author@example.com",
             role="author",
         )
-        content_admin.set_password("Password123!")
-        content_admin.save()
+        author_user.set_password("Password123!")
+        author_user.save()
 
-        resolved = authz_service.require_admin(
-            str(content_admin.id),
-            {"roles": ["author"], "tv": 0},
-        )
-        assert str(resolved.id) == str(content_admin.id)
+        # EXPECTATION: ForbiddenException (Author is not Admin)
+        with pytest.raises(ForbiddenException):
+            authz_service.require_admin(
+                str(author_user.id),
+                {"roles": ["author"], "tv": 0, "un": "author_user"},
+            )
+
 
 
 def test_authz_service_require_admin_rejects_ops_admin(app):

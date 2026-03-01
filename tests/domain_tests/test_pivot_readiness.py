@@ -51,8 +51,11 @@ class TestPivotReadiness:
             assert Comment.objects(post=post_id).count() == 3
 
             # 2. Track Signal and Action
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(author.id), username=author.username, role=author.role, token_version=0)
+            
             with signal_tracker(post_deleted) as tracker:
-                post_service.delete_post(post_id)
+                post_service.delete_post(post_id, user=user_identity)
                 assert tracker.called, "post_deleted signal was not emitted."
 
             # 3. Verification: Signal listener should have cleaned up comments
