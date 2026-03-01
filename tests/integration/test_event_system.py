@@ -66,6 +66,9 @@ class TestEventSystem:
             post_id = str(draft_post.id)
 
             # 2. Track Signal: Connect the tracker to post_published
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(author.id), username=author.username, role=author.role, token_version=0)
+            
             with signal_tracker(post_published) as tracker:
                 # 3. Action: Update the post to be published
                 post_service.update_post(
@@ -73,7 +76,8 @@ class TestEventSystem:
                     title=draft_post.title,
                     content=draft_post.content,
                     summary=draft_post.summary,
-                    is_published=True
+                    is_published=True,
+                    user=user_identity
                 )
 
                 # 4. Assert: Verify the signal was received with the correct payload
@@ -83,7 +87,7 @@ class TestEventSystem:
                 assert tracker.data["event_type"] == "post-published"
             
             # Cleanup
-            post_service.delete_post(post_id)
+            post_service.delete_post(post_id, user=user_identity)
             author.delete()
 
     def test_signal_payloads_are_pii_clean_and_optimized(self, app, signal_tracker):
@@ -120,13 +124,17 @@ class TestEventSystem:
                     assert not isinstance(value, (User, Post)), f"DB Document in key '{key}'"
 
             # 2. Test post_updated payload and change tracking
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(author.id), username=author.username, role=author.role, token_version=0)
+            
             with signal_tracker(post_updated) as tracker:
                 post_service.update_post(
                     post_id=post_id,
                     title="Changed Title",
                     content="Content",
                     summary="Summary",
-                    is_published=True
+                    is_published=True,
+                    user=user_identity
                 )
                 assert tracker.called
                 assert tracker.sender == "post_service"
@@ -135,5 +143,5 @@ class TestEventSystem:
                 assert tracker.data["changes"]["title"]["new"] == "Changed Title"
 
             # Cleanup
-            post_service.delete_post(post_id)
+            post_service.delete_post(post_id, user=user_identity)
             author.delete()

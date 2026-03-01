@@ -40,7 +40,9 @@ class TestHtmlSanitization:
             assert "<script>" not in retrieved_post.summary
             assert retrieved_post.summary == "Hello alert('xss') World!" # Content should remain
             
-            post_service.delete_post(str(retrieved_post.id))
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
+            post_service.delete_post(str(retrieved_post.id), user=user_identity)
 
     def test_allowed_html_tags_preserved(self, app, test_user, post_service):
         """Ensure allowed HTML tags are preserved in content and summary."""
@@ -63,7 +65,9 @@ class TestHtmlSanitization:
             assert "<i>italic</i>" in retrieved_post.summary
             assert "<a href=\"http://example.com\">link</a>" in retrieved_post.summary
             
-            post_service.delete_post(str(retrieved_post.id))
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
+            post_service.delete_post(str(retrieved_post.id), user=user_identity)
 
     def test_disallowed_html_tags_removed(self, app, test_user, post_service):
         """Ensure disallowed HTML tags are removed from content and summary."""
@@ -87,7 +91,9 @@ class TestHtmlSanitization:
             assert "<input>" not in retrieved_post.summary
             assert "Text with form and ." == retrieved_post.summary
             
-            post_service.delete_post(str(retrieved_post.id))
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
+            post_service.delete_post(str(retrieved_post.id), user=user_identity)
 
     def test_disallowed_attributes_removed(self, app, test_user, post_service):
         """Ensure disallowed attributes are removed from allowed tags."""
@@ -108,4 +114,6 @@ class TestHtmlSanitization:
             assert "onclick" not in retrieved_post.summary
             assert "<a href=\"http://example.com\">Click me</a>" in retrieved_post.summary
             
-            post_service.delete_post(str(retrieved_post.id))
+            from src.schemas import UserIdentity
+            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
+            post_service.delete_post(str(retrieved_post.id), user=user_identity)
