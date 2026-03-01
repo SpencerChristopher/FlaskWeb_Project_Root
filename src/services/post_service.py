@@ -10,11 +10,12 @@ import bleach
 from mongoengine.errors import DoesNotExist
 from slugify import slugify
 
-from src.exceptions import ConflictException, NotFoundException
+from src.exceptions import ConflictException, NotFoundException, ForbiddenException
 from src.events import dispatch_event, post_created, post_deleted, post_updated, post_published
 from src.models.post import Post
 from src.models.user import User
 from src.repositories.interfaces import PostRepository
+from src.schemas import UserIdentity
 
 
 class PostService:
@@ -68,8 +69,22 @@ class PostService:
         post.content = self._sanitize_html(post.content) or ""
         post.summary = self._sanitize_html(post.summary)
 
-    def list_admin_posts(self):
-        return self._post_repository.list_all()
+    def _require_ownership_or_admin(self, post: Post, user: UserIdentity, action: str) -> None:
+        """Helper to enforce resource ownership with admin override."""
+        if user.role == "admin":
+            return
+        if str(post.author.id) != user.id:
+            raise ForbiddenException(f"You do not have permission to {action} this post.")
+
+    def list_admin_posts(self, user: UserIdentity):
+        """
+        List posts for management view.
+        Admins see all posts; others see only their own.
+        """
+        all_posts = self._post_repository.list_all()
+        if user.role == "admin":
+            return all_posts
+        return [p for p in all_posts if str(p.author.id) == user.id]
 
     def list_published_posts(self, page: int, per_page: int):
         return self._post_repository.get_published_paginated(page=page, per_page=per_page)
@@ -78,6 +93,12 @@ class PostService:
         post = self._post_repository.get_by_id(post_id)
         if not post:
             raise NotFoundException("Post not found")
+        return post
+
+    def get_post_managed(self, post_id: str, user: UserIdentity) -> Post:
+        """Retrieve a post for management, enforcing ownership."""
+        post = self.get_post_or_404(post_id)
+        self._require_ownership_or_admin(post, user, "view")
         return post
 
     def get_post_by_slug_or_404(self, slug: str) -> Post:
@@ -128,8 +149,11 @@ class PostService:
         content: str,
         summary: str,
         is_published: bool,
+        user: UserIdentity,
     ) -> Post:
         post = self.get_post_or_404(post_id)
+        self._require_ownership_or_admin(post, user, "update")
+
         post_slug = slugify(title)
 
         existing_post = self._post_repository.get_by_slug_excluding_id(post_slug, post_id)
@@ -177,13 +201,15 @@ class PostService:
                 post_updated,
                 "post_service",
                 post_id=str(updated_post.id),
-                user_id=str(updated_user_id := str(updated_post.author.id)),
+                user_id=str(updated_post.author.id),
                 changes=changes,
             )
         return updated_post
 
-    def delete_post(self, post_id: str) -> None:
+    def delete_post(self, post_id: str, user: UserIdentity) -> None:
         post = self.get_post_or_404(post_id)
+        self._require_ownership_or_admin(post, user, "delete")
+
         post_author_id = None
         try:
             post_author_id = str(post.author.id)

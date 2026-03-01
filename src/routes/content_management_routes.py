@@ -47,20 +47,10 @@ def permission_required(permission: str | list[str]) -> Callable:
 def get_posts() -> Response:
     """
     Retrieves posts for management.
-    Admins see all posts; Authors see only their own.
+    Enforcement: Admins see all; Authors see only own (Handled by Service).
     """
-    user_identity = getattr(g, "current_user", None)
-    if not user_identity:
-        raise UnauthorizedException("Authentication required.")
-
-    # Logic for filtering could be in the service, 
-    # but for now we'll let the service handle the role-based list.
-    if user_identity.role == "admin":
-        posts = post_service.list_admin_posts()
-    else:
-        # Assuming we'll add this method or filter the list
-        posts = [p for p in post_service.list_admin_posts() if str(p.author.id) == user_identity.id]
-    
+    user_identity = g.current_user
+    posts = post_service.list_admin_posts(user_identity)
     return jsonify([post.to_dict() for post in posts])
 
 @bp.route('/posts', methods=['POST'])
@@ -70,14 +60,7 @@ def create_post() -> Response:
     Creates a new blog post.
     """
     post_data = BlogPostCreateUpdate(**request.get_json())
-
-    # g.current_user is a UserIdentity DTO (PII-clean)
-    author_identity = getattr(g, "current_user", None)
-    if not author_identity:
-        raise UnauthorizedException("Authentication required.")
-
-    # Hydrate full User document only for write operation
-    author_user = auth_service.get_user_or_raise(author_identity.id)
+    author_user = auth_service.get_user_or_raise(g.current_user.id)
 
     new_post = post_service.create_post(
         title=post_data.title,
@@ -96,15 +79,9 @@ def create_post() -> Response:
 def get_post(post_id: str) -> Response:
     """
     Retrieves a single post by its unique ID for management.
-    Enforces ownership check for authors.
+    Enforcement: Handled by Service.
     """
-    post = post_service.get_post_or_404(post_id)
-    
-    # Authorization Check: Admin can see all; Author can see only own.
-    user_identity = getattr(g, "current_user", None)
-    if user_identity.role != "admin" and str(post.author.id) != user_identity.id:
-        raise UnauthorizedException("You do not have permission to view this post.")
-
+    post = post_service.get_post_managed(post_id, g.current_user)
     return jsonify(post.to_dict())
 
 @bp.route('/posts/<string:post_id>', methods=['PUT'])
@@ -112,15 +89,8 @@ def get_post(post_id: str) -> Response:
 def update_post(post_id: str) -> Response:
     """
     Updates an existing post.
-    Enforces ownership check: Only the author or an admin can update.
+    Enforcement: Handled by Service.
     """
-    post = post_service.get_post_or_404(post_id)
-    
-    # Ownership Check with Admin Override
-    author_identity = getattr(g, "current_user", None)
-    if author_identity.role != "admin" and str(post.author.id) != author_identity.id:
-        raise UnauthorizedException("You do not have permission to modify this post.")
-
     post_data = BlogPostCreateUpdate(**request.get_json())
 
     post = post_service.update_post(
@@ -129,6 +99,7 @@ def update_post(post_id: str) -> Response:
         content=post_data.content,
         summary=post_data.summary,
         is_published=post_data.is_published,
+        user=g.current_user
     )
     
     response_data = post.to_dict()
@@ -140,16 +111,9 @@ def update_post(post_id: str) -> Response:
 def delete_post(post_id: str) -> Response:
     """
     Deletes a post.
-    Enforces ownership check: Only the author or an admin can delete.
+    Enforcement: Handled by Service.
     """
-    post = post_service.get_post_or_404(post_id)
-
-    # Ownership Check with Admin Override
-    author_identity = getattr(g, "current_user", None)
-    if author_identity.role != "admin" and str(post.author.id) != author_identity.id:
-        raise UnauthorizedException("You do not have permission to delete this post.")
-
-    post_service.delete_post(post_id)
+    post_service.delete_post(post_id, g.current_user)
     return jsonify({'message': 'Post deleted successfully'}), 200
 
 
