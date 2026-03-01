@@ -26,7 +26,6 @@ ROLE_PERMISSIONS = {
         Permissions.SYSTEM_VIEW_LOGS
     }),
     ROLE_AUTHOR: frozenset({
-        Permissions.CONTENT_MANAGE, # Temporarily mapped for test stability
         Permissions.CONTENT_AUTHOR
     }),
     ROLE_MEMBER: frozenset(), # Read-only access by default

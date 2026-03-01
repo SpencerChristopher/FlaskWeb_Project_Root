@@ -6,6 +6,7 @@ Define the granular permission-based authorization model. This matrix serves as 
 ## Permissions
 - `content:manage`: Full administrative control over all content (Create, Edit All, Delete All).
 - `content:author`: Control over personal content only (Create, Edit Own, Delete Own).
+- `profile:manage`: Full control over the site-owner developer profile and assets.
 - `users:manage`: Administrative control over user accounts and role assignments.
 - `system:view_logs`: Access to system diagnostics, audit trails, and application logs.
 
@@ -14,7 +15,7 @@ The system maps roles to a set of granular permissions.
 
 | Role | Permissions | Description |
 | :--- | :--- | :--- |
-| **`admin`** | `content:manage`, `users:manage`, `system:view_logs` | System owner with total access. |
+| **`admin`** | `content:manage`, `profile:manage`, `users:manage`, `system:view_logs` | System owner with total access. |
 | **`author`** | `content:author` | Trusted content creator. |
 | **`member`** | `none` | Standard authenticated user (Read-only access). |
 
