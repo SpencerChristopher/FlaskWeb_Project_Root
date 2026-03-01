@@ -83,6 +83,12 @@ jobs:
       - name: Seed Database (CI)
         run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
 
+      - name: Inject tests into container
+        run: |
+          docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
+          docker cp tests/. flask_web_app:/app/tests
+          docker cp pytest.ini flask_web_app:/app/pytest.ini
+
       - name: Run tests
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
 
