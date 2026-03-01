@@ -22,6 +22,8 @@ from typing import Dict, Any
 from src.events import dispatch_event, user_logged_in
 from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
+from src.app.security import permission_required
+from src.services.roles import Permissions
 from src.schemas import UserRegistration, ChangePasswordRequest
 from src.services import get_auth_service
 
@@ -80,19 +82,31 @@ def login() -> Response:
     return response, 200
 
 @bp.route('/register', methods=['POST'])
+@permission_required(Permissions.USERS_MANAGE)
 def register() -> Response:
     """
     Registers a new user.
+    Restricted to users with USERS_MANAGE permission (Admins).
     """
-    user_data = UserRegistration(**request.get_json())
+    data = request.get_json()
+    user_data = UserRegistration(**data)
 
-    # Placeholder for actual user registration logic
-    current_app.logger.info(f"New user registration for: {user_data.username} from IP: {request.remote_addr}")
+    created_user = auth_service.register_user(
+        username=user_data.username,
+        email=user_data.email,
+        password=user_data.password,
+        role=data.get("role", "member") # Allow role assignment during admin creation
+    )
+
+    current_app.logger.info(f"Admin created new user: {created_user.username} with role: {created_user.role}")
     
-    # Return PII-clean response with 201 Created
     return jsonify({
-        "message": "User registration successful (Placeholder)",
-        "username": user_data.username
+        "message": "User created successfully.",
+        "user": {
+            "id": str(created_user.id),
+            "username": created_user.username,
+            "role": created_user.role
+        }
     }), 201
 
 

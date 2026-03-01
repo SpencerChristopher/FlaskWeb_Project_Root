@@ -10,6 +10,7 @@ from flask import Blueprint, request, jsonify, Response, g
 from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 
 from werkzeug.utils import secure_filename
+from src.app.security import permission_required
 from src.services import get_authz_service, get_post_service, get_auth_service, get_profile_service, get_media_service
 from src.services.roles import Permissions
 from src.schemas import BlogPostCreateUpdate, ProfileSchema
@@ -21,26 +22,6 @@ auth_service = get_auth_service()
 post_service = get_post_service()
 profile_service = get_profile_service()
 media_service = get_media_service()
-
-def permission_required(permission: str | list[str]) -> Callable:
-    """
-    Decorator to ensure the current user has at least one of the required permissions.
-    """
-    def decorator(f: Callable) -> Callable:
-        @wraps(f)
-        @jwt_required()
-        def decorated_function(*args: Any, **kwargs: Any) -> Response:
-            current_user_id = get_jwt_identity()
-            current_user_claims = get_jwt()
-
-            # Enforce permission check via AuthzService
-            # Returns a lightweight UserIdentity DTO
-            g.current_user = authz_service.require_permission(
-                current_user_id, current_user_claims, permission
-            )
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
 
 @bp.route('/posts', methods=['GET'])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
