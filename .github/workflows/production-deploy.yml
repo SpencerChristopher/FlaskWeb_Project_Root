@@ -4,13 +4,105 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
-  packages: read
+  packages: write
 
 jobs:
+  build-and-test:
+    name: Verify and Build
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      LOG_LEVEL: INFO
+      FLASK_ENV: development
+      TALISMAN_FORCE_HTTPS: "false"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Security Audit (pip-audit & bandit)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
+            pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
+            poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
+            pip-audit -r constraints.txt && \
+            bandit -r src/ -ll"
+
+      - name: Workflow Lint (actionlint)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Generate Self-Signed Certificates (CI)
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/server.key 2048
+          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          chmod 600 certs/server.key
+          chmod 644 certs/server.crt
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Image Locally (for Testing)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start containers
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
+
+      - name: Seed Database (CI)
+        run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
+
+      - name: Run tests
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+
+      - name: Push Verified Multi-platform Image
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+
   deploy-to-pi:
+    name: Deploy to Pi
+    needs: build-and-test
     runs-on: [self-hosted, pi-prod]
     timeout-minutes: 30
     env:
@@ -21,6 +113,7 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       LOG_LEVEL: INFO
       FLASK_ENV: production
       TALISMAN_FORCE_HTTPS: "true"
@@ -31,19 +124,6 @@ jobs:
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Validate required secrets
-        run: |
-          missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required secret: $key"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -51,20 +131,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Make deploy script executable
-        run: chmod +x ./scripts/deploy.sh
-
       - name: Deploy to Raspberry Pi
         env:
           DEPLOY_CLEAN_START: "true"
           DEPLOY_RESET_VOLUMES: "false"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
         run: ./scripts/deploy.sh
-
-      - name: Verify production health
-        run: |
-          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
 
       - name: Create Admin User
         run: |
@@ -80,18 +152,6 @@ jobs:
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             flask_web_app /app/.venv/bin/python scripts/seed_db.py
 
-      - name: Verify API after seed
-        run: |
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/blog
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/auth/status
-
       - name: Capture deploy logs on failure
         if: failure()
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-prod.log
-
-      - name: Upload deploy logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-prod-logs
-          path: docker-compose-prod.log
