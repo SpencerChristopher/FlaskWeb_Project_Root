@@ -2,30 +2,31 @@
 Script to seed initial data into the application's MongoDB database.
 
 This script creates a default admin user (if not exists) and sample blog posts.
-It requires environment variables for MongoDB connection and admin credentials.
+It requires environment variables for admin credentials.
 """
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 # Add project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from src.models.user import User
 from src.models.post import Post
 from src.models.profile import Profile, WorkHistoryItem
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
-# Set up Flask app context (this also loads .env)
+# Set up Flask app context
 app_context = get_flask_app_context()
 
-MONGO_URI = os.environ.get('MONGO_URI')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set as environment variables or in .env file for local testing.")
+if not all([ADMIN_USERNAME, ADMIN_PASSWORD]):
+    print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables or in .env file.")
     app_context.pop()
     exit(1)
 
@@ -33,11 +34,11 @@ if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
 try:
     validate_password_complexity(ADMIN_PASSWORD)
 except ValueError as e:
-    print(f"Error: Admin password in .env file does not meet complexity requirements: {e}")
+    print(f"Error: Admin password does not meet complexity requirements: {e}")
     app_context.pop()
     exit(1)
 
-print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
+print("Attempting to verify database connectivity...")
 try:
     # A simple query to check the connection
     User.objects.first()
