@@ -35,12 +35,13 @@ class AuthzService:
         self,
         user_id: str,
         user_claims: dict[str, Any],
-        permission: str,
+        permission: str | list[str],
         error_message: str = "Access denied: insufficient permissions.",
     ) -> UserIdentity:
         """
         Enforce a granular permission check.
-        Verifies the session validity and returns a lightweight UserIdentity DTO.
+        Supports single permission string or a list of allowed permissions.
+        User must possess at least one of the provided permissions.
         """
         # Fetch minimal identity fields from DB (Lazy Hydration)
         user_doc = self._user_repository.get_identity(user_id)
@@ -56,20 +57,23 @@ class AuthzService:
             )
             raise UnauthorizedException("Session has expired or been invalidated.")
 
+        # Normalize required permissions to a set
+        required_permissions = {permission} if isinstance(permission, str) else set(permission)
+
         # 2. DB Role Check (Authoritative)
         user_permissions = get_permissions_for_role(user_doc.role)
-        if permission not in user_permissions:
+        if not (required_permissions & user_permissions):
             current_app.logger.warning(
                 f"Permission mismatch: User {user_id} has role '{user_doc.role}' "
-                f"which lacks required permission '{permission}'."
+                f"which lacks any of the required permissions: {required_permissions}."
             )
             raise ForbiddenException(error_message)
 
         # 3. JWT Claim Check (State consistency)
         claims_permissions = get_permissions_from_claims(user_claims)
-        if permission not in claims_permissions:
+        if not (required_permissions & claims_permissions):
             current_app.logger.warning(
-                f"Unauthorized access attempt: User {user_id} lacks permission '{permission}' "
+                f"Unauthorized access attempt: User {user_id} lacks required permissions "
                 f"in JWT claims. Roles in claims: {user_claims.get('roles', 'N/A')}. "
                 f"From IP: {request.remote_addr}"
             )

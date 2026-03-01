@@ -28,14 +28,50 @@ def member_headers(login_user_fixture, member_user):
     token = login_user_fixture("testmember", "password")
     return {"Authorization": f"Bearer {token}"}
 
-def test_author_blocked_from_content_manage_routes(client, author_headers):
+def test_author_can_access_content_manage_routes(client, author_headers):
     """
-    Regression Test: Prove that Author is currently blocked from routes 
-    requiring content:manage (because we removed the temporary mapping).
+    Ensure Author can access content management routes (Stage 2 Fix).
     """
     response = client.get("/api/content/posts", headers=author_headers)
-    # EXPECTED REGRESSION: 403 Forbidden
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert isinstance(response.json, list)
+
+def test_author_only_sees_own_posts(client, author_user, author_headers, admin_user):
+    """
+    Ensure Author only sees their own posts in the management list.
+    """
+    # 1. Author creates a post
+    Post(title="Author Post", slug="author-post", content="content", author=author_user).save()
+    # 2. Admin creates a post
+    Post(title="Admin Post", slug="admin-post", content="content", author=admin_user).save()
+    
+    response = client.get("/api/content/posts", headers=author_headers)
+    assert response.status_code == 200
+    posts = response.json
+    assert len(posts) == 1
+    assert posts[0]["title"] == "Author Post"
+
+def test_author_can_delete_own_post(client, author_user, author_headers):
+    """
+    Ensure Author can delete their own post.
+    """
+    post = Post(title="My Post", slug="my-post", content="content", author=author_user).save()
+    post_id = str(post.id)
+    
+    response = client.delete(f"/api/content/posts/{post_id}", headers=author_headers)
+    assert response.status_code == 200
+    assert Post.objects(id=post_id).count() == 0
+
+def test_admin_can_delete_others_post(client, author_user, admin_headers):
+    """
+    Ensure Admin can delete a post written by an Author (Admin Override).
+    """
+    post = Post(title="Author Post", slug="author-post-2", content="content", author=author_user).save()
+    post_id = str(post.id)
+    
+    response = client.delete(f"/api/content/posts/{post_id}", headers=admin_headers)
+    assert response.status_code == 200
+    assert Post.objects(id=post_id).count() == 0
 
 def test_member_blocked_from_content_manage_routes(client, member_headers):
     """
