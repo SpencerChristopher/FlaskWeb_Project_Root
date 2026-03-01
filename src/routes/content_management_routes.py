@@ -22,9 +22,9 @@ post_service = get_post_service()
 profile_service = get_profile_service()
 media_service = get_media_service()
 
-def permission_required(permission: str) -> Callable:
+def permission_required(permission: str | list[str]) -> Callable:
     """
-    Decorator to ensure the current user has the required granular permission.
+    Decorator to ensure the current user has at least one of the required permissions.
     """
     def decorator(f: Callable) -> Callable:
         @wraps(f)
@@ -43,16 +43,28 @@ def permission_required(permission: str) -> Callable:
     return decorator
 
 @bp.route('/posts', methods=['GET'])
-@permission_required(Permissions.CONTENT_MANAGE)
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def get_posts() -> Response:
     """
-    Retrieves all posts for management, including drafts.
+    Retrieves posts for management.
+    Admins see all posts; Authors see only their own.
     """
-    posts = post_service.list_admin_posts()
+    user_identity = getattr(g, "current_user", None)
+    if not user_identity:
+        raise UnauthorizedException("Authentication required.")
+
+    # Logic for filtering could be in the service, 
+    # but for now we'll let the service handle the role-based list.
+    if user_identity.role == "admin":
+        posts = post_service.list_admin_posts()
+    else:
+        # Assuming we'll add this method or filter the list
+        posts = [p for p in post_service.list_admin_posts() if str(p.author.id) == user_identity.id]
+    
     return jsonify([post.to_dict() for post in posts])
 
 @bp.route('/posts', methods=['POST'])
-@permission_required(Permissions.CONTENT_MANAGE)
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def create_post() -> Response:
     """
     Creates a new blog post.
@@ -80,26 +92,33 @@ def create_post() -> Response:
     return jsonify(response_data), 201
 
 @bp.route('/posts/<string:post_id>', methods=['GET'])
-@permission_required(Permissions.CONTENT_MANAGE)
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def get_post(post_id: str) -> Response:
     """
     Retrieves a single post by its unique ID for management.
-    """
-    post = post_service.get_post_or_404(post_id)
-    return jsonify(post.to_dict())
-
-@bp.route('/posts/<string:post_id>', methods=['PUT'])
-@permission_required(Permissions.CONTENT_MANAGE)
-def update_post(post_id: str) -> Response:
-    """
-    Updates an existing post.
-    Enforces ownership check: Only the author can update.
+    Enforces ownership check for authors.
     """
     post = post_service.get_post_or_404(post_id)
     
-    # Ownership Check
+    # Authorization Check: Admin can see all; Author can see only own.
+    user_identity = getattr(g, "current_user", None)
+    if user_identity.role != "admin" and str(post.author.id) != user_identity.id:
+        raise UnauthorizedException("You do not have permission to view this post.")
+
+    return jsonify(post.to_dict())
+
+@bp.route('/posts/<string:post_id>', methods=['PUT'])
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
+def update_post(post_id: str) -> Response:
+    """
+    Updates an existing post.
+    Enforces ownership check: Only the author or an admin can update.
+    """
+    post = post_service.get_post_or_404(post_id)
+    
+    # Ownership Check with Admin Override
     author_identity = getattr(g, "current_user", None)
-    if str(post.author.id) != author_identity.id:
+    if author_identity.role != "admin" and str(post.author.id) != author_identity.id:
         raise UnauthorizedException("You do not have permission to modify this post.")
 
     post_data = BlogPostCreateUpdate(**request.get_json())
@@ -117,17 +136,17 @@ def update_post(post_id: str) -> Response:
     return jsonify(response_data), 200
 
 @bp.route('/posts/<string:post_id>', methods=['DELETE'])
-@permission_required(Permissions.CONTENT_MANAGE)
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def delete_post(post_id: str) -> Response:
     """
     Deletes a post.
-    Enforces ownership check: Only the author can delete.
+    Enforces ownership check: Only the author or an admin can delete.
     """
     post = post_service.get_post_or_404(post_id)
 
-    # Ownership Check
+    # Ownership Check with Admin Override
     author_identity = getattr(g, "current_user", None)
-    if str(post.author.id) != author_identity.id:
+    if author_identity.role != "admin" and str(post.author.id) != author_identity.id:
         raise UnauthorizedException("You do not have permission to delete this post.")
 
     post_service.delete_post(post_id)

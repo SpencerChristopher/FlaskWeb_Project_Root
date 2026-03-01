@@ -4,25 +4,24 @@ from src.models.post import Post
 
 def test_user_cannot_delete_others_post(client, setup_users, login_user_fixture):
     """
-    Vulnerability Check (IDOR): Ensure a user with CONTENT_MANAGE but NOT the author
+    Vulnerability Check (IDOR): Ensure a user with CONTENT_AUTHOR but NOT the author
     cannot delete another person's post.
     """
     # 1. setup_users creates 'testadmin' (admin) and 'testuser' (member)
     admin_user, regular_user = setup_users
     
-    # We need a second admin to test IDOR between users with same high-level permissions
-    other_admin = User(username="otheradmin", email="other@example.com", role="admin")
-    other_admin.set_password("password")
-    other_admin.save()
+    # We need a second author to test IDOR between users with same restricted permissions
+    other_author = User(username="otherauthor", email="otherauthor@example.com", role="author")
+    other_author.set_password("password")
+    other_author.save()
     
     # 2. Admin A (Victim) creates a post
     post = Post(title="Victim Post", slug="victim-post", content="Secret data", author=admin_user)
     post.save()
     post_id = str(post.id)
     
-    # 3. Admin B (Attacker) logs in
-    # The fixture returns the access token
-    attacker_token = login_user_fixture("otheradmin", "password")
+    # 3. Author B (Attacker) logs in
+    attacker_token = login_user_fixture("otherauthor", "password")
     attacker_headers = {"Authorization": f"Bearer {attacker_token}"}
     
     # 4. Attacker attempts to delete Victim's post
