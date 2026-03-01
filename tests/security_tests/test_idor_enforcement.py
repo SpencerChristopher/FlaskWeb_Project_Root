@@ -27,6 +27,6 @@ def test_user_cannot_delete_others_post(client, setup_users, login_user_fixture)
     # 4. Attacker attempts to delete Victim's post
     response = client.delete(f"/api/content/posts/{post_id}", headers=attacker_headers)
     
-    # EXPECTATION: 401 Unauthorized (Ownership failure)
-    assert response.status_code == 401
+    # EXPECTATION: 403 Forbidden (Ownership failure)
+    assert response.status_code == 403
     assert Post.objects(id=post_id).count() == 1
