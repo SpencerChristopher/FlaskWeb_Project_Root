@@ -78,3 +78,62 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
     _validate_new_password = field_validator('new_password')(password_strength_validator)
+
+
+class UserIdentity(BaseModel):
+    """
+    PII-clean Data Transfer Object representing the authenticated requester.
+    Used in g.current_user to avoid object bloat and PII leakage in the app context.
+    """
+    id: str
+    username: str
+    role: str
+    token_version: int
+
+
+class WorkHistoryItem(BaseModel):
+    """Nested schema for employment history."""
+    company: str
+    role: str
+    start_date: str
+    end_date: Optional[str] = "Present"
+    location: str
+    description: Optional[str] = None
+    skills: list[str] = Field(default_factory=list)
+
+
+class ProfileSchema(BaseModel):
+    """
+    Schema for creating or updating the developer profile.
+    """
+    name: str = Field(..., min_length=2, max_length=100)
+    location: str = Field(..., max_length=100)
+    statement: str = Field(..., min_length=10, max_length=2000)
+    interests: list[str] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    social_links: dict[str, str] = Field(default_factory=dict)
+    work_history: list[WorkHistoryItem] = Field(default_factory=list)
+    image_url: Optional[str] = None
+
+    @field_validator("social_links")
+    @classmethod
+    def validate_urls(cls, v: dict[str, str]) -> dict[str, str]:
+        for platform, url in v.items():
+            if not url.startswith(("http://", "https://")):
+                raise ValueError(f"URL for {platform} must be absolute.")
+        return v
+
+
+class ProfilePublic(BaseModel):
+    """
+    DTO for public-facing profile data.
+    """
+    name: str
+    location: str
+    statement: str
+    interests: list[str]
+    skills: list[str]
+    social_links: dict[str, str]
+    work_history: list[WorkHistoryItem]
+    image_url: Optional[str] = None
+    last_updated: Optional[str] = None

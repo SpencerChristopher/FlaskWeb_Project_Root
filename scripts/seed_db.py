@@ -2,29 +2,31 @@
 Script to seed initial data into the application's MongoDB database.
 
 This script creates a default admin user (if not exists) and sample blog posts.
-It requires environment variables for MongoDB connection and admin credentials.
+It requires environment variables for admin credentials.
 """
 import os
 import sys
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 
 # Add project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from src.models.user import User
 from src.models.post import Post
+from src.models.profile import Profile, WorkHistoryItem
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
-# Set up Flask app context (this also loads .env)
+# Set up Flask app context
 app_context = get_flask_app_context()
 
-MONGO_URI = os.environ.get('MONGO_URI')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set in your .env file.")
+if not all([ADMIN_USERNAME, ADMIN_PASSWORD]):
+    print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables or in .env file.")
     app_context.pop()
     exit(1)
 
@@ -32,11 +34,11 @@ if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
 try:
     validate_password_complexity(ADMIN_PASSWORD)
 except ValueError as e:
-    print(f"Error: Admin password in .env file does not meet complexity requirements: {e}")
+    print(f"Error: Admin password does not meet complexity requirements: {e}")
     app_context.pop()
     exit(1)
 
-print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
+print("Attempting to verify database connectivity...")
 try:
     # A simple query to check the connection
     User.objects.first()
@@ -94,6 +96,48 @@ else:
     )
     post2.save()
     print(f"Added blog post: {post2_slug}")
+
+# --- Seed Profile ---
+if Profile.objects.first():
+    print("Developer profile already exists. Skipping.")
+else:
+    work_history = [
+        WorkHistoryItem(
+            company="Global Tech Solutions",
+            role="Senior Systems Architect",
+            start_date="2021-06",
+            end_date="Present",
+            location="Remote / London",
+            description="Leading the transition to a decoupled modular monolith architecture on Raspberry Pi hardware.",
+            skills=["Python", "Flask", "Docker", "Raspberry Pi"]
+        ),
+        WorkHistoryItem(
+            company="Innovative Startups Inc",
+            role="Full Stack Developer",
+            start_date="2018-01",
+            end_date="2021-05",
+            location="Manchester, UK",
+            description="Developed high-traffic SPAs using modern JavaScript frameworks and Flask backends.",
+            skills=["JavaScript", "REST APIs", "MongoDB"]
+        )
+    ]
+    
+    profile = Profile(
+        name="Chris Developer",
+        location="United Kingdom",
+        statement="Passionate Senior Developer focused on building high-performance, secure, and resource-efficient web applications. Expert in Python, Flask, and IoT deployments.",
+        interests=["Cloud Computing", "Cybersecurity", "Embedded Systems", "Home Automation"],
+        skills=["Python", "Flask", "Docker", "MongoDB", "Linux Admin", "CI/CD"],
+        social_links={
+            "github": "https://github.com/chris",
+            "linkedin": "https://linkedin.com/in/chris",
+            "leetcode": "https://leetcode.com/chris",
+            "hackthebox": "https://app.hackthebox.com/profile/chris"
+        },
+        work_history=work_history
+    )
+    profile.save()
+    print("Added developer profile singleton.")
 
 print("Database seeding complete.")
 

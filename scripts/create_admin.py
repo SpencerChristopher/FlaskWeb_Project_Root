@@ -6,27 +6,28 @@ the 'admin' role based on environment variables.
 """
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Add project root to the Python path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
+project_root = Path(__file__).resolve().parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from src.models.user import User
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
-# Load environment variables
-load_dotenv()
+# The get_flask_app_context() utility will handle loading the .env file
+# in local development environments.
 
 # Set up Flask app context
 app_context = get_flask_app_context()
 
-MONGO_URI = os.environ.get('MONGO_URI')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-if not all([MONGO_URI, ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: MONGO_URI, ADMIN_USERNAME, and ADMIN_PASSWORD must be set in your .env file.")
+if not all([ADMIN_USERNAME, ADMIN_PASSWORD]):
+    print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables or in .env file.")
     app_context.pop()
     exit(1)
 
@@ -38,7 +39,7 @@ except ValueError as e:
     app_context.pop()
     exit(1)
 
-print(f"Attempting to connect to MongoDB at: {MONGO_URI}")
+print("Attempting to verify database connectivity...")
 try:
     # A simple query to check the connection
     User.objects.first()
@@ -56,7 +57,7 @@ else:
     admin_user_obj = User(username=ADMIN_USERNAME, email=f"{ADMIN_USERNAME}@example.com", role='admin')
     admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
-    print(f"Admin user '{ADMIN_USERNAME}' created successfully with role 'admin'.")
+    print(f"Admin user {ADMIN_USERNAME} created successfully with role 'admin'.")
 
 # Pop the application context
 app_context.pop()

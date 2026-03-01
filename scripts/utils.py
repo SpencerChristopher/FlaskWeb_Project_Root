@@ -4,6 +4,7 @@ Utility functions for the scripts in this directory.
 import os
 import sys
 import re
+from pathlib import Path
 from flask import Flask
 from dotenv import load_dotenv
 
@@ -18,22 +19,35 @@ def get_flask_app_context():
         A Flask application context that has been pushed.
     """
     # Add project root to the Python path to allow imports from 'src'
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
+    project_root = Path(__file__).resolve().parent.parent
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
 
     # Now that the path is set, we can import extensions
     from src.extensions import db
 
-    # Load environment variables from .env file
-    load_dotenv()
+    # Load .env file only if not in a container managed by the deploy script.
+    # The DOCKER_CONTAINER env var is set in docker-compose.yml.
+    if os.environ.get('DOCKER_CONTAINER') != 'true':
+        print("Running in local mode. Loading .env file...")
+        load_dotenv()
 
     app = Flask(__name__)
+    
+    # Dynamic URI construction (aligned with src/app/bootstrap.py)
     mongo_uri = os.environ.get('MONGO_URI')
     if not mongo_uri:
-        raise ValueError("MONGO_URI must be set in the .env file.")
+        user = os.environ.get("MONGO_APP_USER", "webserver")
+        password = os.environ.get("MONGO_APP_PASSWORD", "password")
+        host = os.environ.get("MONGO_HOST", "mongo")
+        db_name = os.environ.get("MONGO_APP_DB", "appdb")
+        auth_db = os.environ.get("MONGO_APP_DB", "appdb")
+        mongo_uri = f"mongodb://{user}:{password}@{host}:27017/{db_name}?authSource={auth_db}"
 
-    app.config['MONGODB_SETTINGS'] = {'host': mongo_uri}
+    app.config['MONGODB_SETTINGS'] = {
+        'host': mongo_uri,
+        'uuidRepresentation': 'standard' # Aligned with Stage 2 compliance
+    }
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
 
     db.init_app(app)

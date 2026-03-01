@@ -31,7 +31,7 @@ class TestAdminPostRoutes:
         This test expects the backend to validate ObjectId format.
         """
         invalid_id = "not-a-valid-objectid"
-        response = client.get(f'/api/admin/posts/{invalid_id}', headers=admin_headers)
+        response = client.get(f'/api/content/posts/{invalid_id}', headers=admin_headers)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -51,7 +51,7 @@ class TestAdminPostRoutes:
             "summary": "Updated Summary",
             "is_published": True
         }
-        response = client.put(f'/api/admin/posts/{invalid_id}', headers=admin_headers, json=payload)
+        response = client.put(f'/api/content/posts/{invalid_id}', headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -65,7 +65,7 @@ class TestAdminPostRoutes:
         Tests that deleting a post with an invalid ID format returns a 400 Bad Request.
         """
         invalid_id = "yet-another-invalid-id"
-        response = client.delete(f'/api/admin/posts/{invalid_id}', headers=admin_headers)
+        response = client.delete(f'/api/content/posts/{invalid_id}', headers=admin_headers)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -79,7 +79,7 @@ class TestAdminPostRoutes:
         Tests that getting a post with a NoSQL injection payload in the ID returns a 400 Bad Request.
         """
         nosql_injection_id = "{'$ne': 'some_value'}" # Example NoSQL injection payload
-        response = client.get(f'/api/admin/posts/{nosql_injection_id}', headers=admin_headers)
+        response = client.get(f'/api/content/posts/{nosql_injection_id}', headers=admin_headers)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -99,7 +99,7 @@ class TestAdminPostRoutes:
             "summary": "Updated Summary",
             "is_published": True
         }
-        response = client.put(f'/api/admin/posts/{nosql_injection_id}', headers=admin_headers, json=payload)
+        response = client.put(f'/api/content/posts/{nosql_injection_id}', headers=admin_headers, json=payload)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -113,7 +113,7 @@ class TestAdminPostRoutes:
         Tests that deleting a post with a NoSQL injection payload in the ID returns a 400 Bad Request.
         """
         nosql_injection_id = "{'$where': '1 = 1'}" # Yet another example
-        response = client.delete(f'/api/admin/posts/{nosql_injection_id}', headers=admin_headers)
+        response = client.delete(f'/api/content/posts/{nosql_injection_id}', headers=admin_headers)
         assert response.status_code == 400
         assert response.json['error_code'] == 'BAD_REQUEST'
         assert 'Validation error' in response.json['message']
@@ -134,7 +134,7 @@ class TestAdminPostRoutes:
             "summary": "Summary of my new test post.",
             "is_published": True
         }
-        response = client.post('/api/admin/posts', headers=admin_headers, json=payload)
+        response = client.post('/api/content/posts', headers=admin_headers, json=payload)
         assert response.status_code == 201
         assert response.json['message'] == 'Post created successfully'
         assert 'id' in response.json
@@ -166,7 +166,7 @@ class TestAdminPostRoutes:
             post.save()
             post_id = str(post.id)
 
-        response = client.get(f'/api/admin/posts/{post_id}', headers=admin_headers)
+        response = client.get(f'/api/content/posts/{post_id}', headers=admin_headers)
         assert response.status_code == 200
         assert response.json['title'] == post.title
         assert response.json['slug'] == post.slug
@@ -198,7 +198,7 @@ class TestAdminPostRoutes:
             "summary": "Updated summary for the post.",
             "is_published": True
         }
-        response = client.put(f'/api/admin/posts/{post_id}', headers=admin_headers, json=updated_payload)
+        response = client.put(f'/api/content/posts/{post_id}', headers=admin_headers, json=updated_payload)
         assert response.status_code == 200
         assert response.json['message'] == 'Post updated successfully'
         assert response.json['title'] == updated_payload['title']
@@ -229,7 +229,7 @@ class TestAdminPostRoutes:
             post.save()
             post_id = str(post.id)
 
-        response = client.delete(f'/api/admin/posts/{post_id}', headers=admin_headers)
+        response = client.delete(f'/api/content/posts/{post_id}', headers=admin_headers)
         assert response.status_code == 200
         assert response.json['message'] == 'Post deleted successfully'
 

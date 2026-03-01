@@ -1,68 +1,249 @@
-name: Test and Deploy to WSL
+name: Test and Deploy
 
 on:
   push:
     branches:
       - dev
+      - main
+  workflow_dispatch:
+    inputs:
+      hard_rebuild:
+        description: "Use down -v on staging deploy (includes pre-reset Mongo backup)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      LOG_LEVEL: INFO
+      FLASK_ENV: development
+      TALISMAN_FORCE_HTTPS: "false"
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Security Audit (pip-audit)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
+            pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
+            poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
+            pip-audit -r constraints.txt && \
+            bandit -r src/ -ll"
+
+      - name: Workflow Lint (actionlint)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Reset compose stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Generate Self-Signed Certificates (CI)
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/server.key 2048
+          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          chmod 600 certs/server.key
+          chmod 644 certs/server.crt
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
         with:
-          python-version: '3.12'
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache Poetry dependencies
-        uses: actions/cache@v3
+      - name: Build Image Locally (for Testing)
+        uses: docker/build-push-action@v5
         with:
-          path: ~/.cache/pypoetry
-          key: ${{ runner.os }}-poetry-${{ hashFiles('**/poetry.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-poetry-
-
-      - name: Install dependencies
-        run: pip install poetry && poetry install
-
-      # - name: Run Linting
-      #   run: poetry run flake8 src tests
-
-      # - name: Check Code Formatting
-      #   run: poetry run black --check src tests
-
-      
-
-      - name: Build Docker images
-        run: docker compose build
+          context: .
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
+          build-args: |
+            LOG_LEVEL=${{ env.LOG_LEVEL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Start containers
         run: |
-          export SECRET_KEY=${{ secrets.SECRET_KEY }}
-          export LOG_LEVEL=INFO
-          docker compose up -d
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
 
-      
+      - name: Assert web healthy before seed
+        run: |
+          health_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app)"
+          echo "flask_web_app health status: ${health_status}"
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
+          if [ "${health_status}" != "healthy" ]; then
+            echo "flask_web_app did not reach healthy state."
+            docker logs --tail 200 flask_web_app || true
+            exit 1
+          fi
+
+      - name: Seed Database (CI)
+        run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
+
+      - name: Inject tests into container
+        run: |
+          docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
+          docker cp tests/. flask_web_app:/app/tests
+          docker cp pytest.ini flask_web_app:/app/pytest.ini
+          docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
+
+      - name: Run tests
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+
+      - name: Push Verified Multi-platform Image
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ env.IMAGE_TAG }}
+          build-args: |
+            LOG_LEVEL=${{ env.LOG_LEVEL }}
+          cache-from: type=gha
+
+      - name: Capture logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose.log
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-compose.log
 
       - name: Stop containers
         if: always()
-        run: docker compose down
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
 
   deploy-to-wsl:
+    name: Deploy to WSL
     needs: build-and-test
-    runs-on: self-hosted # This will use your wsl-test labeled runner
+    runs-on: wsl-staging
+    timeout-minutes: 30
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      LOG_LEVEL: INFO
+      FLASK_ENV: production
+      TALISMAN_FORCE_HTTPS: "true"
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Run database connection test
+      - name: Set image tag
+        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+
+      - name: Reset staging compose stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+      - name: Validate required secrets
         run: |
-          docker compose exec -e PYTHONPATH=/app web /app/.venv/bin/pytest tests/test_database_connection.py
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to WSL
+        env:
+          DEPLOY_CLEAN_START: "true"
+          DEPLOY_RESET_VOLUMES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_BACKUP_BEFORE_RESET: "true"
+          DEPLOY_REQUIRE_BACKUP: "true"
+          DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
         run: |
           ./scripts/deploy.sh
-          docker system prune -f
+
+      - name: Verify staging health
+        run: |
+          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
+
+      - name: Create Admin User
+        run: |
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/create_admin.py
+
+      - name: Seed Database
+        run: |
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+
+      - name: Verify API after seed
+        run: |
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/blog
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/auth/status
+
+      - name: Capture deploy logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-deploy.log
+
+      - name: Upload deploy logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-deploy-logs
+          path: docker-compose-deploy.log

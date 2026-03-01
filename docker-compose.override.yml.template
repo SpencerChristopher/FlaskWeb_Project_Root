@@ -1,4 +1,14 @@
 services:
-  web:
-    env_file:
-      - .env
+  nginx:
+    ports:
+      - "443:443" # Expose HTTPS port for local development
+    volumes:
+      - ./certs:/etc/nginx/certs:ro # Mount local certs directory into proxy container
+
+  mongo:
+    ports:
+      - "27017:27017" # Optional: expose MongoDB for local dev/debug
+
+  redis:
+    ports:
+      - "6379:6379" # Optional: expose Redis for local dev/debug

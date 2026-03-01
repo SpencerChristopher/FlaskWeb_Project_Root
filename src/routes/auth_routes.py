@@ -7,17 +7,29 @@ current authentication status.
 
 import datetime
 from flask import Blueprint, request, jsonify, Response, current_app
-from flask_jwt_extended import create_access_token, jwt_required,     get_jwt_identity, create_refresh_token, set_access_cookies, set_refresh_cookies, unset_jwt_cookies
-from src.models.user import User
+from flask_jwt_extended import (
+    create_access_token,
+    create_refresh_token,
+    get_jwt_identity,
+    jwt_required,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies,
+    decode_token,
+    get_jwt,
+)
 from typing import Dict, Any
-from src.events import user_logged_in
-from src.extensions import limiter # Import limiter
+from src.events import dispatch_event, user_logged_in
+from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
+from src.app.security import permission_required
+from src.services.roles import Permissions
 from src.schemas import UserRegistration, ChangePasswordRequest
-from pydantic import ValidationError as PydanticValidationError
+from src.services import get_auth_service
 
 
 bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
+auth_service = get_auth_service()
 
 @bp.route('/login', methods=['POST'])
 @limiter.limit("5 per minute") # Apply rate limit
@@ -32,60 +44,88 @@ def login() -> Response:
     username = data['username']
     password = data['password']
 
-    user = User.objects(username=username).first()
-    if user and user.check_password(password):
-        access_token = create_access_token(
-            identity=str(user.id), additional_claims={"roles": [user.role]}
-        )
-        refresh_token = create_refresh_token(
-            identity=str(user.id)
-        )
+    current_app.logger.debug(f"Login attempt for username: '{username}'")
 
-        user_logged_in.send(current_app._get_current_object(), user_id=str(user.id))
-        current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
+    try:
+        user = auth_service.authenticate(username, password)
+    except UnauthorizedException:
+        current_app.logger.warning(
+            f"Failed login attempt for user: {username} from IP: {request.remote_addr}"
+        )
+        raise
 
-        response = jsonify({
-            'message': 'Login successful',
-            'access_token': access_token,
-            'refresh_token': refresh_token
-        })
-        set_access_cookies(response, access_token)
-        set_refresh_cookies(response, refresh_token)
-        return response, 200
-    else:
-        current_app.logger.warning(f"Failed login attempt for user: {username} from IP: {request.remote_addr}")
-        raise UnauthorizedException("Invalid username or password")
+    token_claims = auth_service.build_token_claims(user)
+    access_token = create_access_token(
+        identity=str(user.id), additional_claims=token_claims
+    )
+    refresh_token = create_refresh_token(
+        identity=str(user.id), additional_claims=token_claims
+    )
+
+    # Phase 3: Record active session in Redis
+    refresh_jti = decode_token(refresh_token)["jti"]
+    refresh_ttl = current_app.config["JWT_REFRESH_TOKEN_EXPIRES"]
+    auth_service._session_service.set_active_refresh_token(
+        user_id=str(user.id),
+        jti=refresh_jti,
+        ttl_seconds=int(refresh_ttl.total_seconds())
+    )
+
+    dispatch_event(user_logged_in, current_app._get_current_object(), user_id=str(user.id))
+    current_app.logger.info(f"Successful login for user: {username} from IP: {request.remote_addr}")
+
+    response = jsonify({
+        'message': 'Login successful'
+    })
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 200
 
 @bp.route('/register', methods=['POST'])
+@permission_required(Permissions.USERS_MANAGE)
 def register() -> Response:
     """
     Registers a new user.
+    Restricted to users with USERS_MANAGE permission (Admins).
     """
-    try:
-        user_data = UserRegistration(**request.get_json())
-    except PydanticValidationError as e:
-        # Extract just the messages for a cleaner response
-        error_messages = [error['msg'] for error in e.errors()]
-        raise BadRequestException("Invalid registration data", details=error_messages)
+    data = request.get_json()
+    user_data = UserRegistration(**data)
 
-    # Placeholder for actual user registration logic
-    current_app.logger.info(f"New user registration for: {user_data.username} from IP: {request.remote_addr}")
-    return jsonify({'message': 'User registration endpoint (placeholder)', 'received_data': user_data.model_dump()}), 200
+    created_user = auth_service.register_user(
+        username=user_data.username,
+        email=user_data.email,
+        password=user_data.password,
+        role=data.get("role", "member") # Allow role assignment during admin creation
+    )
+
+    current_app.logger.info(f"Admin created new user: {created_user.username} with role: {created_user.role}")
+    
+    return jsonify({
+        "message": "User created successfully.",
+        "user": {
+            "id": str(created_user.id),
+            "username": created_user.username,
+            "role": created_user.role
+        }
+    }), 201
 
 
 @bp.route('/logout', methods=['POST'])
 @jwt_required()
 def logout() -> Response:
     """
-    Logs out the currently authenticated user.
+    Logs out the currently authenticated user and invalidates their session.
     """
-    from flask_jwt_extended import get_jwt
-    from src.models.token_blocklist import TokenBlocklist
+    # Phase 3: Invalidate active session in Redis
+    current_user_id = get_jwt_identity()
+    if current_user_id:
+        auth_service._session_service.invalidate_session(current_user_id)
 
-    jti = get_jwt()["jti"]
-    now = datetime.datetime.now(datetime.timezone.utc)
-    blocklisted_token = TokenBlocklist(jti=jti, expires_at=now + datetime.timedelta(minutes=15)) # Block for access token expiry
-    blocklisted_token.save(write_concern={'w': 1})
+    jwt_payload = get_jwt()
+    jti = jwt_payload["jti"]
+    # Block for access token expiry (typically 15 minutes)
+    expires_at = datetime.datetime.fromtimestamp(jwt_payload["exp"], datetime.timezone.utc)
+    auth_service.revoke_token(jti, expires_at)
 
     response = jsonify({'message': 'Logged out successfully'})
     unset_jwt_cookies(response)
@@ -96,10 +136,25 @@ def logout() -> Response:
 def refresh() -> Response:
     """
     Refreshes an access token using a valid refresh token.
+    Validates the token's JTI against the active session in Redis.
     """
     current_user_id = get_jwt_identity()
+    refresh_jti = get_jwt()["jti"]
+
+    # Phase 3: Enforce session validity
+    if not auth_service._session_service.is_refresh_token_valid(current_user_id, refresh_jti):
+        current_app.logger.warning(
+            f"Invalid refresh attempt for user ID: {current_user_id} with JTI: {refresh_jti}. "
+            "Session likely invalidated by a newer login."
+        )
+        raise UnauthorizedException("Session has expired or been invalidated")
+
     current_app.logger.info(f"Token refreshed for user ID: {current_user_id} from IP: {request.remote_addr}")
-    new_access_token = create_access_token(identity=current_user_id)
+    user = auth_service.get_user_or_raise(current_user_id)
+    new_access_token = create_access_token(
+        identity=current_user_id,
+        additional_claims=auth_service.build_token_claims(user)
+    )
     response = jsonify({'message': 'Token refreshed'})
     set_access_cookies(response, new_access_token)
     return response, 200
@@ -113,14 +168,18 @@ def status() -> Response:
     """
     current_user_id = get_jwt_identity()
     if current_user_id:
-        user = User.objects(id=current_user_id).first()
+        user = auth_service.get_user(current_user_id)
         if user:
+            from src.services import get_authz_service
+            authz_service = get_authz_service()
+            
             return jsonify({
                 'logged_in': True,
                 'user': {
                     'username': user.username,
                     'id': str(user.id),
-                    'role': user.role
+                    'role': user.role,
+                    'capabilities': authz_service.get_user_capabilities(get_jwt())
                 }
             }), 200
     return jsonify({'logged_in': False}), 200
@@ -131,22 +190,13 @@ def change_password() -> Response:
     """
     Allows a logged-in user to change their password.
     """
-    try:
-        data = ChangePasswordRequest(**request.get_json())
-    except PydanticValidationError as e:
-        # Extract just the messages for a cleaner response
-        error_messages = [error['msg'] for error in e.errors()]
-        raise BadRequestException("Invalid data", details=error_messages)
-        current_app.logger.warning(f"Invalid data for change password: {error_messages}")
-
+    data = ChangePasswordRequest(**request.get_json())
     user_id = get_jwt_identity()
-    user = User.objects(id=user_id).first()
-
-    if not user or not user.check_password(data.current_password):
-        raise UnauthorizedException("Invalid current password")
-
-    user.set_password(data.new_password)
-    user.save()
+    auth_service.change_password(
+        user_id=user_id,
+        current_password=data.current_password,
+        new_password=data.new_password,
+    )
     current_app.logger.info(f"Password successfully changed for user ID: {user_id} from IP: {request.remote_addr}")
 
     return jsonify({'message': 'Password updated successfully'}), 200

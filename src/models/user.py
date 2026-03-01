@@ -5,7 +5,12 @@ using MongoEngine.
 
 from src.extensions import db, bcrypt
 import datetime
-from src.events import user_deleted
+
+from src.services.roles import (
+    ROLE_ADMIN,
+    ROLE_AUTHOR,
+    ROLE_MEMBER,
+)
 
 
 class User(db.Document):
@@ -17,7 +22,11 @@ class User(db.Document):
     email = db.EmailField(required=True, unique=True)
     password_hash = db.StringField(required=True)
     created_at = db.DateTimeField(default=datetime.datetime.utcnow)
-    role = db.StringField(default='user', choices=['user', 'editor', 'admin'])
+    role = db.StringField(
+        default=ROLE_MEMBER,
+        choices=[ROLE_ADMIN, ROLE_AUTHOR, ROLE_MEMBER],
+    )
+    token_version = db.IntField(default=0)
 
     def set_password(self, password: str) -> None:
         """Hashes the provided password and sets it for the user."""
@@ -30,14 +39,6 @@ class User(db.Document):
         return bcrypt.check_password_hash(
             self.password_hash, password
         )
-
-    def delete(self, *args, **kwargs):
-        """
-        Overrides the default delete method to dispatch a signal before deletion.
-        """
-        user_id = str(self.id)
-        super().delete(*args, **kwargs)
-        user_deleted.send(self, user_id=user_id)
 
     def to_dict(self) -> dict:
         """

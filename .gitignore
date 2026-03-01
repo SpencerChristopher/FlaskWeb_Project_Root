@@ -77,6 +77,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+phased_plan.md
 
 # pyenv
 .python-version
@@ -118,8 +119,15 @@ logs/
 # Test files
 tests/__pycache__/
 tests/*.log
-
+# local certs for https
+/certs
+# Local uploads
+static/uploads/
 # Temporary commit message file
 commit_message.txt
 
 docker-compose.override.yml
+Phased_plan_DEVOPs.md
+phased_plan_backend.md
+phased_plan_db_fix.md
+docs/phase5_domain_alignment.md

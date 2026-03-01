@@ -4,7 +4,7 @@ from src.models.user import User
 # Fixture to create a user in the database
 @pytest.fixture
 def test_user(app):
-    user = User(username='testuser', email='test@example.com', role='user')
+    user = User(username='testuser', email='test@example.com', role='member')
     user.set_password('Password123!') # Complex password
     user.save()
     yield user
@@ -73,5 +73,5 @@ def test_change_password_with_missing_data(client, test_user, login_user_fixture
     data = response.get_json()
     assert data['error_code'] == 'BAD_REQUEST'
     assert data['message'] == 'Invalid data'
-    # Check that the details list contains a message about the missing field
-    assert any('Field required' in detail for detail in data['details'])
+    # Check that the details list contains a structured object about the missing field
+    assert any(detail['msg'] == 'Field required' for detail in data['details'])

@@ -6,7 +6,7 @@ import datetime
 # Fixture to create a test user (author for posts)
 @pytest.fixture
 def test_user(app):
-    user = User(username='testuser', email='test@example.com', role='user')
+    user = User(username='testuser', email='test@example.com', role='member')
     user.set_password('Password123')
     user.save()
     yield user
@@ -111,6 +111,21 @@ class TestApiRoutes:
         assert response.status_code == 200
         assert response.json['title'] == test_post.title
         assert response.json['slug'] == test_post.slug
+
+    def test_blog_post_api_does_not_expose_author_pii(self, client, test_post):
+        """
+        Public blog endpoint must not expose sensitive author fields.
+        """
+        response = client.get(f"/api/blog/{test_post.slug}")
+        assert response.status_code == 200
+
+        author_payload = response.json["author"]
+        assert "id" in author_payload
+        assert "username" in author_payload
+        assert "email" not in author_payload
+        assert "password_hash" not in author_payload
+        assert "role" not in author_payload
+        assert "token_version" not in author_payload
 
     def test_blog_list_api_successful(self, client, app, test_user):
         """Tests successful retrieval of a list of blog posts with pagination."""

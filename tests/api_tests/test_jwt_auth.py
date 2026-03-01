@@ -25,7 +25,7 @@ def setup_users(app):
     admin_user.save()
 
     # Create a test regular user
-    regular_user = User(username="testuser", email="testuser@example.com", role="user")
+    regular_user = User(username="testuser", email="testuser@example.com", role="member")
     regular_user.set_password("testpassword")
     regular_user.save()
 
@@ -164,7 +164,8 @@ class TestTokenLifecycle:
         with app.app_context():
             expired_refresh_token = create_refresh_token(
                 identity="testadmin_id", # Use a dummy ID as user might be deleted
-                expires_delta=datetime.timedelta(seconds=-1)
+                expires_delta=datetime.timedelta(seconds=-1),
+                additional_claims={"tv": 0}
             )
         response = client.post(
             "/api/auth/refresh", headers={"Authorization": f"Bearer {expired_refresh_token}"}
