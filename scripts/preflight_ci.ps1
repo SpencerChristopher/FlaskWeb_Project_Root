@@ -4,7 +4,8 @@ param(
     [switch]$SkipCloud,
     [switch]$SkipRunner,
     [switch]$Offline,
-    [switch]$Verbose
+    [switch]$Verbose,
+    [switch]$StrictSecurity
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,8 +23,8 @@ function Require-Command($name, [switch]$Optional) {
 
 Write-Host "`n--- Preflight Security & Integrity Checks (PowerShell) ---" -ForegroundColor Cyan
 
-# [1/6] Tool Check
-Write-Host "[1/6] Verifying required tools..."
+# [1/7] Tool Check
+Write-Host "[1/7] Verifying required tools..."
 $tools = @("poetry", "docker", "gh")
 foreach ($tool in $tools) {
     if (-not (Require-Command $tool)) { 
@@ -36,9 +37,10 @@ foreach ($tool in $tools) {
     }
 }
 
-# [2/6] Cloud State Validation (GitHub CLI)
+# [2/7] Cloud State Validation (GitHub CLI)
+# ... (rest of the cloud state logic remains unchanged)
 if (-not $SkipCloud -and -not $Offline) {
-    Write-Host "[2/6] Validating Cloud State (GitHub)..."
+    Write-Host "[2/7] Validating Cloud State (GitHub)..."
     
     # Check Runner Status
     if (-not $SkipRunner) {
@@ -93,11 +95,11 @@ if (-not $SkipCloud -and -not $Offline) {
         Write-Host "Warning: Could not fetch secret list." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[2/6] Skipping Cloud State Validation (Offline Mode)." -ForegroundColor Yellow
+    Write-Host "[2/7] Skipping Cloud State Validation (Offline Mode)." -ForegroundColor Yellow
 }
 
-# [3/6] Containerized Validation (Lint & Audit)
-Write-Host "[3/6] Running containerized lints and security audits..."
+# [3/7] Containerized Validation (Lint & Audit)
+Write-Host "[3/7] Running containerized lints and security audits..."
 if ($SkipAudit) {
     Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
@@ -118,28 +120,28 @@ if ($SkipAudit) {
     Write-Host "Validation passed." -ForegroundColor Green
 }
 
-# [4/6] Lockfile Freshness
-Write-Host "[4/6] Ensuring poetry.lock is up to date..."
+# [4/7] Lockfile Freshness
+Write-Host "[4/7] Ensuring poetry.lock is up to date..."
 poetry lock --quiet
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: poetry lock failed." -ForegroundColor Red
     exit 1
 }
 
-# [5/6] Local CI Simulation (Optional)
+# [5/7] Local CI Simulation (Optional)
 if ($RunAct) {
-    Write-Host "[5/6] Running local workflow simulation (act)..."
+    Write-Host "[5/7] Running local workflow simulation (act)..."
     if (Require-Command "act" -Optional) {
         & act -W .github/workflows/test-deploy.yml
     } else {
         Write-Host "Install act to run workflows locally, then re-run with -RunAct." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[5/6] Skipping local workflow simulation."
+    Write-Host "[5/7] Skipping local workflow simulation."
 }
 
-# [6/6] Docker Stack Build
-Write-Host "[6/6] Verifying final Docker stack build..."
+# [6/7] Docker Stack Build
+Write-Host "[6/7] Verifying final Docker stack build..."
 if ($Verbose) {
     docker compose build
 } else {
@@ -149,6 +151,34 @@ if ($Verbose) {
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: Final Docker build failed." -ForegroundColor Red
     exit 1
+}
+
+# [7/7] Infrastructure CVE Baseline Audit (Docker Scout)
+Write-Host "[7/7] Auditing Infrastructure CVE Baseline (Docker Scout)..."
+$images = @("nginx:alpine", "mongo:8.0", "redis:alpine")
+
+# Try to check if docker scout is available
+if (Require-Command "docker" -and (docker scout version 2>&1 | Out-String -ErrorAction SilentlyContinue)) {
+    foreach ($img in $images) {
+        Write-Host "Auditing $img..." -NoNewline
+        if ($StrictSecurity) {
+            # In Strict mode, we fail on any High/Critical CVEs using 'cves' which supports --exit-code and --only-severity
+            docker scout cves $img --exit-code --only-severity critical,high
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host " [FAILED]" -ForegroundColor Red
+
+                Write-Host "Error: $img contains High/Critical vulnerabilities. Resolve them or run without -StrictSecurity." -ForegroundColor Red
+                exit 1
+            }
+            Write-Host " [CLEAN]" -ForegroundColor Green
+        } else {
+            # In Normal mode, we just print the summary for visibility
+            docker scout quickview $img
+        }
+    }
+} else {
+    Write-Host "Warning: Docker Scout not found. Skipping infrastructure audit." -ForegroundColor Yellow
+    Write-Host "Install Docker Scout for baseline CVE monitoring." -ForegroundColor Gray
 }
 
 Write-Host "---------------------------------------------" -ForegroundColor Cyan

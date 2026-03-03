@@ -143,10 +143,47 @@ docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
-To stop the services, run:
+## Development Workflow
+
+### Viewing Logs
+To monitor the application and see real-time output from Flask/Gunicorn, Nginx, and MongoDB:
+
 ```bash
-docker compose down
+# Follow all logs
+docker compose logs -f
+
+# Follow only the web application logs
+docker compose logs -f web
 ```
+Application logs are also persisted locally in the `./logs` directory via volume mounting.
+
+### Running Tests
+To run the test suite inside the container environment (ensuring exact parity with the CI environment):
+
+```bash
+# Run all tests
+docker compose exec web /app/.venv/bin/pytest tests/
+
+# Run tests excluding heavy/performance-intensive ones
+docker compose exec web /app/.venv/bin/pytest tests/ -m "not heavy"
+```
+
+### Quick Reloading & Service Management
+The `docker-compose.override.yml` mounts your local `src/` directory into the container for live development.
+
+- **Auto-Reload**: When `FLASK_ENV=development` is set in your `.env`, the Flask development server (if used) or Gunicorn (with `--reload`) will automatically detect changes to Python files.
+- **Manual Restart**: If you need to force a restart of the web service (e.g., after changing environment variables or configuration files):
+  ```bash
+  docker compose restart web
+  ```
+- **Stop Services**: To stop the services and keep the data volumes:
+  ```bash
+  docker compose stop
+  ```
+- **Down/Clean Up**: To stop and remove containers (adding `-v` will also remove the database volumes):
+  ```bash
+  docker compose down
+  ```
 
 ## Usage
 
