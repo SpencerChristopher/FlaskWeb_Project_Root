@@ -18,7 +18,7 @@ def test_profile_schema_valid():
     schema = ProfileSchema(**data)
     assert schema.statement == data["statement"]
     assert len(schema.skills) == 3
-    assert schema.social_links["github"] == "https://github.com/testuser"
+    assert schema.social_links.github == "https://github.com/testuser"
 
 def test_profile_schema_invalid_statement_length():
     """Verify that too short statements fail."""
@@ -37,4 +37,4 @@ def test_profile_schema_invalid_url():
     }
     with pytest.raises(ValidationError) as excinfo:
         ProfileSchema(**data)
-    assert "URL for github must be absolute" in str(excinfo.value)
+    assert "URL must be absolute" in str(excinfo.value)
