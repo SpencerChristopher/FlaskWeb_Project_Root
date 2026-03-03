@@ -12,14 +12,14 @@ from src.server import create_app
 from mongoengine import disconnect, connect, get_db
 from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
-from src.models.post import Post
+from src.models.article import Article
 from src.extensions import limiter
 
 
 def _clear_test_collections() -> None:
     db = get_db()
     db.get_collection(User._get_collection_name()).delete_many({})
-    db.get_collection(Post._get_collection_name()).delete_many({})
+    db.get_collection(Article._get_collection_name()).delete_many({})
     from src.models.token_blocklist import TokenBlocklist
     from src.models.profile import Profile
 

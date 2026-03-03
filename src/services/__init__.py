@@ -3,20 +3,19 @@ Service wiring for application-layer orchestration.
 """
 
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.services.auth_service import AuthService
     from src.services.authz_service import AuthzService
-    from src.services.post_service import PostService
+    from src.services.article_service import ArticleService
     from src.services.session_service import SessionService
     from src.services.profile_service import ProfileService
     from src.services.media_service import MediaService
 
 _auth_service = None
 _authz_service = None
-_post_service = None
+_article_service = None
 _session_service = None
 _profile_service = None
 _media_service = None
@@ -61,14 +60,18 @@ def get_authz_service() -> "AuthzService":
     return _authz_service
 
 
-def get_post_service() -> "PostService":
-    global _post_service
-    if _post_service is None:
-        from src.repositories import get_post_repository
-        from src.services.post_service import PostService
+def get_article_service() -> "ArticleService":
+    global _article_service
+    if _article_service is None:
+        from src.repositories import get_article_repository, get_user_repository
+        from src.services.article_service import ArticleService
 
-        _post_service = PostService(get_post_repository())
-    return _post_service
+        _article_service = ArticleService(get_article_repository(), get_user_repository())
+    return _article_service
+
+def get_post_service() -> "ArticleService":
+    """Legacy alias for backward compatibility during refactor."""
+    return get_article_service()
 
 
 def get_profile_service() -> "ProfileService":

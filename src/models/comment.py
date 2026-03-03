@@ -3,17 +3,17 @@ This module defines the Comment model using MongoEngine.
 """
 import datetime
 from src.extensions import db
-from src.models.post import Post
+from src.models.article import Article
 from src.models.user import User
 from mongoengine.fields import ReferenceField
 
 class Comment(db.Document):
     """
-    Represents a user comment on a blog post or recipe.
+    Represents a user comment on a blog article.
     """
     content = db.StringField(required=True, max_length=1000)
-    author = ReferenceField(User)
-    post = ReferenceField(Post)
+    author = ReferenceField('User')
+    article = ReferenceField('Article')
     created_at = db.DateTimeField(default=datetime.datetime.utcnow)
     is_approved = db.BooleanField(default=True)
 
@@ -26,11 +26,11 @@ class Comment(db.Document):
                 "id": str(self.author.id),
                 "username": self.author.username
             },
-            "post_id": str(self.post.id),
+            "article_id": str(self.article.id),
             "created_at": self.created_at.isoformat(),
         }
 
     meta = {
         'collection': 'comments',
-        'indexes': ['post', '-created_at']
+        'indexes': ['article', '-created_at']
     }

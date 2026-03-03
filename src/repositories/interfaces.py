@@ -7,13 +7,16 @@ query construction details.
 
 from __future__ import annotations
 
-from typing import Optional, Protocol
+from typing import Optional, Protocol, TYPE_CHECKING
+import datetime
 
-from src.models.post import Post
-from src.models.user import User
-from src.models.comment import Comment
-from src.models.token_blocklist import TokenBlocklist
-from src.models.profile import Profile
+if TYPE_CHECKING:
+    from src.models.user import User
+    from src.models.comment import Comment
+    from src.models.token_blocklist import TokenBlocklist
+    from src.models.profile import Profile
+    from src.models.article import Article
+    from src.schemas import ProfilePublic, ProfileSchema, ArticlePublic, ArticleCreateUpdate
 
 
 class UserRepository(Protocol):
@@ -38,7 +41,7 @@ class UserRepository(Protocol):
 class CommentRepository(Protocol):
     """Persistence contract for comment operations."""
 
-    def delete_by_post_id(self, post_id: str) -> int:
+    def delete_by_article_id(self, article_id: str) -> int:
         ...
 
     def save(self, comment: Comment) -> Comment:
@@ -65,26 +68,29 @@ class ProfileRepository(Protocol):
         ...
 
 
-class PostRepository(Protocol):
-    """Persistence contract for post queries and writes."""
+class ArticleRepository(Protocol):
+    """Persistence contract for article queries and writes."""
 
-    def list_all(self):
+    def list_all(self) -> list[Article]:
         ...
 
     def get_published_paginated(self, page: int, per_page: int):
         ...
 
-    def get_by_id(self, post_id: str) -> Optional[Post]:
+    def get_by_id(self, article_id: str) -> Optional[Article]:
         ...
 
-    def get_by_slug(self, slug: str) -> Optional[Post]:
+    def get_by_slug(self, slug: str) -> Optional[Article]:
         ...
 
-    def get_by_slug_excluding_id(self, slug: str, post_id: str) -> Optional[Post]:
+    def get_by_slug_excluding_id(self, slug: str, article_id: str) -> Optional[Article]:
         ...
 
-    def save(self, post: Post) -> Post:
+    def save(self, article: Article) -> Article:
         ...
 
-    def delete(self, post: Post) -> None:
+    def delete(self, article: Article) -> None:
         ...
+
+# Legacy Aliases for stability
+PostRepository = ArticleRepository
