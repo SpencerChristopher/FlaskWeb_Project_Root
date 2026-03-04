@@ -110,6 +110,25 @@ class AuthService:
             dispatch_event(user_role_changed, "auth_service", user_id=str(user.id), new_role=role)
         return user
 
+    def record_active_refresh_token(self, *, user_id: str, jti: str, ttl_seconds: int) -> None:
+        if not self._session_service:
+            return
+        self._session_service.set_active_refresh_token(
+            user_id=user_id,
+            jti=jti,
+            ttl_seconds=ttl_seconds,
+        )
+
+    def invalidate_session(self, user_id: str) -> None:
+        if not self._session_service:
+            return
+        self._session_service.invalidate_session(user_id)
+
+    def is_refresh_token_valid(self, user_id: str, jti: str) -> bool:
+        if not self._session_service:
+            return True
+        return self._session_service.is_refresh_token_valid(user_id, jti)
+
     def _invalidate_cached_version(self, user_id: str) -> None:
         if self._session_service:
             try:

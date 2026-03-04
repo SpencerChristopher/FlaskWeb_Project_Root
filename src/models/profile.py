@@ -6,6 +6,8 @@ import mongoengine
 import datetime
 from src.extensions import db
 
+PROFILE_SINGLETON_KEY = "profile"
+
 class WorkHistoryItem(mongoengine.EmbeddedDocument):
     """Represents a single employment entry."""
     company = mongoengine.StringField(required=True)
@@ -26,6 +28,7 @@ class Profile(db.Document):
     statement = mongoengine.StringField(required=True, max_length=2000)
     interests = mongoengine.ListField(mongoengine.StringField(max_length=50))
     skills = mongoengine.ListField(mongoengine.StringField(max_length=50))
+    singleton_key = mongoengine.StringField(required=True, unique=True, default=PROFILE_SINGLETON_KEY)
     social_links = mongoengine.DictField()
     work_history = mongoengine.EmbeddedDocumentListField(WorkHistoryItem)
     image_url = mongoengine.StringField()
