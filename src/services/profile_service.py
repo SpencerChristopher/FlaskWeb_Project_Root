@@ -12,6 +12,7 @@ from src.models.profile import Profile, WorkHistoryItem as WorkHistoryModel
 from src.repositories.interfaces import ProfileRepository
 from src.schemas import ProfilePublic, ProfileSchema, WorkHistoryItem as WorkHistorySchema
 from typing import BinaryIO
+from src.exceptions import BadRequestException
 
 class ProfileService:
     """Application service for developer profile orchestration."""
@@ -56,6 +57,13 @@ class ProfileService:
                 normalized[norm_key] = url.strip()
         return normalized
 
+    def _validate_image_url(self, image_url: str | None) -> str | None:
+        if not image_url:
+            return None
+        if not image_url.startswith("/static/uploads/"):
+            raise BadRequestException("Profile image URL must reference a local upload.")
+        return image_url
+
     def get_profile(self) -> ProfilePublic:
         """
         Retrieves the profile. If none exists, returns a default one.
@@ -95,6 +103,7 @@ class ProfileService:
         
         work_history_models = self._map_dto_to_work_history_model(profile_data.work_history)
         normalized_social_links = self._normalize_social_links(profile_data.social_links)
+        desired_image_url = self._validate_image_url(profile_data.image_url)
 
         if not profile:
             profile = Profile(
@@ -105,7 +114,7 @@ class ProfileService:
                 skills=profile_data.skills,
                 social_links=normalized_social_links,
                 work_history=work_history_models,
-                image_url=profile_data.image_url,
+                image_url=desired_image_url,
                 last_updated=datetime.datetime.now(datetime.timezone.utc)
             )
         else:
@@ -116,7 +125,10 @@ class ProfileService:
             profile.skills = profile_data.skills
             profile.social_links = normalized_social_links
             profile.work_history = work_history_models
-            profile.image_url = profile_data.image_url
+            if desired_image_url and desired_image_url != profile.image_url:
+                if profile.image_url:
+                    self._media_service.delete_image(profile.image_url)
+                profile.image_url = desired_image_url
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)
