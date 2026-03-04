@@ -1,33 +1,42 @@
 """
-This module defines Blinker signals and safe dispatch helpers.
+Central signal definitions for the application event system.
+Uses Blinker for decoupled cross-module communication.
 """
 
 from __future__ import annotations
-
 import datetime
 import logging
 import uuid
 from typing import Any
-
 from blinker import NamedSignal
 
 logger = logging.getLogger(__name__)
 
-# Define signals
-post_created = NamedSignal('post-created')
-post_updated = NamedSignal('post-updated')
-post_deleted = NamedSignal('post-deleted')
-post_published = NamedSignal('post-published')
-user_created = NamedSignal('user-created')
+# --- User Events ---
 user_logged_in = NamedSignal('user-logged-in')
+user_logged_out = NamedSignal('user-logged-out')
+user_created = NamedSignal('user-created')
 user_deleted = NamedSignal('user-deleted')
 user_role_changed = NamedSignal('user-role-changed')
 
+# --- Article Events ---
+article_created = NamedSignal('article-created')
+article_updated = NamedSignal('article-updated')
+article_deleted = NamedSignal('article-deleted')
+article_published = NamedSignal('article-published')
+
+# Legacy Aliases
+post_created = article_created
+post_updated = article_updated
+post_deleted = article_deleted
+post_published = article_published
+
+# --- Profile Events ---
+profile_updated = NamedSignal('profile-updated')
 
 def dispatch_event(signal: NamedSignal, sender: Any, **payload: Any) -> dict[str, Any]:
     """
     Dispatch a signal in best-effort mode.
-
     Listener exceptions are logged but do not break the caller flow.
     """
     event_payload = dict(payload)

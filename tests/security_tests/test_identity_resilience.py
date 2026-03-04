@@ -15,7 +15,7 @@ class TestIdentityResilience:
         outstanding JWTs.
         """
         # 1. Verify access works initially
-        resp = client.get("/api/content/posts", headers=admin_headers)
+        resp = client.get("/api/content/articles", headers=admin_headers)
         assert resp.status_code == 200
 
         # 2. Increment token_version in DB
@@ -25,7 +25,7 @@ class TestIdentityResilience:
             user.save()
 
         # 3. Next request with OLD token must fail
-        resp = client.get("/api/content/posts", headers=admin_headers)
+        resp = client.get("/api/content/articles", headers=admin_headers)
 
         assert resp.status_code == 401
         assert resp.get_json()["error_code"] == "UNAUTHORIZED"

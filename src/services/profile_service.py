@@ -91,7 +91,7 @@ class ProfileService:
                 statement=profile_data.statement,
                 interests=profile_data.interests,
                 skills=profile_data.skills,
-                social_links=profile_data.social_links,
+                social_links=profile_data.social_links.model_dump(),
                 work_history=work_history_models,
                 image_url=profile_data.image_url,
                 last_updated=datetime.datetime.now(datetime.timezone.utc)
@@ -102,7 +102,7 @@ class ProfileService:
             profile.statement = profile_data.statement
             profile.interests = profile_data.interests
             profile.skills = profile_data.skills
-            profile.social_links = profile_data.social_links
+            profile.social_links = profile_data.social_links.model_dump()
             profile.work_history = work_history_models
             profile.image_url = profile_data.image_url
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)

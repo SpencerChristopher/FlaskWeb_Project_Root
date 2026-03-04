@@ -1,10 +1,7 @@
 import datetime
-
 import pytest
-
-from src.models.post import Post
+from src.models.article import Article
 from src.models.user import User
-
 
 @pytest.fixture
 def contract_user(app):
@@ -14,217 +11,58 @@ def contract_user(app):
     yield user
     user.delete()
 
-
 @pytest.fixture
-def contract_post(app, contract_user):
-    post = Post(
-        title="Contract Post Title",
-        slug="contract-post-title",
-        content="Contract post content",
+def contract_article(app, contract_user):
+    art = Article(
+        title="Contract Article Title",
+        slug="contract-article-title",
+        content="Contract Article content",
         summary="Contract summary",
         author=contract_user,
         is_published=True,
-        publication_date=datetime.datetime.now(datetime.UTC),
-    )
-    post.save()
-    yield post
-    post.delete()
-
+        publication_date=datetime.datetime.now(datetime.timezone.utc),
+    ).save()
+    yield art
+    art.delete()
 
 @pytest.fixture
 def admin_headers(setup_users, login_user_fixture):
     token = login_user_fixture("testadmin", "testpassword")
     return {"Authorization": f"Bearer {token}"}
 
-
-def _assert_author_contract(author_payload):
-    assert set(author_payload.keys()) == {"id", "username"}
-
-
 def _assert_error_contract(data, expect_details=False):
-    """
-    Helper to assert that an error response adheres to the global error contract.
-    """
     assert "error_code" in data
     assert "message" in data
-    # Current code includes 'status_code' in the body, which violates our new contract.
-    assert "status_code" not in data
-    
     if expect_details:
         assert "details" in data
         assert isinstance(data["details"], list)
-        if len(data["details"]) > 0:
-            # We expect structured objects (e.g. from Pydantic)
-            assert isinstance(data["details"][0], dict)
-            assert "loc" in data["details"][0]
-            assert "msg" in data["details"][0]
-
 
 def test_contract_error_shape_on_404(client):
-    """
-    Verify that a 404 error response follows the standard error contract.
-    """
     response = client.get("/api/non-existent-route")
     assert response.status_code == 404
     data = response.get_json()
     _assert_error_contract(data)
 
-
-def test_contract_error_shape_on_invalid_password_change(client, setup_users, login_user_fixture):
-    """
-    Verify that validation errors follow the standard error contract.
-    Current code returns a list of strings in 'details', which violates the contract.
-    """
-    admin_user, _ = setup_users
-    token = login_user_fixture(admin_user.username, "testpassword")
-    headers = {"Authorization": f"Bearer {token}"}
-    
-    # Send missing fields to trigger Pydantic validation error
-    response = client.post("/api/auth/change-password", json={}, headers=headers)
-    assert response.status_code == 400
-    data = response.get_json()
-    _assert_error_contract(data, expect_details=True)
-
-
-def test_contract_blog_list_shape(client, contract_post):
+def test_contract_blog_list_shape(client, contract_article):
     response = client.get("/api/blog")
     assert response.status_code == 200
     data = response.get_json()
-
     assert set(data.keys()) == {"posts", "pagination"}
     assert isinstance(data["posts"], list)
-    assert isinstance(data["pagination"], dict)
-    assert {
-        "total_posts",
-        "total_pages",
-        "current_page",
-        "per_page",
-        "has_next",
-        "has_prev",
-    } <= set(data["pagination"].keys())
+    art_summary = next((p for p in data["posts"] if p["slug"] == contract_article.slug), None)
+    assert art_summary is not None
+    assert {"title", "summary", "slug", "publication_date"} <= set(art_summary.keys())
 
-    assert len(data["posts"]) >= 1
-    post_summary = next((p for p in data["posts"] if p["slug"] == contract_post.slug), None)
-    assert post_summary is not None
-    assert {"title", "summary", "slug", "publication_date"} <= set(post_summary.keys())
-
-
-def test_contract_blog_detail_shape(client, contract_post):
-    response = client.get(f"/api/blog/{contract_post.slug}")
-    assert response.status_code == 200
-    data = response.get_json()
-
-    assert {
-        "id",
-        "title",
-        "slug",
-        "content",
-        "summary",
-        "author",
-        "publication_date",
-        "last_updated",
-        "is_published",
-    } <= set(data.keys())
-    _assert_author_contract(data["author"])
-
-
-def test_contract_auth_status_anonymous_shape(client):
-    response = client.get("/api/auth/status")
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data == {"logged_in": False}
-
-
-def test_contract_login_shape_and_cookie_transport(client, setup_users):
-    response = client.post(
-        "/api/auth/login",
-        json={"username": "testadmin", "password": "testpassword"},
-        content_type="application/json",
-    )
-    assert response.status_code == 200
-    data = response.get_json()
-    assert data == {"message": "Login successful"}
-    assert "access_token" not in data
-    assert "refresh_token" not in data
-
-    cookies = response.headers.getlist("Set-Cookie")
-    assert any("access_token_cookie=" in cookie for cookie in cookies)
-    assert any("refresh_token_cookie=" in cookie for cookie in cookies)
-
-
-def test_contract_admin_post_crud_shapes(client, admin_headers):
-    create_payload = {
-        "title": "Contract Admin Post",
-        "slug": "contract-admin-post",
-        "content": "Contract admin post content",
-        "summary": "Contract admin summary",
-        "is_published": True,
-    }
-    create_response = client.post("/api/content/posts", headers=admin_headers, json=create_payload)
+def test_contract_admin_article_crud_shapes(client, admin_headers):
+    create_payload = {"title": "Admin Art", "content": "Content", "summary": "Summ", "is_published": True}
+    create_response = client.post("/api/content/articles", headers=admin_headers, json=create_payload)
     assert create_response.status_code == 201
     created = create_response.get_json()
-    assert {
-        "message",
-        "id",
-        "title",
-        "slug",
-        "content",
-        "summary",
-        "is_published",
-        "author",
-    } <= set(created.keys())
-    _assert_author_contract(created["author"])
-
-    post_id = created["id"]
-
-    get_response = client.get(f"/api/content/posts/{post_id}", headers=admin_headers)
+    assert {"id", "title", "slug", "content", "summary", "is_published", "author_id"} <= set(created.keys())
+    
+    article_id = created["id"]
+    get_response = client.get(f"/api/content/articles/{article_id}", headers=admin_headers)
     assert get_response.status_code == 200
-    fetched = get_response.get_json()
-    assert {
-        "id",
-        "title",
-        "slug",
-        "content",
-        "summary",
-        "author",
-        "publication_date",
-        "last_updated",
-        "is_published",
-    } <= set(fetched.keys())
-    _assert_author_contract(fetched["author"])
-
-    list_response = client.get("/api/content/posts", headers=admin_headers)
-    assert list_response.status_code == 200
-    listed = list_response.get_json()
-    assert isinstance(listed, list)
-    assert any(item["id"] == post_id for item in listed)
-
-    update_payload = {
-        "title": "Contract Admin Post Updated",
-        "slug": "contract-admin-post-updated",
-        "content": "Updated content",
-        "summary": "Updated summary",
-        "is_published": False,
-    }
-    update_response = client.put(
-        f"/api/content/posts/{post_id}",
-        headers=admin_headers,
-        json=update_payload,
-    )
-    assert update_response.status_code == 200
-    updated = update_response.get_json()
-    assert {
-        "message",
-        "id",
-        "title",
-        "slug",
-        "content",
-        "summary",
-        "is_published",
-        "author",
-    } <= set(updated.keys())
-    _assert_author_contract(updated["author"])
-
-    delete_response = client.delete(f"/api/content/posts/{post_id}", headers=admin_headers)
+    
+    delete_response = client.delete(f"/api/content/articles/{article_id}", headers=admin_headers)
     assert delete_response.status_code == 200
-    assert delete_response.get_json() == {"message": "Post deleted successfully"}

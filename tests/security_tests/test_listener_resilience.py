@@ -47,7 +47,7 @@ def test_revocation_still_works_when_user_deleted_listener_fails(
     finally:
         user_deleted.disconnect(failing_listener)
 
-    response = client.get("/api/content/posts", headers=headers)
+    response = client.get("/api/content/articles", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"

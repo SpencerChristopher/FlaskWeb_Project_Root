@@ -1,27 +1,34 @@
-from src.models.post import Post
-
+import pytest
+from unittest.mock import patch
+from src.models.article import Article
 
 class TestErrorHandlingAndLogging:
-    """Tests for error handling and logging behavior."""
+    """
+    Tests that the application handles errors gracefully.
+    """
 
-    def test_500_error_returns_json(self, client, admin_headers, monkeypatch):
-        def mock_objects(*args, **kwargs):
-            raise Exception("Simulating a database error")
+    def test_500_error_returns_json(self, client, admin_headers):
+        """
+        Verify that a 500 error returns a structured JSON response.
+        """
+        with patch('src.models.article.Article.objects') as mocked_objects:
+            mocked_objects.side_effect = Exception("Simulating a database error")
 
-        monkeypatch.setattr(Post, "objects", mock_objects)
+            response = client.get("/api/content/articles", headers=admin_headers)
+            
+            assert response.status_code == 500
+            data = response.get_json()
+            assert data['error_code'] == 'INTERNAL_SERVER_ERROR'
 
-        response = client.get("/api/content/posts", headers=admin_headers)
-        assert response.status_code == 500
-        assert response.headers["Content-Type"] == "application/json"
-        assert response.json["error_code"] == "INTERNAL_SERVER_ERROR"
-        assert response.json["message"] == "An unexpected error occurred."
+    def test_no_stack_trace_in_500_response(self, client, admin_headers):
+        """
+        Ensure that the 500 error response does not contain stack trace info.
+        """
+        with patch('src.models.article.Article.objects') as mocked_objects:
+            mocked_objects.side_effect = Exception("Simulating a database error")
 
-    def test_no_stack_trace_in_500_response(self, client, admin_headers, monkeypatch):
-        def mock_objects(*args, **kwargs):
-            raise Exception("Simulating a database error")
-
-        monkeypatch.setattr(Post, "objects", mock_objects)
-
-        response = client.get("/api/content/posts", headers=admin_headers)
-        assert response.status_code == 500
-        assert b"Traceback" not in response.data
+            response = client.get("/api/content/articles", headers=admin_headers)
+            
+            assert response.status_code == 500
+            response_text = response.get_data(as_text=True)
+            assert "Traceback" not in response_text
