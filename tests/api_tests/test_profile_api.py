@@ -57,3 +57,19 @@ def test_member_cannot_update_profile(client, user_headers):
     }
     resp = client.put("/api/content/profile", json=update_data, headers=user_headers)
     assert resp.status_code == 403
+
+
+@pytest.mark.usefixtures("clean_collections_per_function")
+def test_profile_rejects_external_image_url(client, admin_headers):
+    update_data = {
+        "name": "Chris Developer",
+        "location": "London, UK",
+        "statement": "Experienced Senior Developer specializing in Flask and Pi.",
+        "interests": [],
+        "skills": ["Python"],
+        "social_links": {},
+        "work_history": [],
+        "image_url": "https://evil.example.com/image.png"
+    }
+    resp = client.put("/api/content/profile", json=update_data, headers=admin_headers)
+    assert resp.status_code == 400
