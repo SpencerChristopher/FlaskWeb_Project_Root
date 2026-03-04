@@ -7,6 +7,7 @@ from __future__ import annotations
 import datetime
 from typing import TYPE_CHECKING
 
+import re
 from src.models.profile import Profile, WorkHistoryItem as WorkHistoryModel
 from src.repositories.interfaces import ProfileRepository
 from src.schemas import ProfilePublic, ProfileSchema, WorkHistoryItem as WorkHistorySchema
@@ -45,6 +46,16 @@ class ProfileService:
             ) for item in history
         ]
 
+    def _normalize_social_links(self, links: dict[str, str]) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for key, url in links.items():
+            norm_key = re.sub(r"[\\s_]+", "-", key.strip().lower())
+            if not norm_key:
+                continue
+            if url:
+                normalized[norm_key] = url.strip()
+        return normalized
+
     def get_profile(self) -> ProfilePublic:
         """
         Retrieves the profile. If none exists, returns a default one.
@@ -70,7 +81,7 @@ class ProfileService:
             statement=profile.statement,
             interests=profile.interests,
             skills=profile.skills,
-            social_links=profile.social_links.to_mongo().to_dict() if profile.social_links else {},
+            social_links=profile.social_links or {},
             work_history=self._map_work_history_to_dto(profile.work_history),
             image_url=profile.image_url,
             last_updated=profile.last_updated.isoformat() if profile.last_updated else None
@@ -83,6 +94,7 @@ class ProfileService:
         profile = self._profile_repository.get_profile()
         
         work_history_models = self._map_dto_to_work_history_model(profile_data.work_history)
+        normalized_social_links = self._normalize_social_links(profile_data.social_links)
 
         if not profile:
             profile = Profile(
@@ -91,7 +103,7 @@ class ProfileService:
                 statement=profile_data.statement,
                 interests=profile_data.interests,
                 skills=profile_data.skills,
-                social_links=profile_data.social_links.model_dump(),
+                social_links=normalized_social_links,
                 work_history=work_history_models,
                 image_url=profile_data.image_url,
                 last_updated=datetime.datetime.now(datetime.timezone.utc)
@@ -102,7 +114,7 @@ class ProfileService:
             profile.statement = profile_data.statement
             profile.interests = profile_data.interests
             profile.skills = profile_data.skills
-            profile.social_links = profile_data.social_links.model_dump()
+            profile.social_links = normalized_social_links
             profile.work_history = work_history_models
             profile.image_url = profile_data.image_url
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
