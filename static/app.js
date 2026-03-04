@@ -71,24 +71,75 @@ const templates = {
                 </form>
             </div></div></div></div></section>`,
     home: (d) => `
-        <header class="py-5"><div class="container px-5 pb-5"><div class="row gx-5 align-items-center">
-            <div class="col-xxl-5"><div class="text-center text-xxl-start">
-                <div class="badge bg-gradient-primary-to-secondary text-white mb-4"><div class="text-uppercase">${d.location}</div></div>
-                <h1 class="display-3 fw-bolder mb-5"><span class="text-gradient d-inline">${d.name}</span></h1>
-                <div class="fs-3 fw-light text-muted mb-5">${d.statement}</div>
-            </div></div>
-            <div class="col-xxl-7"><div class="d-flex justify-content-center mt-5 mt-xxl-0">
-                <div class="profile bg-gradient-primary-to-secondary">
-                    ${d.image_url ? `<img class="profile-img" src="${d.image_url}" alt="..." />` : ''}
+        <header class="py-5">
+            <div class="container px-5 pb-5">
+                <div class="row gx-5 align-items-center">
+                    <div class="col-xxl-5">
+                        <div class="text-center text-xxl-start">
+                            <div class="badge bg-gradient-primary-to-secondary text-white mb-4"><div class="text-uppercase">${d.location}</div></div>
+                            <h1 class="display-3 fw-bolder mb-5"><span class="text-gradient d-inline">${d.name}</span></h1>
+                            <div class="fs-3 fw-light text-muted mb-5">${d.statement}</div>
+                            <div class="d-flex justify-content-center justify-content-xxl-start gap-3 fs-2 mb-5">
+                                ${d.social_links.github ? `<a class="text-gradient" href="${d.social_links.github}" target="_blank"><i class="bi-github"></i></a>` : ''}
+                                ${d.social_links.linkedin ? `<a class="text-gradient" href="${d.social_links.linkedin}" target="_blank"><i class="bi-linkedin"></i></a>` : ''}
+                                ${d.social_links.twitter ? `<a class="text-gradient" href="${d.social_links.twitter}" target="_blank"><i class="bi-twitter"></i></a>` : ''}
+                                ${d.social_links.leetcode ? `<a class="text-gradient" href="${d.social_links.leetcode}" target="_blank"><i class="bi-code-slash"></i></a>` : ''}
+                                ${d.social_links.kaggle ? `<a class="text-gradient" href="${d.social_links.kaggle}" target="_blank"><i class="bi-graph-up"></i></a>` : ''}
+                                ${d.social_links.hackthebox ? `<a class="text-gradient" href="${d.social_links.hackthebox}" target="_blank"><i class="bi-box-seam"></i></a>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-xxl-7">
+                        <div class="d-flex justify-content-center mt-5 mt-xxl-0">
+                            <div class="profile bg-gradient-primary-to-secondary">
+                                ${d.image_url ? `<img class="profile-img" src="${d.image_url}" alt="..." />` : ''}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div></div></div></div></header>`,
+            </div>
+        </header>
+        
+        <section class="py-5 bg-light">
+            <div class="container px-5">
+                <div class="row gx-5 justify-content-center">
+                    <div class="col-xxl-8">
+                        <div class="text-center mb-5">
+                            <h2 class="display-5 fw-bolder"><span class="text-gradient d-inline">Experience</span></h2>
+                        </div>
+                        ${d.work_history.map(w => `
+                            <div class="card shadow border-0 rounded-4 mb-5">
+                                <div class="card-body p-5">
+                                    <div class="row align-items-center gx-5">
+                                        <div class="col text-center text-lg-start mb-4 mb-lg-0">
+                                            <div class="bg-light p-4 rounded-4">
+                                                <div class="text-primary fw-bolder mb-2">${w.start_date} - ${w.end_date}</div>
+                                                <div class="small fw-bolder">${w.role}</div>
+                                                <div class="small text-muted">${w.company}</div>
+                                                <div class="small text-muted">${w.location}</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-8">
+                                            <div>${w.description}</div>
+                                            <div class="mt-3">
+                                                ${w.skills.map(s => `<span class="badge bg-secondary me-1">${s}</span>`).join('')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        </section>`,
     blogList: (d) => `
         <section class="py-5"><div class="container px-5">
-            <h2 class="display-4 fw-bolder mb-4">Latest Posts</h2>
+            <h2 class="display-4 fw-bolder mb-4">Latest Articles</h2>
             <div class="row gx-5">${d.posts.map(p => `
                 <div class="col-lg-4 mb-5"><div class="card h-100 shadow border-0">
                     <div class="card-body p-4">
-                        <div class="badge bg-primary bg-gradient rounded-pill mb-2">Blog</div>
+                        <div class="badge bg-primary bg-gradient rounded-pill mb-2">Article</div>
                         <a class="text-decoration-none link-dark stretched-link" href="#blog/${p.slug}"><h5 class="card-title mb-3">${p.title}</h5></a>
                         <p class="card-text mb-0">${p.summary}</p>
                     </div>
@@ -112,6 +163,9 @@ function updateNavUI() {
         const caps = userState.user.capabilities || [];
         if (caps.includes('profile:manage')) {
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#admin/profile">Edit Profile</a></li>');
+        }
+        if (caps.includes('content:manage')) {
+            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#admin/articles">Manage Articles</a></li>');
         }
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="#">Logout</a></li>');
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
@@ -142,7 +196,7 @@ async function handleLogin(e) {
 async function initializeApp() {
     try {
         const status = await fetchAPI('/api/auth/status', { suppressAuthRedirect: true });
-        userState.loggedIn = status.is_authenticated;
+        userState.loggedIn = status.logged_in;
         userState.user = status.user;
         updateNavUI();
     } catch (err) {
@@ -167,6 +221,9 @@ async function router() {
             const data = await fetchAPI('/api/content/profile');
             mainContentElement.innerHTML = ProfileView.template(data);
             ProfileView.bindEvents(fetchAPI, router);
+        } else if (hash === '#admin/articles') {
+            // Placeholder for article management view
+            mainContentElement.innerHTML = '<div class="p-5 text-center"><h2>Article Management</h2><p>Coming soon...</p></div>';
         } else if (hash.startsWith('#blog/')) {
             const slug = hash.replace('#blog/', '');
             mainContentElement.innerHTML = templates.blogPost(await fetchAPI(`/api/blog/${slug}`));
