@@ -36,6 +36,10 @@ class TestApiRoutes:
         with app.app_context():
             from src.models.user import User
             author = User.objects.first()
+            if not author:
+                author = User(username="blog_author", email="blog@test.com", role="admin")
+                author.set_password("password")
+                author.save()
             Article(
                 title="Detail Article",
                 slug="detail-article",
