@@ -82,7 +82,7 @@ def blog_article_api(slug: str) -> Response:
         raise BadRequestException("Invalid slug format.")
 
     article = article_service.get_article_by_slug_or_404(slug)
-    return jsonify(article.to_dict())
+    return jsonify(article_service.to_public_dict(article))
 
 @bp.route('/license', methods=['GET'])
 def license_api() -> Response:

@@ -28,7 +28,7 @@ media_service = get_media_service()
 def get_articles() -> Response:
     """Retrieves articles for management."""
     articles = article_service.list_admin_articles(g.current_user)
-    return jsonify([a.to_dict() for a in articles]), 200
+    return jsonify([article_service.to_public_dict(a) for a in articles]), 200
 
 @bp.route('/articles', methods=['POST'])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
@@ -40,14 +40,14 @@ def create_article() -> Response:
     
     article_dto = ArticleCreateUpdate(**data)
     article = article_service.create_article(article_dto, g.current_user)
-    return jsonify(article.to_dict()), 201
+    return jsonify(article_service.to_public_dict(article)), 201
 
 @bp.route('/articles/<string:article_id>', methods=['GET'])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def get_article(article_id: str) -> Response:
     """Retrieves a specific article."""
     article = article_service.get_article_managed(article_id, g.current_user)
-    return jsonify(article.to_dict()), 200
+    return jsonify(article_service.to_public_dict(article)), 200
 
 @bp.route('/articles/<string:article_id>', methods=['PUT'])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
@@ -59,7 +59,7 @@ def update_article(article_id: str) -> Response:
     
     article_dto = ArticleCreateUpdate(**data)
     article = article_service.update_article(article_id, article_dto, g.current_user)
-    return jsonify(article.to_dict()), 200
+    return jsonify(article_service.to_public_dict(article)), 200
 
 @bp.route('/articles/<string:article_id>', methods=['DELETE'])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])

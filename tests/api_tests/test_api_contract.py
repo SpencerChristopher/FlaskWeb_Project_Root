@@ -53,12 +53,42 @@ def test_contract_blog_list_shape(client, contract_article):
     assert art_summary is not None
     assert {"title", "summary", "slug", "publication_date"} <= set(art_summary.keys())
 
+def test_contract_blog_detail_shape(client, contract_article):
+    response = client.get(f"/api/blog/{contract_article.slug}")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert set(data.keys()) == {
+        "id",
+        "title",
+        "slug",
+        "content",
+        "summary",
+        "is_published",
+        "publication_date",
+        "last_updated",
+        "author_id",
+        "author_username",
+    }
+    assert "author" not in data
+
 def test_contract_admin_article_crud_shapes(client, admin_headers):
     create_payload = {"title": "Admin Art", "content": "Content", "summary": "Summ", "is_published": True}
     create_response = client.post("/api/content/articles", headers=admin_headers, json=create_payload)
     assert create_response.status_code == 201
     created = create_response.get_json()
-    assert {"id", "title", "slug", "content", "summary", "is_published", "author_id"} <= set(created.keys())
+    assert set(created.keys()) == {
+        "id",
+        "title",
+        "slug",
+        "content",
+        "summary",
+        "is_published",
+        "publication_date",
+        "last_updated",
+        "author_id",
+        "author_username",
+    }
+    assert "author" not in created
     
     article_id = created["id"]
     get_response = client.get(f"/api/content/articles/{article_id}", headers=admin_headers)
