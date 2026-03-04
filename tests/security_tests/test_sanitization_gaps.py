@@ -1,6 +1,7 @@
 import pytest
 from werkzeug.datastructures import FileStorage
 from io import BytesIO
+from PIL import Image
 
 def test_register_restricted_to_admin(client, admin_headers):
     """
@@ -30,8 +31,11 @@ def test_media_upload_path_traversal_protection(client, admin_headers):
     """
     Vulnerability Check: Ensure filenames are sanitized to prevent path traversal.
     """
+    image_bytes = BytesIO()
+    Image.new("RGB", (1, 1), color=(255, 255, 255)).save(image_bytes, format="PNG")
+    image_bytes.seek(0)
     data = {
-        'file': (BytesIO(b"dummy content"), "../../../../tmp/evil.png")
+        'file': (image_bytes, "../../../../tmp/evil.png")
     }
     response = client.post(
         "/api/content/media",

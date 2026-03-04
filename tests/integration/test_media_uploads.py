@@ -1,5 +1,6 @@
 import pytest
 import io
+from PIL import Image
 
 @pytest.fixture
 def admin_headers(setup_users, login_user_fixture):
@@ -13,8 +14,11 @@ def user_headers(setup_users, login_user_fixture):
 
 @pytest.mark.heavy
 def test_upload_image_success(client, admin_headers):
+    image_bytes = io.BytesIO()
+    Image.new("RGB", (1, 1), color=(255, 255, 255)).save(image_bytes, format="JPEG")
+    image_bytes.seek(0)
     data = {
-        'file': (io.BytesIO(b"fake image content"), 'test.jpg')
+        'file': (image_bytes, 'test.jpg')
     }
     resp = client.post(
         "/api/content/media",

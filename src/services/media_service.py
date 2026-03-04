@@ -8,7 +8,9 @@ import os
 import uuid
 from pathlib import Path
 from typing import BinaryIO
-from werkzeug.utils import secure_filename
+from io import BytesIO
+
+from PIL import Image, ImageOps
 
 class MediaService:
     """Application service for binary asset management."""
@@ -17,6 +19,7 @@ class MediaService:
         self._upload_dir = Path(upload_dir)
         self._allowed_extensions = allowed_extensions or {'png', 'jpg', 'jpeg', 'gif', 'webp'}
         self._max_size_bytes = 2 * 1024 * 1024 # 2MB Limit
+        self._max_dimension_px = 1600
 
     def _is_allowed_file(self, filename: str) -> bool:
         return '.' in filename and filename.rsplit('.', 1)[1].lower() in self._allowed_extensions
@@ -38,15 +41,36 @@ class MediaService:
         # Ensure directory exists (Defensive check)
         self._upload_dir.mkdir(parents=True, exist_ok=True)
 
+        # Load and normalize the image to enforce size and strip metadata
+        file_stream.seek(0)
+        raw = file_stream.read()
+        try:
+            image = Image.open(BytesIO(raw))
+            image = ImageOps.exif_transpose(image)
+        except Exception as exc:
+            raise ValueError("Unsupported image file.") from exc
+
+        image.thumbnail((self._max_dimension_px, self._max_dimension_px), Image.LANCZOS)
+
+        output = BytesIO()
+        if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+            image.save(output, format="WEBP", lossless=True)
+        else:
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            image.save(output, format="WEBP", quality=82, method=6)
+
+        output.seek(0)
+        if output.getbuffer().nbytes > self._max_size_bytes:
+            raise ValueError("Processed image exceeds size limit.")
+
         # Generate UUID filename to prevent collisions and path injection
-        ext = original_filename.rsplit('.', 1)[1].lower()
-        new_filename = f"{uuid.uuid4().hex}.{ext}"
-        
+        new_filename = f"{uuid.uuid4().hex}.webp"
         file_path = self._upload_dir / new_filename
-        
-        # Save the file
+
+        # Save the processed file
         with open(file_path, 'wb') as f:
-            f.write(file_stream.read())
+            f.write(output.read())
 
         # Return the path relative to static
         return f"/static/uploads/{new_filename}"
