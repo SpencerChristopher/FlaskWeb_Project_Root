@@ -14,7 +14,7 @@ if str(project_root) not in sys.path:
 
 from src.models.user import User
 from src.models.article import Article
-from src.models.profile import Profile, WorkHistoryItem, SocialLinks
+from src.models.profile import Profile, WorkHistoryItem
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
 # Set up Flask app context
@@ -102,21 +102,21 @@ if not profile:
         statement="Senior Developer focused on high-performance web applications.",
         interests=["Cloud", "Cybersecurity"],
         skills=["Python", "Flask", "Docker", "MongoDB"],
-        social_links=SocialLinks(
-            github="https://github.com/chris",
-            linkedin="https://linkedin.com/in/chris",
-            hackthebox="https://app.hackthebox.com/profile/chris"
-        ),
+        social_links={
+            "github": "https://github.com/chris",
+            "linkedin": "https://linkedin.com/in/chris",
+            "hackthebox": "https://app.hackthebox.com/profile/chris"
+        },
         work_history=work_history
     )
 else:
     profile.name = "Chris Developer"
     profile.location = "United Kingdom"
-    profile.social_links = SocialLinks(
-        github="https://github.com/chris",
-        linkedin="https://linkedin.com/in/chris",
-        hackthebox="https://app.hackthebox.com/profile/chris"
-    )
+    profile.social_links = {
+        "github": "https://github.com/chris",
+        "linkedin": "https://linkedin.com/in/chris",
+        "hackthebox": "https://app.hackthebox.com/profile/chris"
+    }
     profile.work_history = work_history
 
 profile.save()
