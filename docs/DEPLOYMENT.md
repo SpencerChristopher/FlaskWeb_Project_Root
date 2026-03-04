@@ -33,7 +33,7 @@ Configuration values are sourced in a hierarchical manner:
 4.  **Generate Self-Signed Certificates (CI Only):** Creates temporary SSL certificates for the Nginx service within the CI environment.
 5.  **Build and Push Multi-platform Docker Image:** Builds the `web` service image for `linux/amd64` and `linux/arm64` platforms, then pushes the multi-architecture image manifest to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` (derived from `IMAGE_TAG`).
 6.  **Start Containers:** Uses `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build` to start `mongo`, `redis`, and `web`. It pulls the `web` image from `ghcr.io` (via `docker-compose.ci.yml`) and waits for all services (including the `web` service's health check) to become `healthy`.
-7.  **Seed Database:** Executes `scripts/seed_db.py` to populate the database with initial data.
+7.  **Seed Database:** Executes `scripts/seed_db.py` to populate the database with initial data (articles + profile).
 8.  **Inject and Run Tests:** Copies test files into the running `web` container and executes `pytest`. By default, performance-intensive tests (marked `@pytest.mark.heavy`) are skipped for Pi optimization.
 9.  **Heavy Test Opt-in:** These can be manually triggered via `workflow_dispatch` by setting `run_heavy_tests: true`.
 10. **Teardown:** Stops and removes all services created by Docker Compose.
@@ -53,7 +53,7 @@ Configuration values are sourced in a hierarchical manner:
     *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
     *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
 5.  **Verify Staging Health:** Runs `curl -k -f` check against `https://localhost/` to ensure the application stack is responsive.
-6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data in the staging environment.
+6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data (articles + profile) in the staging environment.
 
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
