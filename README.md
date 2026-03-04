@@ -8,9 +8,9 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 
 *   **API-First Design**: A comprehensive JSON API serves all public and administrative content.
 *   **Pydantic Validation**: All API inputs, especially for CRUD operations, are strictly validated using Pydantic models, ensuring data integrity and security.
-*   **Event-Driven Architecture**: Utilizes the **Blinker** signaling library to decouple application components. Events are dispatched for actions like user logins and post modifications, allowing for extensible and maintainable code.
+*   **Event-Driven Architecture**: Utilizes the **Blinker** signaling library to decouple application components. Events are dispatched for actions like user logins and article modifications, allowing for extensible and maintainable code.
 *   **User Authentication**: Secure JWT-based login with role-based access control (RBAC) implemented via custom claims in the JSON Web Token.
-*   **Admin Panel**: A secure area for administrators to perform full CRUD (Create, Read, Update, Delete) operations on blog posts.
+*   **Admin Panel**: A secure area for administrators to perform full CRUD (Create, Read, Update, Delete) operations on blog articles.
 *   **Security Hardening**: Includes rate limiting on sensitive endpoints with **Flask-Limiter** and HTML sanitization with **Bleach** to prevent XSS attacks.
 *   **Single Page Application (SPA)**: The frontend dynamically renders content without full page reloads, providing a smooth user experience.
 *   **Dockerized Environment**: Easy setup and deployment using Docker Compose, with **Nginx** terminating HTTPS and proxying to the Flask API.
@@ -139,7 +139,7 @@ docker compose exec web /app/.venv/bin/python scripts/drop_db.py
 # 2. Create the initial admin user (credentials from .env)
 docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 
-# 3. Seed initial data (sample posts)
+# 3. Seed initial data (sample articles)
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
@@ -189,13 +189,13 @@ The `docker-compose.override.yml` mounts your local `src/` directory into the co
 
 ### Public Blog
 
-Navigate to `https://localhost`. The SPA will fetch and display a list of blog posts. Click on a post to view its full content.
+Navigate to `https://localhost`. The SPA will fetch and display a list of blog articles. Click on an article to view its full content.
 
 ### Admin Panel
 
 1.  Go to `https://localhost/#login`.
 2.  Log in with the admin credentials set in your `.env` file.
-3.  Upon successful login, a JWT will be stored by the frontend, and you will be redirected to the admin dashboard to manage posts.
+3.  Upon successful login, a JWT will be stored by the frontend, and you will be redirected to the admin dashboard to manage articles.
 
 ## Project Structure
 
