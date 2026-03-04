@@ -10,6 +10,7 @@ const iconMap = {
 
 function renderSocialLinks(links = {}) {
     return Object.entries(links)
+        .filter(([, url]) => typeof url === "string" && url.trim())
         .map(([key, url]) => {
             const icon = iconMap[key] || "bi-link-45deg";
             return `

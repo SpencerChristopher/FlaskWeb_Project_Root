@@ -55,31 +55,11 @@ export const ProfileView = {
 
                                 <div class="mb-4">
                                     <h5 class="fw-bolder mb-3">Social Media Links</h5>
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">GitHub URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="github" value="${d.social_links.github || ''}" placeholder="https://github.com/username">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">LinkedIn URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="linkedin" value="${d.social_links.linkedin || ''}" placeholder="https://linkedin.com/in/username">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">Twitter URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="twitter" value="${d.social_links.twitter || ''}" placeholder="https://twitter.com/username">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">LeetCode URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="leetcode" value="${d.social_links.leetcode || ''}" placeholder="https://leetcode.com/username">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">Kaggle URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="kaggle" value="${d.social_links.kaggle || ''}" placeholder="https://kaggle.com/username">
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small">HackTheBox URL</label>
-                                            <input type="url" class="form-control form-control-sm p-soc-input" data-platform="hackthebox" value="${d.social_links.hackthebox || ''}" placeholder="https://app.hackthebox.com/profile/username">
-                                        </div>
+                                    <div class="row" id="social-links-container">
+                                        ${ProfileView.socialLinkTemplateList(d.social_links)}
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2">
+                                        <button type="button" class="btn btn-sm btn-outline-primary" id="add-social-link">Add Link</button>
                                     </div>
                                 </div>
 
@@ -137,6 +117,25 @@ export const ProfileView = {
             </div>
         </div>`,
 
+    socialLinkTemplate: (platform = "", url = "") => `
+        <div class="col-md-6 mb-3 social-link-row">
+            <div class="d-flex align-items-center gap-2">
+                <input type="text" class="form-control form-control-sm p-soc-key" placeholder="platform (e.g. twitter)" value="${platform}">
+                <input type="url" class="form-control form-control-sm p-soc-input" placeholder="https://example.com/username" value="${url}">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-social-link" aria-label="Remove link">&times;</button>
+            </div>
+        </div>`,
+
+    socialLinkTemplateList: (links = {}) => {
+        const entries = Object.entries(links || {});
+        if (!entries.length) {
+            return ProfileView.socialLinkTemplate();
+        }
+        return entries
+            .map(([platform, url]) => ProfileView.socialLinkTemplate(platform, url))
+            .join('');
+    },
+
     /**
      * Binds event listeners for the profile view.
      */
@@ -145,6 +144,8 @@ export const ProfileView = {
         const form = document.getElementById('profileForm');
         const addWorkBtn = document.getElementById('add-work-btn');
         const workContainer = document.getElementById('work-history-container');
+        const socialContainer = document.getElementById('social-links-container');
+        const addSocialBtn = document.getElementById('add-social-link');
 
         // Photo Upload
         uploadBtn.addEventListener('click', async () => {
@@ -174,15 +175,28 @@ export const ProfileView = {
             }
         });
 
+        addSocialBtn.addEventListener('click', () => {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = ProfileView.socialLinkTemplate();
+            socialContainer.appendChild(wrapper.firstElementChild);
+        });
+
+        socialContainer.addEventListener('click', (e) => {
+            if (e.target.classList.contains('remove-social-link')) {
+                e.target.closest('.social-link-row').remove();
+            }
+        });
+
         // Form Submission
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
                 // Collect Social Links
                 const social_links = {};
-                document.querySelectorAll('.p-soc-input').forEach(input => {
-                    const val = input.value.trim();
-                    if (val) social_links[input.dataset.platform] = val;
+                document.querySelectorAll('.social-link-row').forEach(row => {
+                    const key = row.querySelector('.p-soc-key').value.trim();
+                    const val = row.querySelector('.p-soc-input').value.trim();
+                    if (key && val) social_links[key] = val;
                 });
 
                 // Collect Work History
