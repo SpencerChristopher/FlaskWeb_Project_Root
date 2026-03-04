@@ -14,6 +14,11 @@ const userState = {
     user: null
 };
 
+const consentState = {
+    decided: false,
+    allowsAuth: false
+};
+
 // --- DOM Element Cache ---
 const mainNavList = document.querySelector('#navbarResponsive .navbar-nav');
 const mainContentElement = document.getElementById('main-content');
@@ -30,6 +35,12 @@ async function fetchAPI(url, options = {}) {
     options.credentials = 'include';
     const headers = options.headers || {};
     const method = (options.method || 'GET').toUpperCase();
+
+    if (!consentState.allowsAuth && method !== 'GET') {
+        const error = new Error('Consent required for authenticated actions.');
+        error.status = 403;
+        throw error;
+    }
     
     if (options.body instanceof FormData) {
         delete headers['Content-Type'];
@@ -63,6 +74,17 @@ async function fetchAPI(url, options = {}) {
     }
 }
 
+function renderLoading() {
+    return `
+        <section class="py-5" data-test="view-loading">
+            <div class="container px-5 text-center">
+                <div class="spinner-border text-primary" role="status" aria-label="Loading"></div>
+            </div>
+        </section>`;
+}
+
+let currentViewCleanup = null;
+
 // --- UI Actions ---
 function updateNavUI() {
     const authLinks = document.querySelectorAll('.auth-link');
@@ -78,7 +100,7 @@ function updateNavUI() {
         }
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="#">Logout</a></li>');
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
-    } else {
+    } else if (consentState.allowsAuth) {
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#login">Admin</a></li>');
     }
 }
@@ -114,27 +136,77 @@ async function initializeApp() {
     }
 }
 
+function startApp(allowAuth) {
+    consentState.decided = true;
+    consentState.allowsAuth = allowAuth;
+    if (allowAuth) {
+        initializeApp().then(router);
+    } else {
+        userState.loggedIn = false;
+        userState.user = null;
+        updateNavUI();
+        router();
+    }
+}
+
 // --- Router ---
 async function router() {
     const hash = window.location.hash || '#home';
     console.log("Routing to:", hash);
+    if (currentViewCleanup) {
+        currentViewCleanup();
+        currentViewCleanup = null;
+    }
+
+    const controller = new AbortController();
+    const viewContext = {
+        api: fetchAPI,
+        userState,
+        navigate: (target) => { window.location.hash = target; },
+        signal: controller.signal,
+    };
+    currentViewCleanup = () => controller.abort();
+
     try {
         if (hash === '#home') {
-            mainContentElement.innerHTML = HomeView.template(await fetchAPI('/api/content/profile'));
+            mainContentElement.innerHTML = renderLoading();
+            const data = await fetchAPI('/api/content/profile');
+            mainContentElement.innerHTML = HomeView.template(data);
+            HomeView.mount?.(viewContext);
         } else if (hash === '#blog') {
-            mainContentElement.innerHTML = ArticleListView.template(await fetchAPI('/api/blog'));
+            mainContentElement.innerHTML = renderLoading();
+            const data = await fetchAPI('/api/blog');
+            mainContentElement.innerHTML = ArticleListView.template(data);
+            ArticleListView.mount?.(viewContext);
         } else if (hash === '#login') {
+            if (!consentState.allowsAuth) {
+                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
+                return;
+            }
             mainContentElement.innerHTML = LoginView.template();
-            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            LoginView.mount?.(viewContext, handleLogin);
         } else if (hash === '#admin/profile') {
+            if (!consentState.allowsAuth) {
+                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
+                return;
+            }
+            mainContentElement.innerHTML = renderLoading();
             const data = await fetchAPI('/api/content/profile');
             mainContentElement.innerHTML = ProfileView.template(data);
-            ProfileView.bindEvents(fetchAPI, router);
+            ProfileView.mount?.(viewContext);
         } else if (hash === '#admin/articles') {
+            if (!consentState.allowsAuth) {
+                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
+                return;
+            }
             mainContentElement.innerHTML = ContentManagerView.template();
+            ContentManagerView.mount?.(viewContext);
         } else if (hash.startsWith('#blog/')) {
             const slug = hash.replace('#blog/', '');
-            mainContentElement.innerHTML = ArticleDetailView.template(await fetchAPI(`/api/blog/${slug}`));
+            mainContentElement.innerHTML = renderLoading();
+            const data = await fetchAPI(`/api/blog/${slug}`);
+            mainContentElement.innerHTML = ArticleDetailView.template(data);
+            ArticleDetailView.mount?.(viewContext);
         }
     } catch (err) {
         console.error("Router error:", err);
@@ -144,4 +216,75 @@ async function router() {
 
 // --- Initialization ---
 window.addEventListener('hashchange', router);
-initializeApp().then(router);
+
+// --- Cookie Consent (blocking overlay) ---
+const consentKey = 'cookie_consent';
+const dialog = document.getElementById('cookie-dialog');
+const storageAvailable = (() => {
+    try {
+        const testKey = '__consent_test__';
+        localStorage.setItem(testKey, '1');
+        localStorage.removeItem(testKey);
+        return true;
+    } catch (err) {
+        return false;
+    }
+})();
+const existingConsent = storageAvailable ? localStorage.getItem(consentKey) : null;
+const manageCookiesLink = document.getElementById('manage-cookies');
+let consentHandlersBound = false;
+
+function bindConsentHandlers() {
+    if (!dialog || consentHandlersBound) return;
+    const acceptBtn = document.getElementById('cookie-accept');
+    const declineBtn = document.getElementById('cookie-decline');
+    const message = document.getElementById('cookie-message');
+    if (acceptBtn) {
+        acceptBtn.addEventListener('click', () => {
+            if (storageAvailable) {
+                localStorage.setItem(consentKey, 'accepted');
+            }
+            dialog.close();
+            document.body.style.overflow = '';
+            startApp(true);
+        });
+    }
+    if (declineBtn) {
+        declineBtn.addEventListener('click', () => {
+            if (storageAvailable) {
+                localStorage.setItem(consentKey, 'declined');
+            }
+            if (message) {
+                message.textContent = 'Cookies declined. Admin features are disabled. You can still browse public content.';
+            }
+            dialog.close();
+            document.body.style.overflow = '';
+            startApp(false);
+        });
+    }
+    consentHandlersBound = true;
+}
+
+if (existingConsent === 'accepted') {
+    startApp(true);
+} else if (existingConsent === 'declined') {
+    startApp(false);
+} else if (dialog) {
+    bindConsentHandlers();
+    dialog.showModal();
+    document.body.style.overflow = 'hidden';
+}
+
+if (manageCookiesLink) {
+    manageCookiesLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (!dialog) return;
+        bindConsentHandlers();
+        const message = document.getElementById('cookie-message');
+        if (message) {
+            message.textContent = 'This site uses essential cookies for authentication and security. By continuing, you consent to these cookies.';
+        }
+        dialog.showModal();
+        document.body.style.overflow = 'hidden';
+    });
+}

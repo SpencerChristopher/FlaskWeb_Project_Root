@@ -139,7 +139,8 @@ export const ProfileView = {
     /**
      * Binds event listeners for the profile view.
      */
-    bindEvents: (fetchAPI, router) => {
+    mount: (context) => {
+        const fetchAPI = context.api;
         const uploadBtn = document.getElementById('p-upload');
         const form = document.getElementById('profileForm');
         const addWorkBtn = document.getElementById('add-work-btn');
@@ -159,33 +160,33 @@ export const ProfileView = {
                 document.getElementById('image-preview').innerHTML = `<img src="${res.url}" class="rounded-circle" style="width:80px;height:80px;object-fit:cover;">`;
                 alert(res.message);
             } catch (err) { alert("Upload failed: " + err.message); }
-        });
+        }, { signal: context.signal });
 
         // Add Work History Entry
         addWorkBtn.addEventListener('click', () => {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = ProfileView.workEntryTemplate();
             workContainer.appendChild(tempDiv.firstElementChild);
-        });
+        }, { signal: context.signal });
 
         // Remove Work History Entry (Event Delegation)
         workContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('remove-work-btn')) {
                 e.target.closest('.work-entry').remove();
             }
-        });
+        }, { signal: context.signal });
 
         addSocialBtn.addEventListener('click', () => {
             const wrapper = document.createElement('div');
             wrapper.innerHTML = ProfileView.socialLinkTemplate();
             socialContainer.appendChild(wrapper.firstElementChild);
-        });
+        }, { signal: context.signal });
 
         socialContainer.addEventListener('click', (e) => {
             if (e.target.classList.contains('remove-social-link')) {
                 e.target.closest('.social-link-row').remove();
             }
-        });
+        }, { signal: context.signal });
 
         // Form Submission
         form.addEventListener('submit', async (e) => {
@@ -223,13 +224,13 @@ export const ProfileView = {
 
                 await fetchAPI('/api/content/profile', { method: 'PUT', body: JSON.stringify(body) });
                 alert("Profile saved successfully!");
-                window.location.hash = '#home';
+                context.navigate('#home');
             } catch (err) {
                 const errEl = document.getElementById('profile-error');
                 errEl.textContent = "Save failed: " + err.message;
                 errEl.style.display = 'block';
                 window.scrollTo(0, 0);
             }
-        });
+        }, { signal: context.signal });
     }
 };
