@@ -21,7 +21,7 @@ def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_f
     auth_service.change_role(user_id=str(admin_user.id), role="member")
 
     # Old token should no longer grant admin access
-    response = client.get("/api/content/posts", headers=headers)
+    response = client.get("/api/content/articles", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"
@@ -44,7 +44,7 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
     auth_service.delete_user(user_id=str(admin_user.id))
 
     # Old token should no longer authorize access
-    response = client.get("/api/content/posts", headers=headers)
+    response = client.get("/api/content/articles", headers=headers)
     assert response.status_code == 401
     data = response.get_json()
     assert data["error_code"] == "UNAUTHORIZED"

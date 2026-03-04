@@ -14,12 +14,12 @@ from src.repositories.interfaces import CommentRepository
 class MongoCommentRepository(CommentRepository):
     """MongoEngine implementation of comment persistence operations."""
 
-    def delete_by_post_id(self, post_id: str) -> int:
+    def delete_by_article_id(self, article_id: str) -> int:
         try:
-            return Comment.objects(post=post_id).delete()
+            return Comment.objects(article=article_id).delete()
         except PyMongoError as e:
             raise DatabaseConnectionException(
-                f"Database error while deleting comments for post {post_id}: {e}"
+                f"Database error while deleting comments for article {article_id}: {e}"
             ) from e
 
     def save(self, comment: Comment) -> Comment:

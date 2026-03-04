@@ -8,7 +8,7 @@ import datetime
 from slugify import slugify
 
 from src.exceptions import ConflictException, NotFoundException, ForbiddenException
-from src.events import dispatch_event, post_created, post_deleted, post_updated, post_published
+from src.events import dispatch_event, article_created, article_deleted, article_updated, article_published
 from src.repositories.interfaces import ArticleRepository, UserRepository
 from src.schemas import UserIdentity, ArticleCreateUpdate, ArticlePublic
 
@@ -91,9 +91,9 @@ class ArticleService:
         created_article = self._article_repository.save(new_article)
         
         dispatch_event(
-            post_created,
+            article_created,
             "article_service",
-            post_id=str(created_article.id),
+            article_id=str(created_article.id),
             user_id=str(created_article.author.id),
         )
         return created_article
@@ -130,16 +130,16 @@ class ArticleService:
         
         if was_draft and updated_article.is_published:
             dispatch_event(
-                post_published,
+                article_published,
                 "article_service",
-                post_id=str(updated_article.id),
+                article_id=str(updated_article.id),
                 user_id=str(updated_article.author.id),
             )
         else:
             dispatch_event(
-                post_updated,
+                article_updated,
                 "article_service",
-                post_id=str(updated_article.id),
+                article_id=str(updated_article.id),
                 user_id=str(updated_article.author.id),
             )
         return updated_article
@@ -153,8 +153,8 @@ class ArticleService:
         self._article_repository.delete(article)
         
         dispatch_event(
-            post_deleted,
+            article_deleted,
             "article_service",
-            post_id=persisted_id,
+            article_id=persisted_id,
             user_id=author_id,
         )

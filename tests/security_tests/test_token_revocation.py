@@ -45,7 +45,7 @@ def test_admin_access_after_user_deletion(client, app, test_admin_user, login_us
     auth_service.revoke_token(jti, expires)
 
     # 3. Attempt to access a content-protected endpoint with the token of the deleted user
-    response = client.get('/api/content/posts', headers=headers)
+    response = client.get('/api/content/articles', headers=headers)
     
     # 4. Assert that access is denied (401 Unauthorized) and token is revoked
     assert response.status_code == 401

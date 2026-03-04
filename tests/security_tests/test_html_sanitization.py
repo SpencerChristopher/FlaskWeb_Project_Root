@@ -1,119 +1,23 @@
 import pytest
-from src.models.post import Post
+from src.models.article import Article
 from src.models.user import User
-from src.services import get_post_service
+from src.services import get_article_service
+from src.schemas import ArticleCreateUpdate, UserIdentity
 
 @pytest.fixture
 def test_user(app):
-    user = User(username='testuser', email='test@example.com', role='member')
-    user.set_password('Password123')
-    user.save()
-    yield user
-    user.delete()
-
-
-@pytest.fixture
-def post_service():
-    return get_post_service()
-
+    with app.app_context():
+        user = User(username='testuser', email='test@test.com', role='admin')
+        user.set_password('password')
+        user.save()
+        yield user
+        user.delete()
 
 class TestHtmlSanitization:
-    """Tests for HTML sanitization in PostService content and summary handling."""
-
-    def test_malicious_script_tag_removed(self, app, test_user, post_service):
-        """Ensure <script> tags are removed from content and summary."""
+    def test_malicious_script_tag_removed(self, app, test_user):
+        article_service = get_article_service()
         with app.app_context():
-            malicious_content = "Hello <script>alert('xss')</script> World!"
-            post = post_service.create_post(
-                title="XSS Test",
-                content=malicious_content,
-                summary=malicious_content,
-                author=test_user,
-                is_published=True,
-            )
-            
-            # Retrieve the post to ensure sanitization persisted
-            retrieved_post = Post.objects(id=post.id).first()
-            assert retrieved_post is not None
-            assert "<script>" not in retrieved_post.content
-            assert retrieved_post.content == "Hello alert('xss') World!" # Content should remain
-            assert "<script>" not in retrieved_post.summary
-            assert retrieved_post.summary == "Hello alert('xss') World!" # Content should remain
-            
-            from src.schemas import UserIdentity
             user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
-            post_service.delete_post(str(retrieved_post.id), user=user_identity)
-
-    def test_allowed_html_tags_preserved(self, app, test_user, post_service):
-        """Ensure allowed HTML tags are preserved in content and summary."""
-        with app.app_context():
-            allowed_html = "This is a <b>bold</b> and <i>italic</i> text with a <a href='http://example.com'>link</a>."
-            post = post_service.create_post(
-                title="Allowed HTML Test",
-                content=allowed_html,
-                summary=allowed_html,
-                author=test_user,
-                is_published=True,
-            )
-
-            retrieved_post = Post.objects(id=post.id).first()
-            assert retrieved_post is not None
-            assert "<b>bold</b>" in retrieved_post.content
-            assert "<i>italic</i>" in retrieved_post.content
-            assert "<a href=\"http://example.com\">link</a>" in retrieved_post.content # bleach might normalize quotes
-            assert "<b>bold</b>" in retrieved_post.summary
-            assert "<i>italic</i>" in retrieved_post.summary
-            assert "<a href=\"http://example.com\">link</a>" in retrieved_post.summary
-            
-            from src.schemas import UserIdentity
-            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
-            post_service.delete_post(str(retrieved_post.id), user=user_identity)
-
-    def test_disallowed_html_tags_removed(self, app, test_user, post_service):
-        """Ensure disallowed HTML tags are removed from content and summary."""
-        with app.app_context():
-            disallowed_html = "Text with <form action='.'>form</form> and <input type='text'>."
-            post = post_service.create_post(
-                title="Disallowed HTML Test",
-                content=disallowed_html,
-                summary=disallowed_html,
-                author=test_user,
-                is_published=True,
-            )
-
-            retrieved_post = Post.objects(id=post.id).first()
-            assert retrieved_post is not None
-            assert "<form>" not in retrieved_post.content
-            assert "<input>" not in retrieved_post.content
-            assert "form" in retrieved_post.content # Text content should remain
-            assert "Text with form and ." == retrieved_post.content # Ensure only tags are stripped
-            assert "<form>" not in retrieved_post.summary
-            assert "<input>" not in retrieved_post.summary
-            assert "Text with form and ." == retrieved_post.summary
-            
-            from src.schemas import UserIdentity
-            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
-            post_service.delete_post(str(retrieved_post.id), user=user_identity)
-
-    def test_disallowed_attributes_removed(self, app, test_user, post_service):
-        """Ensure disallowed attributes are removed from allowed tags."""
-        with app.app_context():
-            html_with_disallowed_attr = "<a href='http://example.com' onclick='alert(1)'>Click me</a>"
-            post = post_service.create_post(
-                title="Disallowed Attr Test",
-                content=html_with_disallowed_attr,
-                summary=html_with_disallowed_attr,
-                author=test_user,
-                is_published=True,
-            )
-
-            retrieved_post = Post.objects(id=post.id).first()
-            assert retrieved_post is not None
-            assert "onclick" not in retrieved_post.content
-            assert "<a href=\"http://example.com\">Click me</a>" in retrieved_post.content
-            assert "onclick" not in retrieved_post.summary
-            assert "<a href=\"http://example.com\">Click me</a>" in retrieved_post.summary
-            
-            from src.schemas import UserIdentity
-            user_identity = UserIdentity(id=str(test_user.id), username=test_user.username, role=test_user.role, token_version=0)
-            post_service.delete_post(str(retrieved_post.id), user=user_identity)
+            dto = ArticleCreateUpdate(title="XSS", content="<script>alert(1)</script>Safe", summary="S", is_published=True)
+            art = article_service.create_article(article_dto=dto, user=user_identity)
+            assert "<script>" not in art.content

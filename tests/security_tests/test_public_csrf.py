@@ -11,7 +11,7 @@ def test_contact_api_csrf_exemption(client):
         "message": "Bulk spam message"
     }
     
-    # Attempt POST without CSRF token
+    # Attempt Article without CSRF token
     response = client.post("/api/contact", json=payload)
     
     # We expect 200 OK because it's a public form, 

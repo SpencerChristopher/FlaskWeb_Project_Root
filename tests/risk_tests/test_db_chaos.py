@@ -9,13 +9,13 @@ class TestDatabaseChaos:
     Target: 503 Service Unavailable for critical failures.
     """
 
-    def test_get_posts_during_db_outage(self, client):
+    def test_get_Articles_during_db_outage(self, client):
         """
         G4.1: If MongoDB is unreachable during a blog listing, the API must return 503.
         """
-        # Patch Post.objects to return a mock that raises ConnectionFailure when paginate is called.
+        # Patch Article.objects to return a mock that raises ConnectionFailure when paginate is called.
         # This accurately simulates a DB failure during the actual query execution.
-        with patch('src.models.post.Post.objects') as mocked_objects:
+        with patch('src.models.article.Article.objects') as mocked_objects:
             mocked_objects.return_value.order_by.return_value.paginate.side_effect = ConnectionFailure("Simulated MongoDB failure")
             
             resp = client.get("/api/blog")

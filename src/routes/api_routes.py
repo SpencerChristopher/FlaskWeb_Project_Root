@@ -3,10 +3,10 @@ from flask import Blueprint, jsonify, current_app, request, Response
 from typing import List, Dict, Any
 from src.extensions import limiter
 from src.exceptions import BadRequestException
-from src.services import get_post_service
+from src.services import get_article_service
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
-post_service = get_post_service()
+article_service = get_article_service()
 
 @bp.route('/home', methods=['GET'])
 def home_api() -> Response:
@@ -36,6 +36,7 @@ def about_api() -> Response:
 
 @bp.route('/blog', methods=['GET'])
 def blog_list_api() -> Response:
+    """Public blog listing (still uses /blog for SEO/URLs)."""
     try:
         page = int(request.args.get('page', 1))
         per_page = int(request.args.get('per_page', 6))
@@ -45,55 +46,43 @@ def blog_list_api() -> Response:
     if page < 1 or per_page < 1:
         raise BadRequestException("Page and per_page must be positive integers.")
 
-    paginated_posts = post_service.list_published_posts(page=page, per_page=per_page)
+    paginated_articles = article_service.list_published_articles(page=page, per_page=per_page)
 
-    posts_summary: List[Dict[str, Any]] = [
+    articles_summary: List[Dict[str, Any]] = [
         {
-            'title': post.title,
-            'summary': post.summary,
-            'slug': post.slug,
+            'title': article.title,
+            'summary': article.summary,
+            'slug': article.slug,
             'publication_date': (
-                post.publication_date.strftime('%Y-%m-%d')
-                if post.publication_date
+                article.publication_date.strftime('%Y-%m-%d')
+                if article.publication_date
                 else None
             )
         }
-        for post in paginated_posts.items
+        for article in paginated_articles.items
     ]
 
     return jsonify({
-        'posts': posts_summary,
+        'posts': articles_summary,
         'pagination': {
-            'total_posts': paginated_posts.total,
-            'total_pages': paginated_posts.pages,
-            'current_page': paginated_posts.page,
-            'per_page': paginated_posts.per_page,
-            'has_next': paginated_posts.has_next,
-            'has_prev': paginated_posts.has_prev
+            'total_posts': paginated_articles.total,
+            'total_pages': paginated_articles.pages,
+            'current_page': paginated_articles.page,
+            'per_page': paginated_articles.per_page,
+            'has_next': paginated_articles.has_next,
+            'has_prev': paginated_articles.has_prev
         }
     })
 
 @bp.route('/blog/<string:slug>', methods=['GET'])
-def blog_post_api(slug: str) -> Response:
+def blog_article_api(slug: str) -> Response:
+    """Public article view."""
     # Validate slug format using regex
     if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', slug):
         raise BadRequestException("Invalid slug format.")
 
-    post = post_service.get_post_by_slug_or_404(slug)
-    return jsonify({
-        'id': str(post.id),
-        'title': post.title,
-        'content': post.content,
-        'summary': post.summary,
-        'slug': post.slug,
-        'is_published': post.is_published,
-        'publication_date': post.publication_date.isoformat() if post.publication_date else None,
-        'last_updated': post.last_updated.isoformat() if post.last_updated else None,
-        'author': {
-            'id': str(post.author.id),
-            'username': post.author.username
-        }
-    })
+    article = article_service.get_article_by_slug_or_404(slug)
+    return jsonify(article.to_dict())
 
 @bp.route('/license', methods=['GET'])
 def license_api() -> Response:
