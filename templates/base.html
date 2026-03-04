@@ -41,18 +41,38 @@
         <!-- MAIN CONTENT AREA - All dynamic content will be rendered here by app.js -->
         <main id="main-content"></main>
 
+        <!-- Cookie Consent Dialog (blocking, native) -->
+        <dialog id="cookie-dialog" data-test="cookie-dialog">
+            <div id="cookie-banner" class="alert alert-warning shadow-lg" role="alert" aria-live="polite" data-test="cookie-banner" style="max-width:720px;width:calc(100% - 2rem);">
+                <div class="container px-4 px-lg-5 d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+                    <div class="small" id="cookie-message">
+                        This site uses essential cookies for authentication and security. By continuing, you consent to these cookies.
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button id="cookie-accept" class="btn btn-sm btn-primary" type="button" data-test="cookie-accept">Accept</button>
+                        <button id="cookie-decline" class="btn btn-sm btn-outline-dark" type="button" data-test="cookie-decline">Decline</button>
+                    </div>
+                </div>
+            </div>
+        </dialog>
+
         <!-- Footer-->
         <footer class="bg-light py-5">
-            <div class="container px-4 px-lg-5"><div class="small text-center text-muted">Copyright &copy; 2021 - Company Name</div></div>
-
-            <div class="container px-4 px-lg-5 pt-2"><div class="small text-center text-muted">Distributed By <a href="https://themewagon.com/">Themewagon</a>
-            </div></div>
+            <div class="container px-4 px-lg-5">
+                <div class="small text-center text-muted">Copyright &copy; 2021 - Company Name</div>
+            </div>
+            <div class="container px-4 px-lg-5 pt-2">
+                <div class="small text-center text-muted">
+                    Distributed By <a href="https://themewagon.com/">Themewagon</a>
+                    · <a href="#" id="manage-cookies" data-test="manage-cookies">Manage cookies</a>
+                </div>
+            </div>
         </footer>
         <!-- Bootstrap core JS-->
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"></script>
         <!-- SimpleLightbox plugin JS-->
         <script src="https://cdnjs.cloudflare.com/ajax/libs/SimpleLightbox/2.1.0/simpleLightbox.min.js"></script>
         <!-- Custom App JS-->
-        <script src="{{ url_for('static', filename='app.js') }}" type="module"></script>
+        <script src="{{ url_for('static', filename='app.js') }}?v=20260304" type="module"></script>
     </body>
 </html>

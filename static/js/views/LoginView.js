@@ -29,4 +29,9 @@ export const LoginView = {
                 </div>
             </section>`;
     },
+    mount(context, onLogin) {
+        const form = document.getElementById('loginForm');
+        if (!form) return;
+        form.addEventListener('submit', onLogin, { signal: context.signal });
+    },
 };
