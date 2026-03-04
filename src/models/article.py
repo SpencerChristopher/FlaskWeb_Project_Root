@@ -16,7 +16,7 @@ class Article(db.Document):
     slug = mongoengine.StringField(required=True, unique=True)
     content = mongoengine.StringField(required=True)
     summary = mongoengine.StringField(max_length=500)
-    author = mongoengine.ReferenceField('User', reverse_delete_rule=mongoengine.CASCADE)
+    author = mongoengine.ReferenceField('User', reverse_delete_rule=mongoengine.CASCADE, required=True)
     is_published = mongoengine.BooleanField(default=False)
     publication_date = mongoengine.DateTimeField()
     last_updated = mongoengine.DateTimeField(default=datetime.datetime.utcnow)
