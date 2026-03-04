@@ -42,6 +42,20 @@ class ArticleService:
     def list_published_articles(self, page: int, per_page: int):
         return self._article_repository.get_published_paginated(page=page, per_page=per_page)
 
+    def to_public_dict(self, article) -> dict:
+        """Map a persisted article to the public DTO to stabilize API shape."""
+        return ArticlePublic(
+            id=str(article.id),
+            title=article.title,
+            summary=article.summary or "",
+            content=article.content,
+            slug=article.slug,
+            is_published=article.is_published,
+            publication_date=article.publication_date.isoformat() if article.publication_date else None,
+            last_updated=article.last_updated.isoformat() if article.last_updated else None,
+            author_id=str(article.author.id) if article.author else None,
+            author_username=article.author.username if article.author else None,
+        ).model_dump()
     def get_article_or_404(self, article_id: str):
         article = self._article_repository.get_by_id(article_id)
         if not article:
