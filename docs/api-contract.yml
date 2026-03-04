@@ -105,7 +105,7 @@ endpoints:
   - method: GET
     path: /api/blog
     status: 200
-    description: Paginated list of published posts.
+    description: Paginated list of published articles (still returned as "posts" for legacy clients).
     body:
       required_top_level_keys: [posts, pagination]
       post_item_keys: [title, summary, slug, publication_date]
@@ -114,10 +114,9 @@ endpoints:
   - method: GET
     path: /api/blog/{slug}
     status: 200
-    description: Full content of a single published post.
+    description: Full content of a single published article.
     body:
-      required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
-      author_keys: [id, username]
+      required_keys: [id, title, slug, content, summary, author_id, author_username, publication_date, last_updated, is_published]
 
   # --- Developer Profile (Singleton) ---
   - method: GET
@@ -145,42 +144,42 @@ endpoints:
 
   # --- Content Management (Admin/Author) ---
   - method: GET
-    path: /api/content/posts
+    path: /api/content/articles
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author"]
-    description: List posts for management (Admins see all; Authors see own).
+    description: List articles for management (Admins see all; Authors see own).
     body:
       type: array
-      item_required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
+      item_required_keys: [id, title, slug, content, summary, author_id, author_username, publication_date, last_updated, is_published]
 
   - method: POST
-    path: /api/content/posts
+    path: /api/content/articles
     status: 201
     security: [jwt_required, "permission: content:manage OR content:author"]
-    description: Create a new blog post.
+    description: Create a new article.
     body:
-      required_keys: [message, id, title, slug, content, summary, is_published, author]
+      required_keys: [id, title, slug, content, summary, is_published, author_id, author_username]
 
   - method: PUT
-    path: /api/content/posts/{post_id}
+    path: /api/content/articles/{article_id}
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
-    description: Update an existing post.
+    description: Update an existing article.
     body:
-      required_keys: [message, id, title, slug, content, summary, is_published, author]
+      required_keys: [id, title, slug, content, summary, is_published, author_id, author_username]
 
   - method: DELETE
-    path: /api/content/posts/{post_id}
+    path: /api/content/articles/{article_id}
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
-    description: Delete a post (Atomic cleanup of assets and comments).
+    description: Delete an article (Atomic cleanup of assets and comments).
     body:
       required_keys: [message]
 
   - method: POST
     path: /api/content/media
     status: 201
-    security: [jwt_required, "permission: profile:manage"]
-    description: Upload generic media for blog posts.
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: Upload generic media for blog articles.
     body:
       required_keys: [url, message]

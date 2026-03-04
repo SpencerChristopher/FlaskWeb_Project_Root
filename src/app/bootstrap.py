@@ -64,7 +64,8 @@ def configure_core_runtime(app: Flask) -> None:
     mongo_db = os.environ.get("MONGO_APP_DB", "appdb")
     
     # Check if testing mode is active to use test database
-    if app.config.get("TESTING"):
+    is_testing = bool(app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"))
+    if is_testing:
         mongo_db = os.environ.get("MONGO_TEST_DB", "pytest_appdb")
 
     mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/{mongo_db}?authSource={os.environ.get('MONGO_APP_DB', 'appdb')}"
