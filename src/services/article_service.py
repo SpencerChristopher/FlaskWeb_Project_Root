@@ -7,7 +7,7 @@ from __future__ import annotations
 import datetime
 from slugify import slugify
 
-from src.exceptions import ConflictException, NotFoundException, ForbiddenException
+from src.exceptions import ConflictException, NotFoundException, ForbiddenException, UnauthorizedException
 from src.events import dispatch_event, article_created, article_deleted, article_updated, article_published
 from src.repositories.interfaces import ArticleRepository, UserRepository
 from src.schemas import UserIdentity, ArticleCreateUpdate, ArticlePublic
@@ -24,6 +24,8 @@ class ArticleService:
         """Helper to enforce resource ownership with admin override."""
         if user.role == "admin":
             return
+        if not getattr(article, "author", None):
+            raise NotFoundException("Article not found")
         if str(article.author.id) != user.id:
             raise ForbiddenException(f"You do not have permission to {action} this article.")
 
@@ -70,6 +72,8 @@ class ArticleService:
 
         # Resolve User model for reference
         author_model = self._user_repository.get_by_id(user.id)
+        if not author_model:
+            raise UnauthorizedException("Authentication required or invalid credentials.")
         
         from src.models.article import Article
         

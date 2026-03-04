@@ -1,9 +1,9 @@
 import pytest
-from src.events import article_created
-from src.exceptions import ConflictException, ForbiddenException, UnauthorizedException
+
+from src.exceptions import ConflictException, UnauthorizedException
 from src.models.user import User
-from src.services import get_authz_service, get_article_service
 from src.schemas import ArticleCreateUpdate, UserIdentity
+from src.services import get_article_service
 
 def test_article_service_create_conflict(app):
     article_service = get_article_service()
@@ -36,3 +36,17 @@ def test_article_service_list_published(app):
         paginated = article_service.list_published_articles(page=1, per_page=10)
         assert paginated.total == 1
         author.delete()
+
+
+def test_article_service_create_requires_valid_user(app):
+    article_service = get_article_service()
+    with app.app_context():
+        user_identity = UserIdentity(
+            id="65f0b4b4b4b4b4b4b4b4b4b4",
+            username="missing",
+            role="admin",
+            token_version=0,
+        )
+        dto = ArticleCreateUpdate(title="Orphan", content="C", summary="S", is_published=True)
+        with pytest.raises(UnauthorizedException):
+            article_service.create_article(article_dto=dto, user=user_identity)

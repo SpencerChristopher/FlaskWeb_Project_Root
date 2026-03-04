@@ -1,8 +1,10 @@
 import datetime
-import pytest
 
-from src.models.user import User
+import pytest
+from mongoengine.errors import ValidationError
+
 from src.models.article import Article
+from src.models.user import User
 from src.repositories.mongo_article_repository import MongoArticleRepository
 from src.repositories.mongo_user_repository import MongoUserRepository
 
@@ -70,3 +72,18 @@ def test_article_repository_published_pagination_and_slug_helpers(app):
             article_id=str(published_art.id),
         )
         assert excluded is None
+
+
+def test_article_requires_author(app):
+    article_repository = MongoArticleRepository()
+    with app.app_context():
+        orphan = Article(
+            title="Orphan",
+            slug="orphan",
+            content="Content",
+            summary="Summary",
+            author=None,
+            is_published=True,
+        )
+        with pytest.raises(ValidationError):
+            article_repository.save(orphan)
