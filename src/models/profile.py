@@ -16,6 +16,15 @@ class WorkHistoryItem(mongoengine.EmbeddedDocument):
     description = mongoengine.StringField()
     skills = mongoengine.ListField(mongoengine.StringField())
 
+class SocialLinks(mongoengine.EmbeddedDocument):
+    """Explicitly defined social media links for persistence."""
+    github = mongoengine.StringField()
+    linkedin = mongoengine.StringField()
+    twitter = mongoengine.StringField()
+    leetcode = mongoengine.StringField()
+    kaggle = mongoengine.StringField()
+    hackthebox = mongoengine.StringField()
+
 class Profile(db.Document):
     """
     Represents the site owner's developer profile.
@@ -26,7 +35,7 @@ class Profile(db.Document):
     statement = mongoengine.StringField(required=True, max_length=2000)
     interests = mongoengine.ListField(mongoengine.StringField(max_length=50))
     skills = mongoengine.ListField(mongoengine.StringField(max_length=50))
-    social_links = mongoengine.DictField()
+    social_links = mongoengine.EmbeddedDocumentField(SocialLinks, default=SocialLinks)
     work_history = mongoengine.EmbeddedDocumentListField(WorkHistoryItem)
     image_url = mongoengine.StringField()
     last_updated = mongoengine.DateTimeField(default=datetime.datetime.utcnow)
@@ -38,7 +47,7 @@ class Profile(db.Document):
             "statement": self.statement,
             "interests": self.interests,
             "skills": self.skills,
-            "social_links": self.social_links,
+            "social_links": self.social_links.to_mongo().to_dict() if self.social_links else {},
             "work_history": [item.to_mongo().to_dict() for item in self.work_history],
             "image_url": self.image_url,
             "last_updated": self.last_updated.isoformat() if self.last_updated else None

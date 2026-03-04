@@ -70,7 +70,7 @@ class ProfileService:
             statement=profile.statement,
             interests=profile.interests,
             skills=profile.skills,
-            social_links=profile.social_links,
+            social_links=profile.social_links.to_mongo().to_dict() if profile.social_links else {},
             work_history=self._map_work_history_to_dto(profile.work_history),
             image_url=profile.image_url,
             last_updated=profile.last_updated.isoformat() if profile.last_updated else None

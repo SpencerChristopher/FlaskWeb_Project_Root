@@ -1,8 +1,6 @@
 """
 Script to seed initial data into the application's MongoDB database.
-
-This script creates a default admin user (if not exists) and sample blog posts.
-It requires environment variables for admin credentials.
+Updated for Article Pivot and structured Profile data.
 """
 import os
 import sys
@@ -15,8 +13,8 @@ if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
 from src.models.user import User
-from src.models.post import Post
-from src.models.profile import Profile, WorkHistoryItem
+from src.models.article import Article
+from src.models.profile import Profile, WorkHistoryItem, SocialLinks
 from scripts.utils import get_flask_app_context, validate_password_complexity
 
 # Set up Flask app context
@@ -26,21 +24,12 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
 if not all([ADMIN_USERNAME, ADMIN_PASSWORD]):
-    print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables or in .env file.")
-    app_context.pop()
-    exit(1)
-
-# Validate the admin password complexity before proceeding
-try:
-    validate_password_complexity(ADMIN_PASSWORD)
-except ValueError as e:
-    print(f"Error: Admin password does not meet complexity requirements: {e}")
+    print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables.")
     app_context.pop()
     exit(1)
 
 print("Attempting to verify database connectivity...")
 try:
-    # A simple query to check the connection
     User.objects.first()
     print("Successfully connected to MongoDB via MongoEngine.")
 except Exception as e:
@@ -51,94 +40,87 @@ except Exception as e:
 # --- Seed Admin User ---
 admin_user_obj = User.objects(username=ADMIN_USERNAME).first()
 if admin_user_obj:
-    print(f"Admin user '{ADMIN_USERNAME}' already exists. Skipping.")
+    print(f"Admin user '{ADMIN_USERNAME}' already exists.")
 else:
     admin_user_obj = User(username=ADMIN_USERNAME, email="admin@example.com", role='admin')
     admin_user_obj.set_password(ADMIN_PASSWORD)
     admin_user_obj.save()
     print(f"Added admin user: {ADMIN_USERNAME}")
 
-# --- Seed Blog Posts ---
-if not admin_user_obj:
-    print("Admin user not found or created. Cannot seed posts without an author.")
-    app_context.pop()
-    exit(1)
-
-# Post 1
-post1_slug = "laura-ipa"
-if Post.objects(slug=post1_slug).first():
-    print(f"Blog post '{post1_slug}' already exists. Skipping.")
+# --- Seed Articles (Pivot from Posts) ---
+art1_slug = "laura-ipa"
+if Article.objects(slug=art1_slug).first():
+    print(f"Article '{art1_slug}' already exists. Skipping.")
 else:
-    post1 = Post(
+    art1 = Article(
         title="Laura IPA",
-        content="This is a sample blog post about Laura IPA. It's a delicious beer!",
+        content="This is a sample article about Laura IPA. It's a delicious beer!",
         summary="A refreshing IPA.",
-        slug=post1_slug,
+        slug=art1_slug,
         is_published=True,
-        author=admin_user_obj
+        author=admin_user_obj,
+        publication_date=datetime.now(timezone.utc)
     )
-    post1.save()
-    print(f"Added blog post: {post1_slug}")
+    art1.save()
+    print(f"Added article: {art1_slug}")
 
-# Post 2
-post2_slug = "another-great-beer"
-if Post.objects(slug=post2_slug).first():
-    print(f"Blog post '{post2_slug}' already exists. Skipping.")
+art2_slug = "another-great-beer"
+if Article.objects(slug=art2_slug).first():
+    print(f"Article '{art2_slug}' already exists. Skipping.")
 else:
-    post2 = Post(
+    art2 = Article(
         title="Another Great Beer",
-        content="This is another sample blog post about a fantastic beer.",
-        summary="Simply amazing.",
-        slug=post2_slug,
+        content="Simply amazing fantastic beer.",
+        summary="Amazing.",
+        slug=art2_slug,
         is_published=True,
-        publication_date=datetime.now(timezone.utc) - timedelta(days=3),
-        author=admin_user_obj
+        author=admin_user_obj,
+        publication_date=datetime.now(timezone.utc) - timedelta(days=3)
     )
-    post2.save()
-    print(f"Added blog post: {post2_slug}")
+    art2.save()
+    print(f"Added article: {art2_slug}")
 
-# --- Seed Profile ---
-if Profile.objects.first():
-    print("Developer profile already exists. Skipping.")
-else:
-    work_history = [
-        WorkHistoryItem(
-            company="Global Tech Solutions",
-            role="Senior Systems Architect",
-            start_date="2021-06",
-            end_date="Present",
-            location="Remote / London",
-            description="Leading the transition to a decoupled modular monolith architecture on Raspberry Pi hardware.",
-            skills=["Python", "Flask", "Docker", "Raspberry Pi"]
-        ),
-        WorkHistoryItem(
-            company="Innovative Startups Inc",
-            role="Full Stack Developer",
-            start_date="2018-01",
-            end_date="2021-05",
-            location="Manchester, UK",
-            description="Developed high-traffic SPAs using modern JavaScript frameworks and Flask backends.",
-            skills=["JavaScript", "REST APIs", "MongoDB"]
-        )
-    ]
-    
+# --- Seed Profile (Upsert) ---
+print("Seeding developer profile...")
+work_history = [
+    WorkHistoryItem(
+        company="Global Tech Solutions",
+        role="Senior Systems Architect",
+        start_date="2021-06",
+        end_date="Present",
+        location="Remote / London",
+        description="Leading the transition to a decoupled modular monolith architecture.",
+        skills=["Python", "Flask", "Docker"]
+    )
+]
+
+profile = Profile.objects.first()
+if not profile:
     profile = Profile(
         name="Chris Developer",
         location="United Kingdom",
-        statement="Passionate Senior Developer focused on building high-performance, secure, and resource-efficient web applications. Expert in Python, Flask, and IoT deployments.",
-        interests=["Cloud Computing", "Cybersecurity", "Embedded Systems", "Home Automation"],
-        skills=["Python", "Flask", "Docker", "MongoDB", "Linux Admin", "CI/CD"],
-        social_links={
-            "github": "https://github.com/chris",
-            "linkedin": "https://linkedin.com/in/chris",
-            "leetcode": "https://leetcode.com/chris",
-            "hackthebox": "https://app.hackthebox.com/profile/chris"
-        },
+        statement="Senior Developer focused on high-performance web applications.",
+        interests=["Cloud", "Cybersecurity"],
+        skills=["Python", "Flask", "Docker", "MongoDB"],
+        social_links=SocialLinks(
+            github="https://github.com/chris",
+            linkedin="https://linkedin.com/in/chris",
+            hackthebox="https://app.hackthebox.com/profile/chris"
+        ),
         work_history=work_history
     )
-    profile.save()
-    print("Added developer profile singleton.")
+else:
+    profile.name = "Chris Developer"
+    profile.location = "United Kingdom"
+    profile.social_links = SocialLinks(
+        github="https://github.com/chris",
+        linkedin="https://linkedin.com/in/chris",
+        hackthebox="https://app.hackthebox.com/profile/chris"
+    )
+    profile.work_history = work_history
+
+profile.save()
+print("Developer profile singleton seeded successfully.")
 
 print("Database seeding complete.")
-
 app_context.pop()
