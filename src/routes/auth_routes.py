@@ -65,10 +65,10 @@ def login() -> Response:
     # Phase 3: Record active session in Redis
     refresh_jti = decode_token(refresh_token)["jti"]
     refresh_ttl = current_app.config["JWT_REFRESH_TOKEN_EXPIRES"]
-    auth_service._session_service.set_active_refresh_token(
+    auth_service.record_active_refresh_token(
         user_id=str(user.id),
         jti=refresh_jti,
-        ttl_seconds=int(refresh_ttl.total_seconds())
+        ttl_seconds=int(refresh_ttl.total_seconds()),
     )
 
     dispatch_event(user_logged_in, current_app._get_current_object(), user_id=str(user.id))
@@ -119,7 +119,7 @@ def logout() -> Response:
     # Phase 3: Invalidate active session in Redis
     current_user_id = get_jwt_identity()
     if current_user_id:
-        auth_service._session_service.invalidate_session(current_user_id)
+        auth_service.invalidate_session(current_user_id)
 
     jwt_payload = get_jwt()
     jti = jwt_payload["jti"]
@@ -142,7 +142,7 @@ def refresh() -> Response:
     refresh_jti = get_jwt()["jti"]
 
     # Phase 3: Enforce session validity
-    if not auth_service._session_service.is_refresh_token_valid(current_user_id, refresh_jti):
+    if not auth_service.is_refresh_token_valid(current_user_id, refresh_jti):
         current_app.logger.warning(
             f"Invalid refresh attempt for user ID: {current_user_id} with JTI: {refresh_jti}. "
             "Session likely invalidated by a newer login."

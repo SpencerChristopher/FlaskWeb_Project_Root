@@ -56,6 +56,19 @@ class ArticleService:
             author_id=str(article.author.id) if article.author else None,
             author_username=article.author.username if article.author else None,
         ).model_dump()
+
+    def to_list_dict(self, article) -> dict:
+        """Map a persisted article to the public list DTO used by the blog index."""
+        return {
+            "title": article.title,
+            "summary": article.summary or "",
+            "slug": article.slug,
+            "publication_date": (
+                article.publication_date.strftime("%Y-%m-%d")
+                if article.publication_date
+                else None
+            ),
+        }
     def get_article_or_404(self, article_id: str):
         article = self._article_repository.get_by_id(article_id)
         if not article:

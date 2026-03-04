@@ -49,17 +49,7 @@ def blog_list_api() -> Response:
     paginated_articles = article_service.list_published_articles(page=page, per_page=per_page)
 
     articles_summary: List[Dict[str, Any]] = [
-        {
-            'title': article.title,
-            'summary': article.summary,
-            'slug': article.slug,
-            'publication_date': (
-                article.publication_date.strftime('%Y-%m-%d')
-                if article.publication_date
-                else None
-            )
-        }
-        for article in paginated_articles.items
+        article_service.to_list_dict(article) for article in paginated_articles.items
     ]
 
     return jsonify({
