@@ -8,7 +8,7 @@ export const ProfileView = {
      * Template for the Profile Edit form.
      */
     template: (d) => `
-        <section class="py-5">
+        <section id="view-admin-profile" class="py-5" data-test="view-admin-profile">
             <div class="container px-5">
                 <div class="bg-light rounded-4 py-5 px-4 px-md-5">
                     <div class="text-center mb-5">
