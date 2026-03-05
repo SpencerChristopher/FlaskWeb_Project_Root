@@ -1,6 +1,7 @@
 # --- Builder Stage ---
 # This stage installs dependencies using Poetry
-FROM python:3.11-slim-bookworm AS builder
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -18,7 +19,8 @@ RUN poetry install --no-root
 
 # --- Final Stage ---
 # This stage creates the lean, high-integrity production/staging image
-FROM python:3.11-slim-bookworm AS final
+ARG PYTHON_VERSION=3.11
+FROM python:${PYTHON_VERSION}-slim-bookworm AS final
 
 WORKDIR /app
 
