@@ -20,7 +20,8 @@ const consentState = {
 };
 
 // --- DOM Element Cache ---
-const mainNavList = document.querySelector('#navbarResponsive .navbar-nav');
+const mainNavList = document.getElementById('mainNavList');
+const navToggle = document.getElementById('navToggle');
 const mainContentElement = document.getElementById('main-content');
 
 // --- Helper Functions ---
@@ -103,6 +104,19 @@ function updateNavUI() {
     } else if (consentState.allowsAuth) {
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#login">Admin</a></li>');
     }
+}
+
+if (navToggle && mainNavList) {
+    navToggle.addEventListener('click', () => {
+        const isOpen = mainNavList.classList.toggle('is-open');
+        navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    mainNavList.addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') {
+            mainNavList.classList.remove('is-open');
+            navToggle.setAttribute('aria-expanded', 'false');
+        }
+    });
 }
 
 async function handleLogout(e, force=false) {

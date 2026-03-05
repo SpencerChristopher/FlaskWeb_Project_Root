@@ -3,7 +3,7 @@ def test_cookie_consent_overlay_present(client):
     assert response.status_code == 200
     html = response.data.decode("utf-8")
 
-    assert 'id="cookie-overlay"' in html
+    assert 'id="cookie-dialog"' in html
     assert 'id="cookie-banner"' in html
     assert 'id="cookie-accept"' in html
     assert 'id="cookie-decline"' in html

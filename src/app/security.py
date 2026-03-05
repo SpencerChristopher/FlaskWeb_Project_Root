@@ -75,11 +75,16 @@ def configure_http_security(app: Flask) -> None:
         "style-src": [
             "'self'",
             "https://cdn.jsdelivr.net",
+            "https://cdnjs.cloudflare.com",
             "https://fonts.googleapis.com",
             "'unsafe-inline'",
         ],
         "font-src": [
             "https://fonts.gstatic.com",
+            "https://cdn.jsdelivr.net",
+        ],
+        "connect-src": [
+            "'self'",
             "https://cdn.jsdelivr.net",
         ],
         "img-src": "*",

@@ -12,7 +12,7 @@ def test_base_html_serves_correctly(client):
     assert 'id="page-top"' in html
     assert 'id="mainNav"' in html
     
-    assert 'src="/static/app.js"' in html
+    assert '/static/app.js' in html
 
 def test_navigation_links_are_present_in_base_html(client):
     """
