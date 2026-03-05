@@ -1,21 +1,23 @@
-const iconMap = {
-    github: "bi-github",
-    linkedin: "bi-linkedin",
-    twitter: "bi-twitter",
-    tiktok: "bi-tiktok",
-    leetcode: "bi-code-slash",
-    kaggle: "bi-graph-up",
-    hackthebox: "bi-box-seam",
+const socialLabelMap = {
+    github: "GH",
+    linkedin: "IN",
+    twitter: "TW",
+    tiktok: "TT",
+    leetcode: "LC",
+    kaggle: "KG",
+    hackthebox: "HTB",
 };
 
 function renderSocialLinks(links = {}) {
     return Object.entries(links)
         .filter(([, url]) => typeof url === "string" && url.trim())
         .map(([key, url]) => {
-            const icon = iconMap[key] || "bi-link-45deg";
+            const label = key.replace(/[-_]+/g, " ").trim();
+            const short = socialLabelMap[key] || (label ? label[0].toUpperCase() : "?");
             return `
-                <a class="text-gradient" href="${url}" target="_blank" rel="noopener" data-test="social-link-${key}">
-                    <i class="bi ${icon}"></i>
+                <a class="social-link" href="${url}" target="_blank" rel="noopener" data-test="social-link-${key}">
+                    <span class="social-pill" aria-hidden="true">${short}</span>
+                    <span class="visually-hidden">${label}</span>
                 </a>`;
         })
         .join("");
@@ -25,29 +27,45 @@ export const HomeView = {
     template(profile) {
         const data = profile || {};
         const workItems = Array.isArray(data.work_history) ? data.work_history : [];
+        const roleTitle = workItems.length ? (workItems[0].role || "") : "";
+        const skillTags = Array.isArray(data.skills) ? data.skills : [];
         return `
             <section id="view-home" class="py-5" data-test="view-home">
                 <header class="py-5">
                     <div class="container px-5 pb-5">
-                        <div class="row gx-5 align-items-center">
-                            <div class="col-xxl-5">
-                                <div class="text-center text-xxl-start">
-                                    <div class="badge bg-gradient-primary-to-secondary text-white mb-4">
-                                        <div class="text-uppercase">${data.location || ""}</div>
-                                    </div>
-                                    <h1 class="display-3 fw-bolder mb-5">
-                                        <span class="text-gradient d-inline" data-test="profile-name">${data.name || ""}</span>
-                                    </h1>
-                                    <div class="fs-3 fw-light text-muted mb-5" data-test="profile-statement">${data.statement || ""}</div>
-                                    <div class="d-flex justify-content-center justify-content-xxl-start gap-3 fs-2 mb-5" data-test="profile-socials">
-                                        ${renderSocialLinks(data.social_links || {})}
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-xxl-7">
-                                <div class="d-flex justify-content-center mt-5 mt-xxl-0">
-                                    <div class="profile bg-gradient-primary-to-secondary">
-                                        ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
+                        <div class="row gx-5 justify-content-center">
+                            <div class="col-12 col-lg-10 col-xxl-8">
+                                <div class="hero-card card shadow-sm border-0 rounded-4 overflow-hidden">
+                                    <div class="card-body p-4 p-lg-5">
+                                        <div class="row g-4 align-items-center">
+                                            <div class="col-md-4 text-center">
+                                                <div class="profile-circle mx-auto">
+                                                    ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
+                                                </div>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <div class="hero-header">
+                                                    <h1 class="profile-name" data-test="profile-name">
+                                                        ${data.name || ""}
+                                                    </h1>
+                                                    ${data.location ? `
+                                                        <span class="badge location-badge">
+                                                            📍 ${data.location}
+                                                        </span>
+                                                    ` : ""}
+                                                </div>
+                                                ${roleTitle ? `<p class="role-title">${roleTitle}</p>` : ""}
+                                                <div class="fs-5 fw-light text-muted mb-3 bio" data-test="profile-statement">${data.statement || ""}</div>
+                                                ${skillTags.length ? `
+                                                    <div class="tags mb-3" data-test="profile-skills">
+                                                        ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
+                                                    </div>
+                                                ` : ""}
+                                                <div class="socials" data-test="profile-socials">
+                                                    ${renderSocialLinks(data.social_links || {})}
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -60,31 +78,21 @@ export const HomeView = {
                         <div class="row gx-5 justify-content-center">
                             <div class="col-xxl-8">
                                 <div class="text-center mb-5">
-                                    <h2 class="display-5 fw-bolder">
-                                        <span class="text-gradient d-inline">Experience</span>
-                                    </h2>
+                                    <h2 class="section-title">Experience</h2>
                                 </div>
                                 ${workItems
                                     .map((w, idx) => `
-                                        <article class="card shadow border-0 rounded-4 mb-5" data-test="work-card-${idx}">
-                                            <div class="card-body p-5">
-                                                <div class="row align-items-center gx-5">
-                                                    <div class="col text-center text-lg-start mb-4 mb-lg-0">
-                                                        <div class="bg-light p-4 rounded-4">
-                                                            <div class="text-primary fw-bolder mb-2">${w.start_date || ""} - ${w.end_date || ""}</div>
-                                                            <div class="small fw-bolder">${w.role || ""}</div>
-                                                            <div class="small text-muted">${w.company || ""}</div>
-                                                            <div class="small text-muted">${w.location || ""}</div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-lg-8">
-                                                        <div>${w.description || ""}</div>
-                                                        <div class="mt-3">
-                                                            ${(w.skills || []).map(s => `<span class="badge bg-secondary me-1">${s}</span>`).join("")}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                        <article class="exp-card" data-test="work-card-${idx}">
+                                            <div class="exp-meta">
+                                                <h3>${w.role || ""}${w.company ? ` @ ${w.company}` : ""}</h3>
+                                                <span class="date">${w.start_date || ""} — ${w.end_date || ""}</span>
                                             </div>
+                                            ${w.description ? `<ul><li>${w.description}</li></ul>` : ""}
+                                            ${Array.isArray(w.skills) && w.skills.length ? `
+                                                <div class="tags">
+                                                    ${w.skills.map((s, i) => `<span class="tag ${i % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
+                                                </div>
+                                            ` : ""}
                                         </article>
                                     `)
                                     .join("")}

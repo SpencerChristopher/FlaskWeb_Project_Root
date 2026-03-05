@@ -12,7 +12,7 @@ export const ProfileView = {
             <div class="container px-5">
                 <div class="bg-light rounded-4 py-5 px-4 px-md-5">
                     <div class="text-center mb-5">
-                        <div class="feature bg-primary bg-gradient-primary-to-secondary text-white rounded-3 mb-3"><i class="bi bi-person-badge"></i></div>
+                        <div class="feature bg-primary text-white rounded-3 mb-3">Profile</div>
                         <h1 class="fw-bolder">Edit Profile</h1>
                         <p class="lead fw-normal text-muted mb-0">Update your developer identity</p>
                     </div>
@@ -66,7 +66,7 @@ export const ProfileView = {
                                 <div class="mb-4">
                                     <div class="d-flex justify-content-between align-items-center mb-3">
                                         <h5 class="fw-bolder mb-0">Work History</h5>
-                                        <button type="button" class="btn btn-sm btn-primary" id="add-work-btn"><i class="bi bi-plus-circle me-1"></i>Add Entry</button>
+                                        <button type="button" class="btn btn-sm btn-primary" id="add-work-btn">Add Entry</button>
                                     </div>
                                     <div id="work-history-container">
                                         ${d.work_history.map((item, index) => ProfileView.workEntryTemplate(item, index)).join('')}
