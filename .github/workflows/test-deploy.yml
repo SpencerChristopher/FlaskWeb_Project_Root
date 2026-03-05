@@ -137,8 +137,8 @@ jobs:
           docker cp pytest.ini flask_web_app:/app/pytest.ini
           docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
 
-      - name: Run tests
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+      - name: Run tests (exclude e2e)
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e"
 
       - name: Push Verified Multi-platform Image
         if: success() && matrix.python-version == '3.11'

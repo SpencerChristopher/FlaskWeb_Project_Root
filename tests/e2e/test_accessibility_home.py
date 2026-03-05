@@ -4,12 +4,19 @@ import pytest
 
 playwright = pytest.importorskip("playwright.sync_api")
 Page = playwright.Page
+BASE_URL = os.getenv("E2E_BASE_URL")
+RUN_E2E = os.getenv("RUN_E2E") == "1"
+
+pytestmark = pytest.mark.skipif(
+    not (RUN_E2E and BASE_URL),
+    reason="Set RUN_E2E=1 and E2E_BASE_URL to enable Playwright a11y checks.",
+)
 
 
 @pytest.mark.e2e
 @pytest.mark.a11y
 def test_homepage_accessibility(page: Page):
-    base_url = os.getenv("E2E_BASE_URL")
+    base_url = BASE_URL
     axe_path = pathlib.Path("tests/axe/axe.min.js")
 
     if not base_url:
