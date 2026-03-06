@@ -24,46 +24,80 @@ function renderSocialLinks(links = {}) {
 }
 
 export const HomeView = {
+    sortWorkHistory(history) {
+        return [...history].sort((a, b) => {
+            const dateA = a.end_date === "Present" ? new Date() : new Date(a.end_date || a.start_date);
+            const dateB = b.end_date === "Present" ? new Date() : new Date(b.end_date || b.start_date);
+            return dateB - dateA;
+        });
+    },
+
     template(profile) {
         const data = profile || {};
-        const workItems = Array.isArray(data.work_history) ? data.work_history : [];
-        const roleTitle = workItems.length ? (workItems[0].role || "") : "";
+        const rawWorkItems = Array.isArray(data.work_history) ? data.work_history : [];
+        const workItems = HomeView.sortWorkHistory(rawWorkItems);
+        
+        // Priority Logic for Hero Role Title:
+        const currentJob = workItems.find(w => w.end_date && w.end_date.trim() === "Present");
+        
+        let roleTitle = "";
+        if (currentJob) {
+            roleTitle = currentJob.role;
+        } else if (data.headline_role) {
+            roleTitle = data.headline_role;
+        } else if (workItems.length > 0) {
+            roleTitle = workItems[0].role;
+        }
+        
         const skillTags = Array.isArray(data.skills) ? data.skills : [];
         return `
             <section id="view-home" class="py-5" data-test="view-home">
                 <header class="py-5">
-                    <div class="container px-5 pb-5">
-                        <div class="row gx-5 justify-content-center">
-                            <div class="col-12 col-lg-10 col-xxl-8">
-                                <div class="hero-card card shadow-sm border-0 rounded-4 overflow-hidden">
-                                    <div class="card-body p-4 p-lg-5">
-                                        <div class="row g-4 align-items-center">
-                                            <div class="col-12 col-md-4 text-center">
-                                                <div class="profile-circle mx-auto mb-3 mb-md-0">
-                                                    ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
-                                                </div>
-                                            </div>
-                                            <div class="col-12 col-md-8">
-                                                <div class="hero-header flex-column flex-md-row align-items-md-center">
-                                                    <h1 class="profile-name" data-test="profile-name">
-                                                        ${data.name || ""}
-                                                    </h1>
-                                                    ${data.location ? `
-                                                        <span class="badge location-badge mt-2 mt-md-0">
-                                                            📍 ${data.location}
-                                                        </span>
-                                                    ` : ""}
-                                                </div>
-                                                ${roleTitle ? `<p class="role-title mt-2">${roleTitle}</p>` : ""}
-                                                <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement">${data.statement || ""}</div>
-                                                ${skillTags.length ? `
-                                                    <div class="tags mb-4" data-test="profile-skills">
-                                                        ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
-                                                    </div>
+                    <div class="hero-container px-3 px-md-5">
+                        <div class="hero-card card shadow-sm border-0 rounded-4 overflow-hidden">
+                            <div class="card-body p-4 p-lg-5">
+                                <div class="row g-4 align-items-start">
+                                    <div class="col-12 col-md-auto text-center">
+                                        <div class="profile-circle mx-auto mb-3 mb-md-0" style="width: 160px; height: 160px;">
+                                            ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-md">
+                                        <div class="hero-header mb-3">
+                                            <h1 class="profile-name mb-2" data-test="profile-name">
+                                                ${data.name || ""}
+                                            </h1>
+                                            
+                                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                                ${data.location ? `
+                                                    <span class="badge location-badge">
+                                                        📍 ${data.location}
+                                                    </span>
                                                 ` : ""}
-                                                <div class="socials mt-3" data-test="profile-socials">
-                                                    ${renderSocialLinks(data.social_links || {})}
+                                                
+                                                ${data.social_links?.linkedin ? `
+                                                    <a href="${data.social_links.linkedin}" target="_blank" class="btn btn-linkedin btn-sm">
+                                                        Follow on LinkedIn
+                                                    </a>
+                                                ` : ""}
+                                            </div>
+                                        </div>
+
+                                        ${roleTitle ? `<p class="role-title mb-4">${roleTitle}</p>` : ""}
+                                        
+                                        <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement" style="line-height: 1.6; max-width: 800px; text-align: justify;">
+                                            ${data.statement || ""}
+                                        </div>
+
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 pt-2 border-top">
+                                            ${skillTags.length ? `
+                                                <div class="tags" data-test="profile-skills">
+                                                    ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
                                                 </div>
+                                            ` : ""}
+                                            
+                                            <div class="socials" data-test="profile-socials">
+                                                ${renderSocialLinks(data.social_links || {})}
                                             </div>
                                         </div>
                                     </div>
@@ -74,25 +108,42 @@ export const HomeView = {
                 </header>
 
                 <section class="py-5 bg-light" aria-label="Experience">
-                    <div class="container px-5">
-                        <div class="row gx-5 justify-content-center">
-                            <div class="col-xxl-8">
-                                <div class="text-center mb-5">
-                                    <h2 class="section-title">Experience</h2>
-                                </div>
+                    <div class="wide-container px-3 px-md-5">
+                        <div class="text-center mb-5">
+                            <h2 class="section-title">Experience</h2>
+                        </div>
+                        <div class="row justify-content-center">
+                            <div class="col-12">
                                 ${workItems
                                     .map((w, idx) => `
-                                        <article class="exp-card" data-test="work-card-${idx}">
-                                            <div class="exp-meta">
-                                                <h3>${w.role || ""}${w.company ? ` @ ${w.company}` : ""}</h3>
-                                                <span class="date">${w.start_date || ""} — ${w.end_date || ""}</span>
-                                            </div>
-                                            ${w.description ? `<ul><li>${w.description}</li></ul>` : ""}
-                                            ${Array.isArray(w.skills) && w.skills.length ? `
-                                                <div class="tags">
-                                                    ${w.skills.map((s, i) => `<span class="tag ${i % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
+                                        <article class="exp-card card mb-4 border-0 shadow-sm bg-white" data-test="work-card-${idx}">
+                                            <div class="card-body p-4 p-md-5">
+                                                <header class="mb-3">
+                                                    <h3 class="fw-bolder mb-1" style="color: var(--text);">${w.role || ""}</h3>
+                                                    <div class="text-primary fw-bold mb-2 fs-5">${w.company || ""}</div>
+                                                    
+                                                    <div class="text-muted d-flex flex-wrap gap-3 small fw-bold text-uppercase">
+                                                        <span class="d-flex align-items-center gap-1">
+                                                            📅 ${w.start_date || ""} — ${w.end_date || ""}
+                                                        </span>
+                                                        <span class="d-flex align-items-center gap-1">
+                                                            📍 ${w.location || ""}
+                                                        </span>
+                                                    </div>
+                                                </header>
+
+                                                <div class="bio mb-4 text-muted">
+                                                    ${w.description ? `<p class="mb-0">${w.description}</p>` : ""}
                                                 </div>
-                                            ` : ""}
+
+                                                <footer class="mt-auto">
+                                                    ${Array.isArray(w.skills) && w.skills.length ? `
+                                                        <div class="tags">
+                                                            ${w.skills.map((s, i) => `<span class="tag ${i % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
+                                                        </div>
+                                                    ` : ""}
+                                                </footer>
+                                            </div>
                                         </article>
                                     `)
                                     .join("")}

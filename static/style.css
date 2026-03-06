@@ -264,17 +264,37 @@ body {
   .col-xl-8 { width: calc(66.666% - 16px); }
 }
 
-.hero-card {
+.hero-card, .exp-card {
   border-radius: 32px;
   margin: 0 auto 40px;
   width: 100%;
+  max-width: 1100px; /* Standardized width for all main content cards */
 }
 
-.exp-card {
-  border-radius: 20px;
-  margin-left: auto;
-  margin-right: auto;
-  width: 100%;
+.hero-container, .wide-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.btn-linkedin {
+  background-color: #0077b5;
+  color: white !important;
+  border: none;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: background-color 0.2s ease;
+}
+
+.btn-linkedin:hover {
+  background-color: #005582;
 }
 
 .profile-circle {
@@ -327,8 +347,12 @@ body {
   color: var(--text);
   font-weight: 700;
   margin-bottom: 12px;
-  border-left: 4px solid var(--accent-sage);
-  padding-left: 12px;
+  /* Removed border and padding to maintain vertical alignment spine */
+}
+
+.bio, .description, .article-content {
+  text-align: justify;
+  line-height: 1.6;
 }
 
 .section-title {

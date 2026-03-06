@@ -73,6 +73,7 @@ class ProfileService:
             # Return a default DTO if no profile exists yet
             return ProfilePublic(
                 name="Developer Name",
+                headline_role=None,
                 location="Remote / City",
                 statement="Welcome to my developer profile.",
                 interests=[],
@@ -85,6 +86,7 @@ class ProfileService:
         
         return ProfilePublic(
             name=profile.name,
+            headline_role=profile.headline_role,
             location=profile.location,
             statement=profile.statement,
             interests=profile.interests,
@@ -108,6 +110,7 @@ class ProfileService:
         if not profile:
             profile = Profile(
                 name=profile_data.name,
+                headline_role=profile_data.headline_role,
                 location=profile_data.location,
                 statement=profile_data.statement,
                 interests=profile_data.interests,
@@ -119,6 +122,7 @@ class ProfileService:
             )
         else:
             profile.name = profile_data.name
+            profile.headline_role = profile_data.headline_role
             profile.location = profile_data.location
             profile.statement = profile_data.statement
             profile.interests = profile_data.interests

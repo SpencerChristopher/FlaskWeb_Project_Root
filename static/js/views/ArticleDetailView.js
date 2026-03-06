@@ -14,13 +14,13 @@ export const ArticleDetailView = {
                             </div>
                             <article class="card">
                                 <div class="card-body">
-                                    <header class="mb-3">
+                                    <header class="mb-4">
                                         <h1 class="profile-name mb-2" data-test="article-title">${data.title || ""}</h1>
-                                        <div class="text-muted mb-2" data-test="article-date">
+                                        <div class="text-muted" data-test="article-date">
                                             Published on ${published}
                                         </div>
                                     </header>
-                                    <section class="mb-4" data-test="article-content">
+                                    <section class="article-content" data-test="article-content">
                                         ${data.content || ""}
                                     </section>
                                 </div>
