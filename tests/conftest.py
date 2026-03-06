@@ -89,7 +89,11 @@ def pytest_collection_modifyitems(config, items):
 def database_connection_check():
     """
     Gatekeeper fixture to check for database connection before running tests.
+    Can be skipped with SKIP_DB_CHECK=1 for E2E tests where the runner doesn't need DB access.
     """
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        return
+
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
 
     try:
@@ -103,6 +107,11 @@ def database_connection_check():
 @pytest.fixture(scope='session')
 def app():
     """Create and configure a new app instance for the test session."""
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        # Return a dummy object or None if we are just doing E2E against a remote/container URL
+        yield None
+        return
+
     # Determine MONGO_URI based on environment
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
@@ -166,6 +175,8 @@ def setup_users(app):
 def clean_collections_per_function(app):
     """Cleans up specific collections after each test function."""
     yield
+    if app is None:
+        return
     with app.app_context():
         try:
             # Explicitly drop collections that are modified by tests

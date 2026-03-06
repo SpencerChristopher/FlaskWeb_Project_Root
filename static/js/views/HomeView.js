@@ -38,30 +38,30 @@ export const HomeView = {
                                 <div class="hero-card card shadow-sm border-0 rounded-4 overflow-hidden">
                                     <div class="card-body p-4 p-lg-5">
                                         <div class="row g-4 align-items-center">
-                                            <div class="col-md-4 text-center">
-                                                <div class="profile-circle mx-auto">
+                                            <div class="col-12 col-md-4 text-center">
+                                                <div class="profile-circle mx-auto mb-3 mb-md-0">
                                                     ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
                                                 </div>
                                             </div>
-                                            <div class="col-md-8">
-                                                <div class="hero-header">
+                                            <div class="col-12 col-md-8">
+                                                <div class="hero-header flex-column flex-md-row align-items-md-center">
                                                     <h1 class="profile-name" data-test="profile-name">
                                                         ${data.name || ""}
                                                     </h1>
                                                     ${data.location ? `
-                                                        <span class="badge location-badge">
+                                                        <span class="badge location-badge mt-2 mt-md-0">
                                                             📍 ${data.location}
                                                         </span>
                                                     ` : ""}
                                                 </div>
-                                                ${roleTitle ? `<p class="role-title">${roleTitle}</p>` : ""}
-                                                <div class="fs-5 fw-light text-muted mb-3 bio" data-test="profile-statement">${data.statement || ""}</div>
+                                                ${roleTitle ? `<p class="role-title mt-2">${roleTitle}</p>` : ""}
+                                                <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement">${data.statement || ""}</div>
                                                 ${skillTags.length ? `
-                                                    <div class="tags mb-3" data-test="profile-skills">
+                                                    <div class="tags mb-4" data-test="profile-skills">
                                                         ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
                                                     </div>
                                                 ` : ""}
-                                                <div class="socials" data-test="profile-socials">
+                                                <div class="socials mt-3" data-test="profile-socials">
                                                     ${renderSocialLinks(data.social_links || {})}
                                                 </div>
                                             </div>
