@@ -40,7 +40,11 @@ def register_error_handlers(app) -> None:
     @app.errorhandler(PydanticValidationError)
     def handle_pydantic_validation_error(error):
         # Pydantic v2 .errors() returns exactly what we want: list of dicts with loc, msg, type
-        details = error.errors()
+        # We explicitly strip 'input' to avoid leaking passwords or PII in error responses
+        details = [
+            {k: v for k, v in err.items() if k != "input"} 
+            for err in error.errors()
+        ]
         app.logger.warning(f"Pydantic Validation Error: {details}")
         response = BadRequestException("Invalid data", details=details).to_dict()
         return jsonify(response), 400
@@ -73,7 +77,13 @@ def register_error_handlers(app) -> None:
         )
         if error.status_code in [400, 422] and request.is_json:
             try:
-                log_message += f", Request Data: {request.json}"
+                # Redact sensitive fields from logs (shallow redact for common keys)
+                sensitive_keys = {"password", "current_password", "new_password", "token", "secret"}
+                redacted_data = {
+                    k: ("[REDACTED]" if k.lower() in sensitive_keys else v) 
+                    for k, v in request.json.items()
+                }
+                log_message += f", Request Data: {redacted_data}"
             except Exception:
                 log_message += ", Request Data: <unparseable JSON>"
 
