@@ -21,6 +21,7 @@ class WorkHistoryItem(BaseModel):
 
 class ProfileSchema(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
+    headline_role: Optional[str] = Field(None, max_length=100)
     location: str = Field(..., max_length=100)
     statement: str = Field(..., min_length=10, max_length=2000)
     interests: list[str] = Field(default_factory=list)
@@ -43,6 +44,7 @@ class ProfileSchema(BaseModel):
 
 class ProfilePublic(BaseModel):
     name: str
+    headline_role: Optional[str] = None
     location: str
     statement: str
     interests: list[str]

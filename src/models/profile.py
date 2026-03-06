@@ -24,6 +24,7 @@ class Profile(db.Document):
     This is intended to be a singleton-style document.
     """
     name = mongoengine.StringField(required=True, max_length=100)
+    headline_role = mongoengine.StringField(max_length=100) # Optional headline override
     location = mongoengine.StringField(required=True, max_length=100)
     statement = mongoengine.StringField(required=True, max_length=2000)
     interests = mongoengine.ListField(mongoengine.StringField(max_length=50))
@@ -37,6 +38,7 @@ class Profile(db.Document):
     def to_dict(self) -> dict:
         return {
             "name": self.name,
+            "headline_role": self.headline_role,
             "location": self.location,
             "statement": self.statement,
             "interests": self.interests,
