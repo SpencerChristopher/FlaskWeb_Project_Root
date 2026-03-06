@@ -1,31 +1,34 @@
 import os
 import pathlib
 import pytest
+from playwright.sync_api import Page, expect
 
-playwright = pytest.importorskip("playwright.sync_api")
-Page = playwright.Page
-BASE_URL = os.getenv("E2E_BASE_URL")
-RUN_E2E = os.getenv("RUN_E2E") == "1"
-
-pytestmark = pytest.mark.skipif(
-    not (RUN_E2E and BASE_URL),
-    reason="Set RUN_E2E=1 and E2E_BASE_URL to enable Playwright a11y checks.",
-)
-
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    return {
+        **browser_context_args,
+        "ignore_https_errors": True
+    }
 
 @pytest.mark.e2e
 @pytest.mark.a11y
 def test_homepage_accessibility(page: Page):
-    base_url = BASE_URL
+    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
     axe_path = pathlib.Path("tests/axe/axe.min.js")
 
-    if not base_url:
-        pytest.skip("Set E2E_BASE_URL to enable Playwright a11y checks.")
     if not axe_path.exists():
-        pytest.skip("Missing tests/axe/axe.min.js; add axe core script to enable a11y checks.")
+        pytest.skip("Missing tests/axe/axe.min.js; run 'curl -L -o tests/axe/axe.min.js https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js' to enable.")
 
     page.goto(base_url, wait_until="domcontentloaded")
-    page.add_script_tag(path=str(axe_path))
+    
+    # Handle Cookie Consent
+    accept_btn = page.locator("[data-test='cookie-accept']")
+    if accept_btn.is_visible():
+        accept_btn.click()
+
+    # Load Axe from CDN (already allowed by CSP)
+    page.add_script_tag(url="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js")
+
     results = page.evaluate("""
         async () => {
             return await axe.run();

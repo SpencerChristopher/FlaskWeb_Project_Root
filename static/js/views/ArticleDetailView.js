@@ -9,6 +9,9 @@ export const ArticleDetailView = {
                 <div class="container px-5">
                     <div class="row g-4 justify-content-center">
                         <div class="col-12 col-lg-10 col-xl-8">
+                            <div class="mb-4">
+                                <a href="#blog" class="btn btn-outline-primary btn-sm">&larr; Back to Blog</a>
+                            </div>
                             <article class="card">
                                 <div class="card-body">
                                     <header class="mb-3">
@@ -18,7 +21,7 @@ export const ArticleDetailView = {
                                         </div>
                                     </header>
                                     <section class="mb-4" data-test="article-content">
-                                        <p>${data.content || ""}</p>
+                                        ${data.content || ""}
                                     </section>
                                 </div>
                             </article>
