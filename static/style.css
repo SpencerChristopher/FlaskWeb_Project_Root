@@ -343,6 +343,10 @@ body {
   margin-left: auto;
 }
 
+.text-inherit {
+  color: inherit !important;
+}
+
 .role-title {
   color: var(--text);
   font-weight: 700;
