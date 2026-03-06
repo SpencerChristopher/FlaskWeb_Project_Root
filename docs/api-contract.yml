@@ -124,7 +124,7 @@ endpoints:
     status: 200
     description: Publicly accessible developer profile.
     body:
-      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
 
   - method: PUT
     path: /api/content/profile
@@ -132,7 +132,7 @@ endpoints:
     security: [jwt_required, "permission: profile:manage"]
     description: Update the developer profile.
     body:
-      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
 
   - method: POST
     path: /api/content/profile/photo
