@@ -7,10 +7,11 @@ from __future__ import annotations
 from typing import Any, Optional, TYPE_CHECKING
 
 from src.events import dispatch_event, user_deleted, user_role_changed, user_created
-from src.exceptions import UnauthorizedException, ConflictException
+from src.exceptions import UnauthorizedException, ConflictException, ValidationError
 from src.models.user import User
 from src.repositories.interfaces import UserRepository, TokenRepository
 from src.services.roles import build_claim_roles_for_role
+from src.schemas.base import password_policy
 
 if TYPE_CHECKING:
     from src.services.session_service import SessionService
@@ -31,6 +32,20 @@ class AuthService:
         self._mongo_token_repository = mongo_token_repository
         self._session_service = session_service
 
+    def _validate_password_strength(self, password: str) -> None:
+        """Enforces the centralized password complexity policy."""
+        test_results = password_policy.test(password)
+        if test_results:
+            error_messages = []
+            if 'length' in test_results: error_messages.append(f'Password must be at least {password_policy.length} characters long.')
+            if 'uppercase' in test_results: error_messages.append(f'Password must contain at least {password_policy.uppercase} uppercase letter(s).')
+            if 'numbers' in test_results: error_messages.append(f'Password must contain at least {password_policy.numbers} digit(s).')
+            if 'special' in test_results: error_messages.append(f'Password must contain at least {password_policy.special} special character(s).')
+            
+            # Use loc format consistent with Pydantic for frontend compatibility
+            details = [{"loc": ["password"], "msg": msg, "type": "value_error"} for msg in error_messages]
+            raise ValidationError(message="Password does not meet complexity requirements.", details=details)
+
     def authenticate(self, username: str, password: str) -> User:
         user = self._user_repository.get_by_username(username)
         if not user or not user.check_password(password):
@@ -44,6 +59,8 @@ class AuthService:
         """
         if self._user_repository.get_by_username(username):
             raise ConflictException(f"Username '{username}' is already taken.")
+        
+        self._validate_password_strength(password)
         
         # In a real system, we'd also check email uniqueness if mandated
         
@@ -94,6 +111,7 @@ class AuthService:
         if not user.check_password(current_password):
             raise UnauthorizedException("Invalid current password")
 
+        self._validate_password_strength(new_password)
         user.set_password(new_password)
         user.token_version = (user.token_version or 0) + 1
         self._user_repository.save(user)
