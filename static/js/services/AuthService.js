@@ -38,6 +38,15 @@ export class AuthService {
         this.listeners.forEach(callback => callback(this.user, this.loggedIn));
     }
 
+    /**
+     * Hydrate state from external bootstrap data.
+     */
+    hydrate(status) {
+        this._loggedIn = status.logged_in;
+        this.user = status.user || null;
+        this.notify();
+    }
+
     async checkStatus() {
         try {
             const status = await this.api('/api/auth/status', { suppressAuthRedirect: true });

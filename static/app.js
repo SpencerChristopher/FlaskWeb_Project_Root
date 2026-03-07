@@ -14,8 +14,12 @@ const auth = new AuthService(fetchAPI);
 
 const consentState = {
     decided: false,
-    allowsAuth: false
+    allowsAuth: false,
+    initializing: false
 };
+
+// Cache for bootstrap data to prevent double-fetching on first paint
+let bootstrapCache = null;
 
 // --- DOM Element Cache ---
 const mainNavList = document.getElementById('mainNavList');
@@ -29,7 +33,6 @@ auth.subscribe((user, loggedIn) => {
     updateNavUI();
     
     // Only re-route if we are already fully initialized AND on the home page.
-    // This prevents jitter where startApp() and the observer both trigger router().
     const isHomePage = window.location.pathname === '/' || window.location.pathname === '/home';
     if (isHomePage && consentState.decided && !consentState.initializing) {
         console.debug("Home page auth change detected. Refreshing view...");
@@ -179,9 +182,11 @@ async function startApp(allowAuth) {
     
     if (allowAuth) {
         try {
-            await auth.checkStatus();
+            const boot = await fetchAPI('/api/bootstrap');
+            auth.hydrate(boot.auth);
+            bootstrapCache = boot.profile;
         } catch (err) {
-            console.warn("Initial auth check failed, continuing as guest.");
+            console.warn("Bootstrap failed, continuing as guest.");
         }
     } else {
         auth.user = null;
@@ -191,16 +196,16 @@ async function startApp(allowAuth) {
     
     consentState.decided = true;
     consentState.initializing = false;
-    router(); // Single entry point for routing on startup
+    router();
 }
 
 // --- Router Registry ---
 const ROUTES = {
-    '/': { view: HomeView, fetch: () => fetchAPI('/api/content/profile') },
-    '/home': { view: HomeView, fetch: () => fetchAPI('/api/content/profile') },
+    '/': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
+    '/home': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/blog': { view: ArticleListView, fetch: () => fetchAPI('/api/blog') },
     '/login': { view: LoginView, auth: true },
-    '/admin/profile': { view: ProfileView, auth: true, fetch: () => fetchAPI('/api/content/profile') },
+    '/admin/profile': { view: ProfileView, auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/admin/articles': { view: ContentManagerView, auth: true },
     '/about': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p class="lead">${d.content}</p></div></section>` }, fetch: () => fetchAPI('/api/about') },
     '/license': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p>${d.content}</p><hr><p class="small text-muted">${d.copyright}</p></div></section>` }, fetch: () => fetchAPI('/api/license') },
@@ -249,7 +254,13 @@ async function router() {
 
         if (route.fetch) {
             mainContentElement.innerHTML = renderLoading();
-            data = await route.fetch();
+            // Data can be a promise or an object (cached)
+            data = await (typeof route.fetch === 'function' ? route.fetch() : route.fetch);
+            
+            // Clear cache after first use to ensure freshness on subsequent navigations
+            if (bootstrapCache && (path === '/' || path === '/home')) {
+                bootstrapCache = null;
+            }
         }
 
         mainContentElement.innerHTML = route.view.template(data, auth);

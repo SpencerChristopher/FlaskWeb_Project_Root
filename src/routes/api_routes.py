@@ -3,22 +3,51 @@ from flask import Blueprint, jsonify, current_app, request, Response
 from typing import List, Dict, Any
 from src.extensions import limiter
 from src.exceptions import BadRequestException
-from src.services import get_article_service
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
+from src.services import get_article_service, get_profile_service, get_authz_service, get_auth_service
 
 bp = Blueprint('api_routes', __name__, url_prefix='/api')
 article_service = get_article_service()
+profile_service = get_profile_service()
+authz_service = get_authz_service()
+auth_service = get_auth_service()
+
+@bp.route('/bootstrap', methods=['GET'])
+@jwt_required(optional=True)
+def bootstrap_api() -> Response:
+    """
+    Combined endpoint for initial app load. 
+    Returns the public profile AND current auth status.
+    """
+    profile = profile_service.get_profile()
+    
+    auth_status = {'logged_in': False}
+    current_user_id = get_jwt_identity()
+    if current_user_id:
+        user = auth_service.get_user(current_user_id)
+        if user:
+            auth_status = {
+                'logged_in': True,
+                'user': {
+                    'username': user.username,
+                    'capabilities': authz_service.get_user_capabilities(get_jwt())
+                }
+            }
+
+    return jsonify({
+        'profile': profile.model_dump(),
+        'auth': auth_status
+    }), 200
 
 @bp.route('/home', methods=['GET'])
 def home_api() -> Response:
+    """Legacy/Simple home data endpoint, now backed by ProfileService."""
+    profile = profile_service.get_profile()
     return jsonify({
-        'title': 'Your Favorite Place for Free Bootstrap Themes',
-        'tagline': (
-            'Start Bootstrap can help you build better websites using the '
-            'Bootstrap framework! Just download a theme and start '
-            'customizing, no strings attached!'
-        ),
-        'button_text': 'Find Out More',
-        'button_link': '/about'
+        'title': profile.name,
+        'tagline': profile.statement,
+        'button_text': 'Technical Blog',
+        'button_link': '/blog'
     })
 
 @bp.route('/about', methods=['GET'])
