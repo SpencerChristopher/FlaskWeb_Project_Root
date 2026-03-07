@@ -18,7 +18,7 @@ def home_api() -> Response:
             'customizing, no strings attached!'
         ),
         'button_text': 'Find Out More',
-        'button_link': '#about'
+        'button_link': '/about'
     })
 
 @bp.route('/about', methods=['GET'])
@@ -31,7 +31,7 @@ def about_api() -> Response:
             'to download, and easy to use themes! No strings attached!'
         ),
         'button_text': 'Get Started!',
-        'button_link': '#services'
+        'button_link': '/services'
     })
 
 @bp.route('/blog', methods=['GET'])
