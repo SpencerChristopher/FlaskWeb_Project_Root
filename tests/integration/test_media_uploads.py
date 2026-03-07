@@ -27,7 +27,16 @@ def test_upload_image_success(client, admin_headers):
         headers=admin_headers
     )
     assert resp.status_code == 201
-    assert 'url' in resp.get_json()
+    json_data = resp.get_json()
+    assert 'url' in json_data
+    
+    # Cleanup: Delete the uploaded image
+    url = json_data['url']
+    del_resp = client.delete(
+        f"/api/content/media?url={url}",
+        headers=admin_headers
+    )
+    assert del_resp.status_code == 200
 
 @pytest.mark.heavy
 def test_upload_invalid_extension(client, admin_headers):
