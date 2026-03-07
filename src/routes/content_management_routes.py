@@ -124,3 +124,16 @@ def upload_media() -> Response:
         return jsonify({"url": url, "message": "Media uploaded successfully"}), 201
     except ValueError as e:
         raise BadRequestException(str(e))
+
+@bp.route('/media', methods=['DELETE'])
+@permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
+def delete_media() -> Response:
+    """Deletes generic media."""
+    url = request.args.get('url')
+    if not url:
+        raise BadRequestException("Missing 'url' parameter.")
+    
+    if media_service.delete_image(url):
+        return jsonify({"message": "Media deleted successfully"}), 200
+    else:
+        raise BadRequestException("Failed to delete media or invalid URL.")
