@@ -158,15 +158,31 @@ docker compose logs -f web
 Application logs are also persisted locally in the `./logs` directory via volume mounting.
 
 ### Running Tests
-To run the test suite inside the container environment (ensuring exact parity with the CI environment):
+To run the backend and integration test suite inside the container environment (ensuring exact parity with the CI environment):
 
 ```bash
-# Run all tests
-docker compose exec web /app/.venv/bin/pytest tests/
-
-# Run tests excluding heavy/performance-intensive ones
-docker compose exec web /app/.venv/bin/pytest tests/ -m "not heavy"
+# Run backend and integration tests
+docker compose exec web /app/.venv/bin/pytest tests/ -m "not e2e"
 ```
+
+#### End-to-End (Browser) Tests
+E2E tests use **Playwright** and are typically run from the local host against the containerized application to utilize local browser binaries.
+
+**Prerequisites:**
+1. Install Playwright browsers locally: `playwright install`
+2. Ensure the Docker stack is running: `docker compose up -d`
+
+**Stable Execution Command (PowerShell):**
+```powershell
+$env:SKIP_DB_CHECK="1"; python -m pytest tests/e2e/ --base-url https://localhost -p no:flask
+```
+
+**Stable Execution Command (Bash/macOS):**
+```bash
+SKIP_DB_CHECK=1 python -m pytest tests/e2e/ --base-url https://localhost -p no:flask
+```
+
+*Note: The `-p no:flask` flag is required to prevent local configuration conflicts with the containerized Flask instance.*
 
 ### Quick Reloading & Service Management
 The `docker-compose.override.yml` mounts your local `src/` directory into the container for live development.
