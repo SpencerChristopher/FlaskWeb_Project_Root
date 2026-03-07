@@ -22,9 +22,10 @@ class MongoArticleRepository(ArticleRepository):
 
     def get_published_paginated(self, page: int, per_page: int):
         try:
-            return Article.objects(is_published=True).order_by("-publication_date").paginate(
-                page=page, per_page=per_page
-            )
+            return Article.objects(is_published=True)\
+                .only('title', 'summary', 'slug', 'publication_date')\
+                .order_by("-publication_date")\
+                .paginate(page=page, per_page=per_page)
         except PyMongoError as e:
             raise DatabaseConnectionException(f"Database error while fetching paginated published articles: {e}") from e
 

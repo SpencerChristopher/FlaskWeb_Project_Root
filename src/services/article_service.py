@@ -64,7 +64,7 @@ class ArticleService:
             "summary": article.summary or "",
             "slug": article.slug,
             "publication_date": (
-                article.publication_date.strftime("%Y-%m-%d")
+                article.publication_date.isoformat()
                 if article.publication_date
                 else None
             ),

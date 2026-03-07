@@ -20,6 +20,8 @@ const consentState = {
 
 // Cache for bootstrap data to prevent double-fetching on first paint
 let bootstrapCache = null;
+// Cache for article metadata from the list view
+const articleCache = new Map();
 
 // --- DOM Element Cache ---
 const mainNavList = document.getElementById('mainNavList');
@@ -203,7 +205,16 @@ async function startApp(allowAuth) {
 const ROUTES = {
     '/': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/home': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
-    '/blog': { view: ArticleListView, fetch: () => fetchAPI('/api/blog') },
+    '/blog': { 
+        view: ArticleListView, 
+        fetch: async () => {
+            const data = await fetchAPI('/api/blog');
+            if (data?.posts) {
+                data.posts.forEach(p => articleCache.set(p.slug, p));
+            }
+            return data;
+        } 
+    },
     '/login': { view: LoginView, auth: true },
     '/admin/profile': { view: ProfileView, auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/admin/articles': { view: ContentManagerView, auth: true },
@@ -239,7 +250,22 @@ async function router() {
 
         if (!route && path.startsWith('/blog/')) {
             const slug = path.replace('/blog/', '');
-            route = { view: ArticleDetailView, fetch: () => fetchAPI(`/api/blog/${slug}`) };
+            // Check cache for metadata, but we still need the full content if not cached or if cache is partial
+            const cached = articleCache.get(slug);
+            route = { 
+                view: ArticleDetailView, 
+                fetch: async () => {
+                    const full = await fetchAPI(`/api/blog/${slug}`);
+                    articleCache.set(slug, full); // Upgrade cache to full content
+                    return full;
+                } 
+            };
+            
+            // If we have a cached version with content, use it immediately
+            if (cached && cached.content) {
+                data = cached;
+                route.fetch = null; // Skip fetch
+            }
         }
 
         if (!route) {
