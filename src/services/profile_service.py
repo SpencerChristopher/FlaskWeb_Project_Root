@@ -97,10 +97,11 @@ class ProfileService:
             last_updated=profile.last_updated.isoformat() if profile.last_updated else None
         )
 
-    def update_profile(self, profile_data: ProfileSchema) -> ProfilePublic:
+    def update_profile(self, profile_data: ProfileSchema, user: UserIdentity) -> ProfilePublic:
         """
         Updates the singleton profile. Creates it if it doesn't exist.
         """
+        from flask import current_app
         profile = self._profile_repository.get_profile()
         
         work_history_models = self._map_dto_to_work_history_model(profile_data.work_history)
@@ -136,14 +137,16 @@ class ProfileService:
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)
+        current_app.logger.info(f"Developer profile updated by user: {user.username} (ID: {user.id})")
         
         return self.get_profile() # Returns the hydrated Public DTO
 
-    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str) -> str:
+    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str, user: UserIdentity) -> str:
         """
         Specialized method to replace the existing profile photo with a new one.
         Ensures only one photo exists by deleting the previous file.
         """
+        from flask import current_app
         profile_doc = self._profile_repository.get_profile()
         
         # 1. Cleanup old photo if it exists
@@ -166,4 +169,5 @@ class ProfileService:
             profile_doc.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         self._profile_repository.save(profile_doc)
+        current_app.logger.info(f"Profile photo replaced by user: {user.username} (ID: {user.id}). URL: {new_url}")
         return new_url

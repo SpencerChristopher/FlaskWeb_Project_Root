@@ -68,25 +68,23 @@ def delete_article(article_id: str) -> Response:
     article_service.delete_article(article_id, g.current_user)
     return jsonify({"message": "Article deleted successfully"}), 200
 
-@bp.route('/profile', methods=['GET', 'PUT'])
+@bp.route('/profile', methods=['GET'])
+def get_profile() -> Response:
+    """Retrieves the developer profile singleton."""
+    profile = profile_service.get_profile()
+    return jsonify(profile.model_dump()), 200
+
+@bp.route('/profile', methods=['PUT'])
+@permission_required([Permissions.PROFILE_MANAGE])
 def update_profile() -> Response:
     """Updates the developer profile singleton."""
-    if request.method == 'GET':
-        profile = profile_service.get_profile()
-        return jsonify(profile.model_dump()), 200
+    data = request.get_json()
+    if not data:
+        raise BadRequestException("Invalid JSON payload")
     
-    # PUT requires profile:manage
-    @permission_required([Permissions.PROFILE_MANAGE])
-    def do_update():
-        data = request.get_json()
-        if not data:
-            raise BadRequestException("Invalid JSON payload")
-        
-        profile_data = ProfileSchema(**data)
-        updated_profile = profile_service.update_profile(profile_data)
-        return jsonify(updated_profile.model_dump()), 200
-    
-    return do_update()
+    profile_data = ProfileSchema(**data)
+    updated_profile = profile_service.update_profile(profile_data, g.current_user)
+    return jsonify(updated_profile.model_dump()), 200
 
 @bp.route('/profile/photo', methods=['POST'])
 @permission_required([Permissions.PROFILE_MANAGE])
@@ -100,7 +98,7 @@ def upload_profile_photo() -> Response:
         raise BadRequestException("No selected file.")
 
     try:
-        url = profile_service.update_profile_photo(file.stream, file.filename)
+        url = profile_service.update_profile_photo(file.stream, file.filename, g.current_user)
         return jsonify({
             "url": url, 
             "message": "Profile photo replaced successfully. Old file deleted."
