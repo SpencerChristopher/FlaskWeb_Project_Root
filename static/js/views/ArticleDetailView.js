@@ -1,5 +1,5 @@
 export const ArticleDetailView = {
-    template(article) {
+    template(article, auth) {
         const data = article || {};
         const published = data.publication_date
             ? new Date(data.publication_date).toLocaleDateString()

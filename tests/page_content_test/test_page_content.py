@@ -24,8 +24,8 @@ def test_navigation_links_are_present_in_base_html(client):
     html = response.data.decode('utf-8')
 
     # Check for the navigation links that the SPA router depends on
-    assert 'href="#home"' in html
-    assert 'href="#about"' in html
-    assert 'href="#blog"' in html
-    assert 'href="#contact"' in html
-    assert 'href="#license"' in html
+    assert 'href="/home"' in html
+    assert 'href="/blog"' in html
+    assert 'href="/license"' in html
+    assert 'href="/about"' in html
+    assert 'href="/contact"' in html

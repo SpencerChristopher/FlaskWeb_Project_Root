@@ -4,7 +4,7 @@
  */
 
 export const ContentManagerView = {
-    template() {
+    template(data, auth) {
         return `
             <section id="view-content-manager" class="py-5" data-test="view-content-manager">
                 <div class="container px-5">

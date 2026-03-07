@@ -4,7 +4,7 @@
  */
 
 export const ArticleListView = {
-    template(data) {
+    template(data, auth) {
         const articles = data?.posts || [];
         return `
             <section id="view-articles" class="py-5" data-test="view-articles">
