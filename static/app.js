@@ -28,10 +28,12 @@ auth.subscribe((user, loggedIn) => {
     console.info("Auth state changed. Updating UI...", { loggedIn });
     updateNavUI();
     
-    // If we are on the Home page, we should re-render to update Hero buttons
-    if (window.location.pathname === '/' || window.location.pathname === '/home') {
-        // Only re-route if we are already initialized to avoid double-routing on start
-        if (consentState.decided) router();
+    // Only re-route if we are already fully initialized AND on the home page.
+    // This prevents jitter where startApp() and the observer both trigger router().
+    const isHomePage = window.location.pathname === '/' || window.location.pathname === '/home';
+    if (isHomePage && consentState.decided && !consentState.initializing) {
+        console.debug("Home page auth change detected. Refreshing view...");
+        router();
     }
 });
 
@@ -171,17 +173,25 @@ async function handleLogin(e) {
     } catch (err) { alert(err.message); }
 }
 
-function startApp(allowAuth) {
-    consentState.decided = true;
+async function startApp(allowAuth) {
+    consentState.initializing = true;
     consentState.allowsAuth = allowAuth;
+    
     if (allowAuth) {
-        auth.checkStatus().then(router);
+        try {
+            await auth.checkStatus();
+        } catch (err) {
+            console.warn("Initial auth check failed, continuing as guest.");
+        }
     } else {
         auth.user = null;
         auth._loggedIn = false;
         auth.notify();
-        router();
     }
+    
+    consentState.decided = true;
+    consentState.initializing = false;
+    router(); // Single entry point for routing on startup
 }
 
 // --- Router Registry ---
