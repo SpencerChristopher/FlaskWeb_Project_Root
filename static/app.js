@@ -57,12 +57,44 @@ async function fetchAPI(url, options = {}) {
 
     try {
         const response = await fetch(url, options);
-        if (!response.ok) {
-            if ((response.status === 401 || response.status === 403) && !options.suppressAuthRedirect) {
-                console.warn('Authentication error:', response.status);
-                handleLogout(null, true);
-                throw new Error('Authentication required.');
+
+        // --- Auth Interceptor ---
+        if (response.status === 401 && !headers['X-Is-Retry'] && !url.includes('/api/auth/refresh')) {
+            console.warn('Session expired, attempting silent refresh...');
+            try {
+                // Perform refresh via raw fetch to avoid recursion
+                // Must include credentials for cookies and the REFRESH CSRF token
+                const refreshRes = await fetch('/api/auth/refresh', { 
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'X-CSRF-TOKEN': getCookie('csrf_refresh_token') }
+                });
+                
+                if (refreshRes.ok) {
+                    console.info('Refresh successful, retrying original request.');
+                    // Merge X-Is-Retry into the original headers
+                    options.headers = { ...headers, 'X-Is-Retry': 'true' };
+                    const retryResult = await fetchAPI(url, options);
+                    console.info('Retry successful.');
+                    return retryResult;
+                }
+            } catch (refreshErr) {
+                console.error('Silent refresh failed:', refreshErr);
             }
+            // If refresh fails or returns non-OK, logout and throw
+            handleLogout(null, true);
+            throw new Error('Session expired. Please login again.');
+        }
+
+        if (!response.ok) {
+            // For 403 (Forbidden), we stay on the page and just throw the error for the view to handle
+            if (response.status === 403) {
+                const errorData = await response.json().catch(() => ({ message: 'Forbidden' }));
+                const error = new Error(errorData.message || 'Access Denied');
+                error.status = 403;
+                throw error;
+            }
+
             const errorData = await response.json().catch(() => ({ message: response.statusText }));
             const error = new Error(errorData.message || `Error ${response.status}`);
             error.status = response.status;

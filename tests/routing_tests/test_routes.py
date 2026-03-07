@@ -46,3 +46,26 @@ def test_change_password_route_is_unauthorized_without_login(client):
     data = response.get_json()
     assert data['error_code'] == 'UNAUTHORIZED'
     assert data['message'] == 'Missing or invalid token.'
+
+# --- New Path-based Routing "Gate" Tests ---
+
+def test_root_returns_spa_shell(client):
+    """Verifies the root returns the SPA shell (base.html)."""
+    response = client.get('/')
+    assert response.status_code == 200
+    assert b'<!DOCTYPE html>' in response.data
+    assert b'id="main-content"' in response.data
+
+def test_catch_all_returns_spa_shell(client):
+    """Verifies any non-API path returns the SPA shell (History API Support)."""
+    # This should return base.html, NOT a 404.
+    response = client.get('/admin/profile')
+    assert response.status_code == 200
+    assert b'<!DOCTYPE html>' in response.data
+    assert b'id="main-content"' in response.data
+
+def test_catch_all_blog_returns_spa_shell(client):
+    """Verifies blog slugs return the SPA shell."""
+    response = client.get('/blog/my-test-article')
+    assert response.status_code == 200
+    assert b'<!DOCTYPE html>' in response.data
