@@ -239,8 +239,13 @@ export const ProfileView = {
      * Binds event listeners for the profile view.
      */
     mount: (context) => {
+        console.log("ProfileView Mount Called");
         const fetchAPI = context.api;
         const form = document.getElementById('profileForm');
+        if (!form) {
+            console.error("Profile form not found in DOM!");
+            return;
+        }
         const uploadBtn = document.getElementById('p-upload');
         const addSocialBtn = document.getElementById('add-social-link');
         const socialContainer = document.getElementById('social-links-container');
