@@ -1,3 +1,5 @@
+import { ComponentFactory } from '../components/ComponentFactory.js';
+
 const socialLabelMap = {
     github: "GH",
     linkedin: "IN",
@@ -124,39 +126,14 @@ export const HomeView = {
                         </div>
                         <div class="row justify-content-center">
                             <div class="col-12">
-                                ${workItems
-                                    .map((w, idx) => `
-                                        <article class="exp-card card mb-4 border-0 shadow-sm bg-white" data-test="work-card-${idx}">
-                                            <div class="card-body p-4 p-md-5">
-                                                <header class="mb-3">
-                                                    <h3 class="fw-bolder mb-1" style="color: var(--text);">${w.role || ""}</h3>
-                                                    <div class="text-primary fw-bold mb-2 fs-5">${w.company || ""}</div>
-                                                    
-                                                    <div class="text-muted d-flex flex-wrap gap-3 small fw-bold text-uppercase">
-                                                        <span class="d-flex align-items-center gap-1">
-                                                            📅 ${w.start_date || ""} — ${w.end_date || ""}
-                                                        </span>
-                                                        <span class="d-flex align-items-center gap-1">
-                                                            📍 ${w.location || ""}
-                                                        </span>
-                                                    </div>
-                                                </header>
-
-                                                <div class="bio mb-4 text-muted">
-                                                    ${w.description ? `<p class="mb-0">${w.description}</p>` : ""}
-                                                </div>
-
-                                                <footer class="mt-auto">
-                                                    ${Array.isArray(w.skills) && w.skills.length ? `
-                                                        <div class="tags">
-                                                            ${w.skills.map((s, i) => `<span class="tag ${i % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
-                                                        </div>
-                                                    ` : ""}
-                                                </footer>
-                                            </div>
-                                        </article>
-                                    `)
-                                    .join("")}
+                                ${workItems.map((w, idx) => ComponentFactory.createCard({
+                                    title: w.role || "",
+                                    subtitle: w.company || "",
+                                    meta: `📅 ${w.start_date || ""} — ${w.end_date || ""} &nbsp;&bull;&nbsp; 📍 ${w.location || ""}`,
+                                    body: w.description ? `<p class="mb-0">${w.description}</p>` : "",
+                                    tags: Array.isArray(w.skills) ? w.skills : [],
+                                    dataTest: `work-card-${idx}`
+                                })).join("")}
                             </div>
                         </div>
                     </div>

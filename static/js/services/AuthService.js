@@ -1,7 +1,6 @@
 /**
  * AuthService.js
- * Abstracts authentication logic away from the main application and views.
- * Ready for future pivot to OAuth/SSO.
+ * Abstracts authentication logic and acts as an OBSERVABLE for UI state.
  */
 
 export class AuthService {
@@ -9,6 +8,7 @@ export class AuthService {
         this.api = api;
         this.user = null;
         this._loggedIn = false;
+        this.listeners = []; // Observer pattern listeners
     }
 
     get loggedIn() {
@@ -20,43 +20,52 @@ export class AuthService {
     }
 
     /**
-     * Checks the current authentication status with the server.
+     * Observer Pattern: Subscribe to auth state changes.
      */
+    subscribe(callback) {
+        this.listeners.push(callback);
+        // Immediate call with current state
+        callback(this.user, this.loggedIn);
+        return () => {
+            this.listeners = this.listeners.filter(l => l !== callback);
+        };
+    }
+
+    /**
+     * Notify all observers of a state change.
+     */
+    notify() {
+        this.listeners.forEach(callback => callback(this.user, this.loggedIn));
+    }
+
     async checkStatus() {
         try {
-            // Using suppressAuthRedirect: true to prevent infinite loops in fetchAPI
             const status = await this.api('/api/auth/status', { suppressAuthRedirect: true });
-            this.loggedIn = status.logged_in;
+            this._loggedIn = status.logged_in;
             this.user = status.user || null;
+            this.notify(); // State changed
             return status;
         } catch (err) {
-            this.loggedIn = false;
+            this._loggedIn = false;
             this.user = null;
+            this.notify();
             throw err;
         }
     }
 
-    /**
-     * Authenticates a user with username and password.
-     */
     async login(username, password) {
         const body = JSON.stringify({ username, password });
         await this.api('/api/auth/login', { method: 'POST', body });
-        return await this.checkStatus();
+        return await this.checkStatus(); // checkStatus triggers notify()
     }
 
-    /**
-     * Terminates the current session.
-     */
     async logout() {
         await this.api('/api/auth/logout', { method: 'POST' }).catch(() => {});
-        this.loggedIn = false;
+        this._loggedIn = false;
         this.user = null;
+        this.notify(); // State changed
     }
 
-    /**
-     * Checks if the user has a specific permission.
-     */
     hasPermission(permission) {
         if (!this.loggedIn || !this.user) return false;
         const caps = this.user.capabilities || [];

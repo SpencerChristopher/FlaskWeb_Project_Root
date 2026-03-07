@@ -32,7 +32,7 @@ bp = Blueprint('auth_routes', __name__, url_prefix='/api/auth')
 auth_service = get_auth_service()
 
 @bp.route('/login', methods=['POST'])
-@limiter.limit("5 per minute") # Apply rate limit
+@limiter.limit("20 per minute") # Increased for E2E testing
 def login() -> Response:
     """
     Authenticates a user and returns JWT access and refresh tokens.

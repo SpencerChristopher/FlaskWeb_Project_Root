@@ -1,4 +1,4 @@
-// app.js - Modern SPA Core with History API and AuthService
+// app.js - Modern SPA Core with Design Patterns
 import { ProfileView } from './js/views/ProfileView.js';
 import { HomeView } from './js/views/HomeView.js';
 import { ArticleListView } from './js/views/ArticleListView.js';
@@ -7,10 +7,11 @@ import { LoginView } from './js/views/LoginView.js';
 import { ContentManagerView } from './js/views/ContentManagerView.js';
 import { AuthService } from './js/services/AuthService.js';
 
-console.log("App.js Module Loaded - initializing with AuthService...");
+console.log("App.js Module Loaded - initializing with Patterns...");
 
-// --- Application State ---
+// --- Application State (Observable) ---
 const auth = new AuthService(fetchAPI);
+
 const consentState = {
     decided: false,
     allowsAuth: false
@@ -20,6 +21,19 @@ const consentState = {
 const mainNavList = document.getElementById('mainNavList');
 const navToggle = document.getElementById('navToggle');
 const mainContentElement = document.getElementById('main-content');
+
+// --- Observer Subscription ---
+// Automatically update navigation whenever auth state changes.
+auth.subscribe((user, loggedIn) => {
+    console.info("Auth state changed. Updating UI...", { loggedIn });
+    updateNavUI();
+    
+    // If we are on the Home page, we should re-render to update Hero buttons
+    if (window.location.pathname === '/' || window.location.pathname === '/home') {
+        // Only re-route if we are already initialized to avoid double-routing on start
+        if (consentState.decided) router();
+    }
+});
 
 // --- Helper Functions ---
 function getCookie(name) {
@@ -55,7 +69,6 @@ async function fetchAPI(url, options = {}) {
     try {
         const response = await fetch(url, options);
 
-        // --- Auth Interceptor ---
         if (response.status === 401 && !headers['X-Is-Retry'] && !url.includes('/api/auth/refresh')) {
             console.warn('Session expired, attempting silent refresh...');
             try {
@@ -73,7 +86,7 @@ async function fetchAPI(url, options = {}) {
             } catch (refreshErr) {
                 console.error('Silent refresh failed:', refreshErr);
             }
-            handleLogout(null, true);
+            auth.logout(); // Use service to notify listeners
             throw new Error('Session expired. Please login again.');
         }
 
@@ -122,7 +135,7 @@ function updateNavUI() {
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/admin/articles">Manage Articles</a></li>');
         }
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="javascript:void(0)">Logout</a></li>');
-        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
+        document.getElementById('logout-btn')?.addEventListener('click', () => auth.logout().then(() => navigate('/home')));
     } else if (consentState.allowsAuth) {
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/login">Admin</a></li>');
     }
@@ -135,68 +148,38 @@ if (navToggle && mainNavList) {
     });
 }
 
-// Handle all internal link clicks (Link Hijacking)
 document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link && link.href && link.origin === window.location.origin && !link.hasAttribute('target')) {
         const href = link.getAttribute('href');
-        
-        // Ignore fragment-only links (e.g. #page-top) or same-page hashes
-        if (href && (href.startsWith('#') || href.includes('#'))) {
-            return; // Let default browser behavior handle anchor scrolling
-        }
+        if (href && (href.startsWith('#') || href.includes('#'))) return;
 
         const path = link.pathname;
         if (!path.startsWith('/api/') && !path.startsWith('/static/')) {
             e.preventDefault();
-            // Only navigate if it's a different path to avoid redundant fetches
-            if (path !== window.location.pathname) {
-                navigate(path);
-            }
+            if (path !== window.location.pathname) navigate(path);
         }
     }
 });
-
-async function handleLogout(e, force=false) {
-    if (e) e.preventDefault();
-    if (!force) await auth.logout();
-    auth.loggedIn = false;
-    auth.user = null;
-    updateNavUI();
-    navigate('/home');
-}
 
 async function handleLogin(e) {
     e.preventDefault();
     const [u, p] = [document.getElementById('username').value, document.getElementById('password').value];
     try {
-        await auth.login(u, p);
-        updateNavUI();
+        await auth.login(u, p); // Observer triggers re-render/nav-update
         navigate('/home');
     } catch (err) { alert(err.message); }
-}
-
-async function initializeApp() {
-    try {
-        await auth.checkStatus();
-        updateNavUI();
-    } catch (err) {
-        updateNavUI();
-    }
 }
 
 function startApp(allowAuth) {
     consentState.decided = true;
     consentState.allowsAuth = allowAuth;
     if (allowAuth) {
-        // Initialize state then trigger the initial route
-        initializeApp().then(() => {
-            router();
-        });
+        auth.checkStatus().then(router);
     } else {
-        auth.loggedIn = false;
         auth.user = null;
-        updateNavUI();
+        auth._loggedIn = false;
+        auth.notify();
         router();
     }
 }
@@ -221,23 +204,15 @@ function navigate(path) {
 
 async function router() {
     const path = window.location.pathname;
-    console.log("Routing to path:", path);
-    
     if (currentViewCleanup) {
         currentViewCleanup();
         currentViewCleanup = null;
     }
 
     const controller = new AbortController();
-    const viewContext = {
-        api: fetchAPI,
-        auth: auth, // Passing the full auth service
-        navigate,
-        signal: controller.signal,
-    };
+    const viewContext = { api: fetchAPI, auth: auth, navigate, signal: controller.signal };
     currentViewCleanup = () => controller.abort();
 
-    // Close mobile nav on route change
     if (mainNavList) {
         mainNavList.classList.remove('is-open');
         navToggle?.setAttribute('aria-expanded', 'false');
@@ -247,19 +222,18 @@ async function router() {
         let route = ROUTES[path];
         let data = null;
 
-        // Dynamic Match for Blog Slugs
         if (!route && path.startsWith('/blog/')) {
             const slug = path.replace('/blog/', '');
             route = { view: ArticleDetailView, fetch: () => fetchAPI(`/api/blog/${slug}`) };
         }
 
         if (!route) {
-            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>404 - Not Found</h3><p>The page you are looking for does not exist.</p></div>`;
+            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>404 - Not Found</h3></div>`;
             return;
         }
 
         if (route.auth && !consentState.allowsAuth) {
-            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access this feature.</p></div>`;
+            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3></div>`;
             return;
         }
 
@@ -268,7 +242,6 @@ async function router() {
             data = await route.fetch();
         }
 
-        // Pass auth state to templates for permission-aware rendering
         mainContentElement.innerHTML = route.view.template(data, auth);
         route.view.mount?.(viewContext, route.view === LoginView ? handleLogin : undefined);
 
@@ -278,7 +251,6 @@ async function router() {
     }
 }
 
-// --- Initialization ---
 window.addEventListener('popstate', router);
 
 // --- Cookie Consent ---
@@ -286,45 +258,30 @@ const consentKey = 'cookie_consent';
 const dialog = document.getElementById('cookie-dialog');
 const storageAvailable = (() => {
     try {
-        const testKey = '__consent_test__';
-        localStorage.setItem(testKey, '1');
-        localStorage.removeItem(testKey);
+        localStorage.setItem('__test__', '1');
+        localStorage.removeItem('__test__');
         return true;
-    } catch (err) { return false; }
+    } catch (e) { return false; }
 })();
 
 const existingConsent = storageAvailable ? localStorage.getItem(consentKey) : null;
-let consentHandlersBound = false;
-
-function bindConsentHandlers() {
-    if (!dialog || consentHandlersBound) return;
+if (existingConsent === 'accepted') startApp(true);
+else if (existingConsent === 'declined') startApp(false);
+else if (dialog) {
     document.getElementById('cookie-accept')?.addEventListener('click', () => {
         if (storageAvailable) localStorage.setItem(consentKey, 'accepted');
         dialog.close();
-        document.body.style.overflow = '';
         startApp(true);
     });
     document.getElementById('cookie-decline')?.addEventListener('click', () => {
         if (storageAvailable) localStorage.setItem(consentKey, 'declined');
         dialog.close();
-        document.body.style.overflow = '';
         startApp(false);
     });
-    consentHandlersBound = true;
-}
-
-if (existingConsent === 'accepted') startApp(true);
-else if (existingConsent === 'declined') startApp(false);
-else if (dialog) {
-    bindConsentHandlers();
     dialog.showModal();
-    document.body.style.overflow = 'hidden';
 }
 
 document.getElementById('manage-cookies')?.addEventListener('click', (e) => {
     e.preventDefault();
-    if (!dialog) return;
-    bindConsentHandlers();
-    dialog.showModal();
-    document.body.style.overflow = 'hidden';
+    dialog?.showModal();
 });
