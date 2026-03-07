@@ -20,7 +20,7 @@ def test_article_lifecycle_admin(page: Page):
 
     # 1. Login
     page.set_viewport_size({"width": 1440, "height": 900})
-    page.goto(f"{base_url}#login")
+    page.goto(f"{base_url}/login")
     
     # Accept cookies
     accept_btn = page.locator("[data-test='cookie-accept']")
@@ -82,11 +82,11 @@ def test_article_lifecycle_admin(page: Page):
     expect(page.locator(f"tr:has-text('{title}') .badge")).to_have_text("Published")
     
     # 5. Verify on Public Blog
-    page.goto(f"{base_url}#blog")
+    page.goto(f"{base_url}/blog")
     expect(page.locator(f"h3:has-text('{title}')")).to_be_visible()
     
     # 6. Delete Article
-    page.goto(f"{base_url}#admin/articles")
+    page.goto(f"{base_url}/admin/articles")
     page.wait_for_selector(f"tr:has-text('{title}')")
     
     # Handle delete confirmation

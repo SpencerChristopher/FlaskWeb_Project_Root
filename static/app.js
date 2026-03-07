@@ -1,19 +1,16 @@
-// app.js - Modular SPA Core
+// app.js - Modern SPA Core with History API and AuthService
 import { ProfileView } from './js/views/ProfileView.js';
 import { HomeView } from './js/views/HomeView.js';
 import { ArticleListView } from './js/views/ArticleListView.js';
 import { ArticleDetailView } from './js/views/ArticleDetailView.js';
 import { LoginView } from './js/views/LoginView.js';
 import { ContentManagerView } from './js/views/ContentManagerView.js';
+import { AuthService } from './js/services/AuthService.js';
 
-console.log("App.js Module Loaded - initializing...");
+console.log("App.js Module Loaded - initializing with AuthService...");
 
 // --- Application State ---
-const userState = {
-    loggedIn: false,
-    user: null
-};
-
+const auth = new AuthService(fetchAPI);
 const consentState = {
     decided: false,
     allowsAuth: false
@@ -62,8 +59,6 @@ async function fetchAPI(url, options = {}) {
         if (response.status === 401 && !headers['X-Is-Retry'] && !url.includes('/api/auth/refresh')) {
             console.warn('Session expired, attempting silent refresh...');
             try {
-                // Perform refresh via raw fetch to avoid recursion
-                // Must include credentials for cookies and the REFRESH CSRF token
                 const refreshRes = await fetch('/api/auth/refresh', { 
                     method: 'POST',
                     credentials: 'include',
@@ -72,29 +67,23 @@ async function fetchAPI(url, options = {}) {
                 
                 if (refreshRes.ok) {
                     console.info('Refresh successful, retrying original request.');
-                    // Merge X-Is-Retry into the original headers
                     options.headers = { ...headers, 'X-Is-Retry': 'true' };
-                    const retryResult = await fetchAPI(url, options);
-                    console.info('Retry successful.');
-                    return retryResult;
+                    return await fetchAPI(url, options);
                 }
             } catch (refreshErr) {
                 console.error('Silent refresh failed:', refreshErr);
             }
-            // If refresh fails or returns non-OK, logout and throw
             handleLogout(null, true);
             throw new Error('Session expired. Please login again.');
         }
 
         if (!response.ok) {
-            // For 403 (Forbidden), we stay on the page and just throw the error for the view to handle
             if (response.status === 403) {
                 const errorData = await response.json().catch(() => ({ message: 'Forbidden' }));
                 const error = new Error(errorData.message || 'Access Denied');
                 error.status = 403;
                 throw error;
             }
-
             const errorData = await response.json().catch(() => ({ message: response.statusText }));
             const error = new Error(errorData.message || `Error ${response.status}`);
             error.status = response.status;
@@ -123,18 +112,17 @@ function updateNavUI() {
     const authLinks = document.querySelectorAll('.auth-link');
     authLinks.forEach(el => el.parentElement.remove());
     
-    if (userState.loggedIn) {
-        const caps = userState.user.capabilities || [];
-        if (caps.includes('profile:manage')) {
-            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#admin/profile">Edit Profile</a></li>');
+    if (auth.loggedIn) {
+        if (auth.hasPermission('profile:manage')) {
+            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/admin/profile">Edit Profile</a></li>');
         }
-        if (caps.includes('content:manage')) {
-            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#admin/articles">Manage Articles</a></li>');
+        if (auth.hasPermission('content:manage')) {
+            mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/admin/articles">Manage Articles</a></li>');
         }
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="#">Logout</a></li>');
         document.getElementById('logout-btn').addEventListener('click', handleLogout);
     } else if (consentState.allowsAuth) {
-        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="#login">Admin</a></li>');
+        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/login">Admin</a></li>');
     }
 }
 
@@ -143,41 +131,44 @@ if (navToggle && mainNavList) {
         const isOpen = mainNavList.classList.toggle('is-open');
         navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     });
-    mainNavList.addEventListener('click', (e) => {
-        if (e.target.tagName === 'A') {
-            mainNavList.classList.remove('is-open');
-            navToggle.setAttribute('aria-expanded', 'false');
-        }
-    });
 }
+
+// Handle all internal link clicks (Link Hijacking)
+document.addEventListener('click', (e) => {
+    const link = e.target.closest('a');
+    if (link && link.href && link.origin === window.location.origin && !link.hasAttribute('target')) {
+        const path = link.pathname;
+        if (!path.startsWith('/api/') && !path.startsWith('/static/')) {
+            e.preventDefault();
+            navigate(path);
+        }
+    }
+});
 
 async function handleLogout(e, force=false) {
     if (e) e.preventDefault();
-    if (!force) await fetchAPI('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    userState.loggedIn = false;
-    userState.user = null;
+    if (!force) await auth.logout();
+    auth.loggedIn = false;
+    auth.user = null;
     updateNavUI();
-    window.location.hash = '#home';
+    navigate('/home');
 }
 
 async function handleLogin(e) {
     e.preventDefault();
     const [u, p] = [document.getElementById('username').value, document.getElementById('password').value];
     try {
-        await fetchAPI('/api/auth/login', { method: 'POST', body: JSON.stringify({username:u, password:p}) });
-        await initializeApp();
-        window.location.hash = '#home';
+        await auth.login(u, p);
+        updateNavUI();
+        navigate('/home');
     } catch (err) { alert(err.message); }
 }
 
 async function initializeApp() {
     try {
-        const status = await fetchAPI('/api/auth/status', { suppressAuthRedirect: true });
-        userState.loggedIn = status.logged_in;
-        userState.user = status.user;
+        await auth.checkStatus();
         updateNavUI();
     } catch (err) {
-        userState.loggedIn = false;
         updateNavUI();
     }
 }
@@ -188,17 +179,32 @@ function startApp(allowAuth) {
     if (allowAuth) {
         initializeApp().then(router);
     } else {
-        userState.loggedIn = false;
-        userState.user = null;
+        auth.loggedIn = false;
+        auth.user = null;
         updateNavUI();
         router();
     }
 }
 
-// --- Router ---
+// --- Router Registry ---
+const ROUTES = {
+    '/': { view: HomeView, fetch: () => fetchAPI('/api/content/profile') },
+    '/home': { view: HomeView, fetch: () => fetchAPI('/api/content/profile') },
+    '/blog': { view: ArticleListView, fetch: () => fetchAPI('/api/blog') },
+    '/login': { view: LoginView, auth: true },
+    '/admin/profile': { view: ProfileView, auth: true, fetch: () => fetchAPI('/api/content/profile') },
+    '/admin/articles': { view: ContentManagerView, auth: true },
+};
+
+function navigate(path) {
+    window.history.pushState({}, '', path);
+    router();
+}
+
 async function router() {
-    const hash = window.location.hash || '#home';
-    console.log("Routing to:", hash);
+    const path = window.location.pathname;
+    console.log("Routing to path:", path);
+    
     if (currentViewCleanup) {
         currentViewCleanup();
         currentViewCleanup = null;
@@ -207,53 +213,46 @@ async function router() {
     const controller = new AbortController();
     const viewContext = {
         api: fetchAPI,
-        userState,
-        navigate: (target) => { window.location.hash = target; },
+        auth: auth, // Passing the full auth service
+        navigate,
         signal: controller.signal,
     };
     currentViewCleanup = () => controller.abort();
 
+    // Close mobile nav on route change
+    if (mainNavList) {
+        mainNavList.classList.remove('is-open');
+        navToggle?.setAttribute('aria-expanded', 'false');
+    }
+
     try {
-        if (hash === '#home') {
-            mainContentElement.innerHTML = renderLoading();
-            const data = await fetchAPI('/api/content/profile');
-            mainContentElement.innerHTML = HomeView.template(data);
-            HomeView.mount?.(viewContext);
-        } else if (hash === '#blog') {
-            mainContentElement.innerHTML = renderLoading();
-            const data = await fetchAPI('/api/blog');
-            mainContentElement.innerHTML = ArticleListView.template(data);
-            ArticleListView.mount?.(viewContext);
-        } else if (hash === '#login') {
-            if (!consentState.allowsAuth) {
-                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
-                return;
-            }
-            mainContentElement.innerHTML = LoginView.template();
-            LoginView.mount?.(viewContext, handleLogin);
-        } else if (hash === '#admin/profile') {
-            if (!consentState.allowsAuth) {
-                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
-                return;
-            }
-            mainContentElement.innerHTML = renderLoading();
-            const data = await fetchAPI('/api/content/profile');
-            mainContentElement.innerHTML = ProfileView.template(data);
-            ProfileView.mount?.(viewContext);
-        } else if (hash === '#admin/articles') {
-            if (!consentState.allowsAuth) {
-                mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access admin features.</p></div>`;
-                return;
-            }
-            mainContentElement.innerHTML = ContentManagerView.template();
-            ContentManagerView.mount?.(viewContext);
-        } else if (hash.startsWith('#blog/')) {
-            const slug = hash.replace('#blog/', '');
-            mainContentElement.innerHTML = renderLoading();
-            const data = await fetchAPI(`/api/blog/${slug}`);
-            mainContentElement.innerHTML = ArticleDetailView.template(data);
-            ArticleDetailView.mount?.(viewContext);
+        let route = ROUTES[path];
+        let data = null;
+
+        // Dynamic Match for Blog Slugs
+        if (!route && path.startsWith('/blog/')) {
+            const slug = path.replace('/blog/', '');
+            route = { view: ArticleDetailView, fetch: () => fetchAPI(`/api/blog/${slug}`) };
         }
+
+        if (!route) {
+            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>404 - Not Found</h3><p>The page you are looking for does not exist.</p></div>`;
+            return;
+        }
+
+        if (route.auth && !consentState.allowsAuth) {
+            mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3><p>Please accept cookies to access this feature.</p></div>`;
+            return;
+        }
+
+        if (route.fetch) {
+            mainContentElement.innerHTML = renderLoading();
+            data = await route.fetch();
+        }
+
+        mainContentElement.innerHTML = route.view.template(data);
+        route.view.mount?.(viewContext, route.view === LoginView ? handleLogin : undefined);
+
     } catch (err) {
         console.error("Router error:", err);
         mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Page not available</h3><p>${err.message}</p></div>`;
@@ -261,9 +260,9 @@ async function router() {
 }
 
 // --- Initialization ---
-window.addEventListener('hashchange', router);
+window.addEventListener('popstate', router);
 
-// --- Cookie Consent (blocking overlay) ---
+// --- Cookie Consent ---
 const consentKey = 'cookie_consent';
 const dialog = document.getElementById('cookie-dialog');
 const storageAvailable = (() => {
@@ -272,65 +271,41 @@ const storageAvailable = (() => {
         localStorage.setItem(testKey, '1');
         localStorage.removeItem(testKey);
         return true;
-    } catch (err) {
-        return false;
-    }
+    } catch (err) { return false; }
 })();
+
 const existingConsent = storageAvailable ? localStorage.getItem(consentKey) : null;
-const manageCookiesLink = document.getElementById('manage-cookies');
 let consentHandlersBound = false;
 
 function bindConsentHandlers() {
     if (!dialog || consentHandlersBound) return;
-    const acceptBtn = document.getElementById('cookie-accept');
-    const declineBtn = document.getElementById('cookie-decline');
-    const message = document.getElementById('cookie-message');
-    if (acceptBtn) {
-        acceptBtn.addEventListener('click', () => {
-            if (storageAvailable) {
-                localStorage.setItem(consentKey, 'accepted');
-            }
-            dialog.close();
-            document.body.style.overflow = '';
-            startApp(true);
-        });
-    }
-    if (declineBtn) {
-        declineBtn.addEventListener('click', () => {
-            if (storageAvailable) {
-                localStorage.setItem(consentKey, 'declined');
-            }
-            if (message) {
-                message.textContent = 'Cookies declined. Admin features are disabled. You can still browse public content.';
-            }
-            dialog.close();
-            document.body.style.overflow = '';
-            startApp(false);
-        });
-    }
+    document.getElementById('cookie-accept')?.addEventListener('click', () => {
+        if (storageAvailable) localStorage.setItem(consentKey, 'accepted');
+        dialog.close();
+        document.body.style.overflow = '';
+        startApp(true);
+    });
+    document.getElementById('cookie-decline')?.addEventListener('click', () => {
+        if (storageAvailable) localStorage.setItem(consentKey, 'declined');
+        dialog.close();
+        document.body.style.overflow = '';
+        startApp(false);
+    });
     consentHandlersBound = true;
 }
 
-if (existingConsent === 'accepted') {
-    startApp(true);
-} else if (existingConsent === 'declined') {
-    startApp(false);
-} else if (dialog) {
+if (existingConsent === 'accepted') startApp(true);
+else if (existingConsent === 'declined') startApp(false);
+else if (dialog) {
     bindConsentHandlers();
     dialog.showModal();
     document.body.style.overflow = 'hidden';
 }
 
-if (manageCookiesLink) {
-    manageCookiesLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!dialog) return;
-        bindConsentHandlers();
-        const message = document.getElementById('cookie-message');
-        if (message) {
-            message.textContent = 'This site uses essential cookies for authentication and security. By continuing, you consent to these cookies.';
-        }
-        dialog.showModal();
-        document.body.style.overflow = 'hidden';
-    });
-}
+document.getElementById('manage-cookies')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!dialog) return;
+    bindConsentHandlers();
+    dialog.showModal();
+    document.body.style.overflow = 'hidden';
+});

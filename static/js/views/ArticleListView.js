@@ -25,7 +25,7 @@ export const ArticleListView = {
                                                 <header class="mb-3">
                                                     <div class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill mb-3 small fw-bold text-uppercase">Article</div>
                                                     <h3 class="fw-bolder mb-2" style="color: var(--text);">
-                                                        <a href="#blog/${a.slug}" class="text-decoration-none text-inherit stretched-link">${a.title}</a>
+                                                        <a href="/blog/${a.slug}" class="text-decoration-none text-inherit stretched-link">${a.title}</a>
                                                     </h3>
                                                     <div class="text-muted small fw-bold text-uppercase">
                                                         📅 ${a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft'}
