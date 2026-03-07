@@ -15,9 +15,18 @@ error_response_shape:
 endpoints:
   # --- Public Utility Routes ---
   - method: GET
+    path: /api/bootstrap
+    status: 200
+    description: Initial app load endpoint. Returns both public profile and current auth status.
+    body:
+      required_keys: [profile, auth]
+      profile_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
+      auth_keys: [logged_in, user]
+
+  - method: GET
     path: /api/home
     status: 200
-    description: Public landing page metadata.
+    description: Public landing page metadata (Now backed by ProfileService).
     body:
       keys: [title, tagline, button_text, button_link]
 
@@ -57,7 +66,7 @@ endpoints:
   - method: POST
     path: /api/auth/login
     status: 200
-    description: Login and receive JWT cookies (Rate-limited: 5/min).
+    description: Login and receive JWT cookies (Rate-limited: 20/min for testing stability).
     request_body:
       required: [username, password]
     body:
@@ -105,7 +114,7 @@ endpoints:
   - method: GET
     path: /api/blog
     status: 200
-    description: Paginated list of published articles (still returned as "posts" for legacy clients).
+    description: Paginated list of published articles. Dates are ISO-8601 strings.
     body:
       required_top_level_keys: [posts, pagination]
       post_item_keys: [title, summary, slug, publication_date]
@@ -114,7 +123,7 @@ endpoints:
   - method: GET
     path: /api/blog/{slug}
     status: 200
-    description: Full content of a single published article.
+    description: Full content of a single published article. Dates are ISO-8601 strings.
     body:
       required_keys: [id, title, slug, content, summary, author_id, author_username, publication_date, last_updated, is_published]
 
@@ -122,7 +131,7 @@ endpoints:
   - method: GET
     path: /api/content/profile
     status: 200
-    description: Publicly accessible developer profile.
+    description: Publicly accessible developer profile. Dates are ISO-8601 strings.
     body:
       required_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
 
@@ -183,3 +192,11 @@ endpoints:
     description: Upload generic media for blog articles.
     body:
       required_keys: [url, message]
+
+  - method: DELETE
+    path: /api/content/media
+    status: 200
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: Delete generic media via URL query parameter.
+    body:
+      required_keys: [message]
