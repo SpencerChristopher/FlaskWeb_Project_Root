@@ -125,6 +125,18 @@ body {
 .fw-light { font-weight: 300; }
 .small { font-size: 0.85rem; }
 
+/* Ensure high contrast for buttons on light backgrounds (A11y Fix) */
+.hero-card .btn-outline-primary {
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  border-width: 1px;
+}
+
+.hero-card .btn-outline-primary:hover {
+  background-color: var(--primary) !important;
+  color: white !important;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

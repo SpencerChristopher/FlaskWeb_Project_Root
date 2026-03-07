@@ -137,10 +137,20 @@ if (navToggle && mainNavList) {
 document.addEventListener('click', (e) => {
     const link = e.target.closest('a');
     if (link && link.href && link.origin === window.location.origin && !link.hasAttribute('target')) {
+        const href = link.getAttribute('href');
+        
+        // Ignore fragment-only links (e.g. #page-top) or same-page hashes
+        if (href && (href.startsWith('#') || href.includes('#'))) {
+            return; // Let default browser behavior handle anchor scrolling
+        }
+
         const path = link.pathname;
         if (!path.startsWith('/api/') && !path.startsWith('/static/')) {
             e.preventDefault();
-            navigate(path);
+            // Only navigate if it's a different path to avoid redundant fetches
+            if (path !== window.location.pathname) {
+                navigate(path);
+            }
         }
     }
 });
@@ -177,7 +187,10 @@ function startApp(allowAuth) {
     consentState.decided = true;
     consentState.allowsAuth = allowAuth;
     if (allowAuth) {
-        initializeApp().then(router);
+        // Initialize state then trigger the initial route
+        initializeApp().then(() => {
+            router();
+        });
     } else {
         auth.loggedIn = false;
         auth.user = null;
@@ -194,6 +207,9 @@ const ROUTES = {
     '/login': { view: LoginView, auth: true },
     '/admin/profile': { view: ProfileView, auth: true, fetch: () => fetchAPI('/api/content/profile') },
     '/admin/articles': { view: ContentManagerView, auth: true },
+    '/about': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p class="lead">${d.content}</p></div></section>` }, fetch: () => fetchAPI('/api/about') },
+    '/license': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p>${d.content}</p><hr><p class="small text-muted">${d.copyright}</p></div></section>` }, fetch: () => fetchAPI('/api/license') },
+    '/contact': { view: { template: () => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">Contact</h2><p>Coming soon...</p></div></section>` } },
 };
 
 function navigate(path) {
@@ -250,7 +266,8 @@ async function router() {
             data = await route.fetch();
         }
 
-        mainContentElement.innerHTML = route.view.template(data);
+        // Pass auth state to templates for permission-aware rendering
+        mainContentElement.innerHTML = route.view.template(data, auth);
         route.view.mount?.(viewContext, route.view === LoginView ? handleLogin : undefined);
 
     } catch (err) {

@@ -27,7 +27,7 @@ function renderSocialLinks(links = {}) {
 }
 
 export const ProfileView = {
-    template(data) {
+    template(data, auth) {
         const profile = data || {};
         const workHistory = profile.work_history || [];
 
