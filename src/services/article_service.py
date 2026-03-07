@@ -97,11 +97,8 @@ class ArticleService:
         if self._article_repository.get_by_slug(article_slug):
             raise ConflictException("An article with this title already exists")
 
-        # Resolve User model for reference
-        author_model = self._user_repository.get_by_id(user.id)
-        if not author_model:
-            raise UnauthorizedException("Authentication required or invalid credentials.")
-        
+        # Optimization: Use a lazy reference instead of a full DB fetch.
+        # MongoEngine allows assigning the ID string directly to a ReferenceField.
         from src.models.article import Article
         
         new_article = Article(
@@ -109,7 +106,7 @@ class ArticleService:
             slug=article_slug,
             content=article_dto.content,
             summary=article_dto.summary,
-            author=author_model,
+            author=user.id, # MongoEngine handles ID-to-Proxy assignment
             is_published=article_dto.is_published,
         )
         
@@ -125,7 +122,7 @@ class ArticleService:
             article_created,
             "article_service",
             article_id=str(created_article.id),
-            user_id=str(created_article.author.id),
+            user_id=user.id,
         )
         return created_article
 

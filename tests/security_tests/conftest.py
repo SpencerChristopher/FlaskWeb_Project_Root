@@ -87,12 +87,16 @@ def content_admin_headers(app, content_admin_user):
 
 
 @pytest.fixture
-def ops_admin_headers(app, ops_admin_user):
-    """Return headers for an ops user (now Member)."""
-    from src.services import get_auth_service
-    auth_service = get_auth_service()
-    access_token = create_access_token(
-        identity=str(ops_admin_user.id),
-        additional_claims=auth_service.build_token_claims(ops_admin_user),
-    )
-    return {"Authorization": f"Bearer {access_token}"}
+def admin_article(app, admin_user):
+    from src.models.article import Article
+    with app.app_context():
+        art = Article(
+            title="Admin Draft",
+            slug="admin-draft",
+            content="Content.",
+            summary="Summary.",
+            author=admin_user,
+            is_published=False,
+        ).save()
+        yield art
+        art.delete()

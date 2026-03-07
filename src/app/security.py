@@ -27,16 +27,26 @@ def permission_required(permission: str | list[str]) -> Callable:
         @jwt_required()
         def decorated_function(*args: Any, **kwargs: Any):
             from src.services import get_authz_service
+            from flask import request, current_app
             authz_service = get_authz_service()
             
             current_user_id = get_jwt_identity()
             current_user_claims = get_jwt()
 
-            # Enforce permission check via AuthzService
-            # Returns a lightweight UserIdentity DTO
-            g.current_user = authz_service.require_permission(
-                current_user_id, current_user_claims, permission
-            )
+            try:
+                # Enforce permission check via AuthzService
+                # Returns a lightweight UserIdentity DTO
+                g.current_user = authz_service.require_permission(
+                    current_user_id, current_user_claims, permission
+                )
+            except Exception as e:
+                # Audit the failure before letting the error handler take over
+                current_app.logger.warning(
+                    f"SECURITY ALERT: unauthorized {request.method} attempt on {request.path} "
+                    f"by User {current_user_id}. Reason: {str(e)}"
+                )
+                raise
+            
             return f(*args, **kwargs)
         return decorated_function
     return decorator
