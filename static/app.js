@@ -109,6 +109,8 @@ let currentViewCleanup = null;
 
 // --- UI Actions ---
 function updateNavUI() {
+    if (!mainNavList) return;
+    
     const authLinks = document.querySelectorAll('.auth-link');
     authLinks.forEach(el => el.parentElement.remove());
     
@@ -119,8 +121,8 @@ function updateNavUI() {
         if (auth.hasPermission('content:manage')) {
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/admin/articles">Manage Articles</a></li>');
         }
-        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="#">Logout</a></li>');
-        document.getElementById('logout-btn').addEventListener('click', handleLogout);
+        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="javascript:void(0)">Logout</a></li>');
+        document.getElementById('logout-btn')?.addEventListener('click', handleLogout);
     } else if (consentState.allowsAuth) {
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/login">Admin</a></li>');
     }

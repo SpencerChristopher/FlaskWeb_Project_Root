@@ -8,7 +8,15 @@ export class AuthService {
     constructor(api) {
         this.api = api;
         this.user = null;
-        this.loggedIn = false;
+        this._loggedIn = false;
+    }
+
+    get loggedIn() {
+        return !!(this._loggedIn && this.user);
+    }
+
+    set loggedIn(value) {
+        this._loggedIn = value;
     }
 
     /**
