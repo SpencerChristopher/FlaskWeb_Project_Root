@@ -36,14 +36,13 @@ class TestRateLimiting:
 
     def test_rate_limit_blocks_requests_beyond_limit(self, client):
         """Test that requests beyond the rate limit are blocked (429) for /api/auth/login."""
-        # Assuming a rate limit of 5 requests per minute on /api/auth/login
-        # This test should pass once rate limiting is correctly implemented
-        for _ in range(5):
+        # Current limit is 20 per minute for testing/E2E stability
+        for _ in range(20):
             client.post('/api/auth/login', json={'username': 'test', 'password': 'password'})
 
-        # The 6th request should be blocked
+        # The 21st request should be blocked
         response = client.post('/api/auth/login', json={'username': 'test', 'password': 'password'})
-        assert response.status_code == 429 # Expecting 429 Too Many Requests
+        assert response.status_code == 429
         data = response.get_json()
         assert data['error_code'] == 'TOO_MANY_REQUESTS'
         assert data['message'] == 'Too Many Requests'
@@ -104,11 +103,11 @@ class TestRateLimiting:
         user.save()
 
         # Make requests within the limit for this user
-        for _ in range(5): # Assuming 5 attempts per minute for login
+        for _ in range(20): 
             response = client.post('/api/auth/login', json={'username': username, 'password': password})
             assert response.status_code == 200 # Successful login
 
-        # The 6th request should be blocked
+        # The 21st request should be blocked
         response = client.post('/api/auth/login', json={'username': username, 'password': password})
         assert response.status_code == 429
         data = response.get_json()
