@@ -28,3 +28,8 @@
 8. Optimize Test Suite for CI/Pi:
    - Evaluate moving high-payload integration tests (Profile API, Media) to a post-deploy smoke suite.
    - Keep core CI lightweight to reduce log bloat and save resources on Raspberry Pi.
+9. Review Architectural Patterns for Multi-User Transition:
+   - Current state: Single-admin content model where the Admin is the only provider.
+   - Requirement: Future migration to "True User Access" (Comments, User-Generated Content).
+   - Task: Review Backend Singletons and Frontend Factory/Observer patterns to ensure they scale for multiple resource owners.
+   - Task: Solidify the "Comment Service" and "Resource Ownership" patterns before expanding the user base.
