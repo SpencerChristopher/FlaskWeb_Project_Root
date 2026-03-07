@@ -3,16 +3,21 @@ Profile service for managing the site owner's developer identity.
 Follows the 'Pydemic' style: accepting and returning Pydantic DTOs.
 """
 
-from __future__ import annotations
 import datetime
-from typing import TYPE_CHECKING
-
+import logging
 import re
+from typing import TYPE_CHECKING, BinaryIO
+
 from src.models.profile import Profile, WorkHistoryItem as WorkHistoryModel
 from src.repositories.interfaces import ProfileRepository
 from src.schemas import ProfilePublic, ProfileSchema, WorkHistoryItem as WorkHistorySchema
-from typing import BinaryIO
 from src.exceptions import BadRequestException
+
+if TYPE_CHECKING:
+    from src.services.media_service import MediaService
+    from src.schemas import UserIdentity
+
+logger = logging.getLogger(__name__)
 
 class ProfileService:
     """Application service for developer profile orchestration."""
@@ -97,11 +102,10 @@ class ProfileService:
             last_updated=profile.last_updated.isoformat() if profile.last_updated else None
         )
 
-    def update_profile(self, profile_data: ProfileSchema, user: UserIdentity) -> ProfilePublic:
+    def update_profile(self, profile_data: ProfileSchema, user: "UserIdentity") -> ProfilePublic:
         """
         Updates the singleton profile. Creates it if it doesn't exist.
         """
-        from flask import current_app
         profile = self._profile_repository.get_profile()
         
         work_history_models = self._map_dto_to_work_history_model(profile_data.work_history)
@@ -137,16 +141,15 @@ class ProfileService:
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)
-        current_app.logger.info(f"Developer profile updated by user: {user.username} (ID: {user.id})")
+        logger.info(f"Developer profile updated by user: {user.username} (ID: {user.id})")
         
         return self.get_profile() # Returns the hydrated Public DTO
 
-    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str, user: UserIdentity) -> str:
+    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str, user: "UserIdentity") -> str:
         """
         Specialized method to replace the existing profile photo with a new one.
         Ensures only one photo exists by deleting the previous file.
         """
-        from flask import current_app
         profile_doc = self._profile_repository.get_profile()
         
         # 1. Cleanup old photo if it exists
@@ -169,5 +172,5 @@ class ProfileService:
             profile_doc.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         self._profile_repository.save(profile_doc)
-        current_app.logger.info(f"Profile photo replaced by user: {user.username} (ID: {user.id}). URL: {new_url}")
+        logger.info(f"Profile photo replaced by user: {user.username} (ID: {user.id}). URL: {new_url}")
         return new_url
