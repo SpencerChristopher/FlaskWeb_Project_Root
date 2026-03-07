@@ -85,6 +85,12 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         _add_markers_by_path(item)
 
+@pytest.fixture
+def prod_base_url():
+    """Returns the live URL for smoke and performance testing."""
+    return os.environ.get("PROD_BASE_URL", "https://localhost")
+
+
 @pytest.fixture(scope='session', autouse=True)
 def database_connection_check():
     """

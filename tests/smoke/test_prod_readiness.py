@@ -9,10 +9,6 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # These tests are intended to run against a LIVE production/staging instance.
 # They verify that the 'Double Gate' and core infrastructure are operational.
 
-@pytest.fixture
-def prod_base_url():
-    return os.environ.get("PROD_BASE_URL", "https://localhost")
-
 class TestProdReadiness:
     """Smoke tests for production environments."""
 

@@ -5,6 +5,9 @@ import { ArticleListView } from './js/views/ArticleListView.js';
 import { ArticleDetailView } from './js/views/ArticleDetailView.js';
 import { LoginView } from './js/views/LoginView.js';
 import { ContentManagerView } from './js/views/ContentManagerView.js';
+import { AboutView } from './js/views/AboutView.js';
+import { LicenseView } from './js/views/LicenseView.js';
+import { ContactView } from './js/views/ContactView.js';
 import { AuthService } from './js/services/AuthService.js';
 
 console.log("App.js Module Loaded - initializing with Patterns...");
@@ -218,9 +221,9 @@ const ROUTES = {
     '/login': { view: LoginView, auth: true },
     '/admin/profile': { view: ProfileView, auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/admin/articles': { view: ContentManagerView, auth: true },
-    '/about': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p class="lead">${d.content}</p></div></section>` }, fetch: () => fetchAPI('/api/about') },
-    '/license': { view: { template: (d) => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">${d.title}</h2><p>${d.content}</p><hr><p class="small text-muted">${d.copyright}</p></div></section>` }, fetch: () => fetchAPI('/api/license') },
-    '/contact': { view: { template: () => `<section class="py-5"><div class="container px-5"><h2 class="fw-bolder">Contact</h2><p>Coming soon...</p></div></section>` } },
+    '/about': { view: AboutView, fetch: () => fetchAPI('/api/about') },
+    '/license': { view: LicenseView, fetch: () => fetchAPI('/api/license') },
+    '/contact': { view: ContactView },
 };
 
 function navigate(path) {
