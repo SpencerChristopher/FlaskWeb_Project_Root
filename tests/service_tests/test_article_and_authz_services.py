@@ -39,14 +39,18 @@ def test_article_service_list_published(app):
 
 
 def test_article_service_create_requires_valid_user(app):
-    article_service = get_article_service()
+    """
+    Verify that the system requires a valid user for article creation.
+    Note: ArticleService trusts the UserIdentity provided by AuthzService.
+    Verification of user existence happens in AuthzService.
+    """
+    from src.services import get_authz_service
+    authz_service = get_authz_service()
+    
     with app.app_context():
-        user_identity = UserIdentity(
-            id="65f0b4b4b4b4b4b4b4b4b4b4",
-            username="missing",
-            role="admin",
-            token_version=0,
-        )
-        dto = ArticleCreateUpdate(title="Orphan", content="C", summary="S", is_published=True)
+        user_id = "65f0b4b4b4b4b4b4b4b4b4b4"
+        user_claims = {"un": "missing", "roles": ["admin"], "tv": 0}
+        
+        # AuthzService should raise UnauthorizedException if the user doesn't exist in DB
         with pytest.raises(UnauthorizedException):
-            article_service.create_article(article_dto=dto, user=user_identity)
+            authz_service.require_permission(user_id, user_claims, "content:manage")

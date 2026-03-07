@@ -10,12 +10,12 @@ class TestAPIPerformance:
     Targets under 200ms for core endpoints to ensure 'snappy' feel.
     """
 
-    def test_bootstrap_latency(self):
+    def test_bootstrap_latency(self, prod_base_url):
         """
         Verify that the bootstrap endpoint (combined Auth + Profile) 
         responds within the performance budget.
         """
-        url = "https://127.0.0.1/api/bootstrap"
+        url = f"{prod_base_url}/api/bootstrap"
         
         # Measure 5 samples to get an average
         latencies = []
@@ -32,11 +32,11 @@ class TestAPIPerformance:
         # Threshold: 200ms for initial combined load
         assert avg_latency < 200, f"Bootstrap API too slow: {avg_latency:.2f}ms"
 
-    def test_blog_list_latency(self):
+    def test_blog_list_latency(self, prod_base_url):
         """
         Verify that the blog listing (paginated) responds efficiently.
         """
-        url = "https://127.0.0.1/api/blog?page=1&per_page=6"
+        url = f"{prod_base_url}/api/blog?page=1&per_page=6"
         
         start = time.perf_counter()
         resp = requests.get(url, verify=False)
