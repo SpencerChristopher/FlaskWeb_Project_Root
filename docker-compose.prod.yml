@@ -1,0 +1,26 @@
+services:
+  # The Cloudflare Tunnel connector
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared_tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      nginx:
+        condition: service_started
+    networks:
+      - default
+
+  # Production-specific overrides for Nginx
+  nginx:
+    # In production, we ensure Nginx is only reachable via the tunnel and local network
+    ports:
+      - "443:443"
+    environment:
+      - NGINX_HOST=${DOMAIN_NAME:-localhost}
+
+networks:
+  default:
+    name: flask_network
