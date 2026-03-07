@@ -233,6 +233,12 @@ function navigate(path) {
 
 async function router() {
     const path = window.location.pathname;
+    
+    // Reset Infinite Scroll state if we navigate AWAY from the blog
+    if (path !== '/blog' && !path.startsWith('/blog/')) {
+        ArticleListView.resetState?.();
+    }
+
     if (currentViewCleanup) {
         currentViewCleanup();
         currentViewCleanup = null;
