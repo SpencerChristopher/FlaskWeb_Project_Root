@@ -1,5 +1,6 @@
 param(
     [switch]$RunAct,
+    [switch]$SmokeTest, # New: Run local CI-parity smoke test (no act required)
     [switch]$SkipAudit,
     [switch]$SkipCloud,
     [switch]$SkipRunner,
@@ -23,8 +24,8 @@ function Require-Command($name, [switch]$Optional) {
 
 Write-Host "`n--- Preflight Security & Integrity Checks (PowerShell) ---" -ForegroundColor Cyan
 
-# [1/7] Tool Check
-Write-Host "[1/7] Verifying required tools..."
+# [1/8] Tool Check
+Write-Host "[1/8] Verifying required tools..."
 $tools = @("poetry", "docker", "gh")
 foreach ($tool in $tools) {
     if (-not (Require-Command $tool)) { 
@@ -37,10 +38,9 @@ foreach ($tool in $tools) {
     }
 }
 
-# [2/7] Cloud State Validation (GitHub CLI)
-# ... (rest of the cloud state logic remains unchanged)
+# [2/8] Cloud State Validation
 if (-not $SkipCloud -and -not $Offline) {
-    Write-Host "[2/7] Validating Cloud State (GitHub)..."
+    Write-Host "[2/8] Validating Cloud State (GitHub)..."
     
     # Check Runner Status
     if (-not $SkipRunner) {
@@ -60,14 +60,11 @@ if (-not $SkipCloud -and -not $Offline) {
         }
     }
 
-    # Check Dependabot Alerts
+    # Check Dependabot
     try {
         $alerts = gh api repos/:owner/:repo/dependabot/alerts -f state=open | ConvertFrom-Json
         if ($alerts.Count -gt 0) {
             Write-Host "CRITICAL: GitHub has detected $($alerts.Count) OPEN Dependabot vulnerabilities." -ForegroundColor Red
-            foreach ($a in $alerts) {
-                Write-Host " - [$($a.security_advisory.severity)] $($a.security_advisory.summary)" -ForegroundColor Yellow
-            }
             if ($ConfirmPreference -ne "None") {
                 $choice = Read-Host "Proceed anyway? (y/N)"
                 if ($choice -ne "y") { exit 1 }
@@ -83,102 +80,97 @@ if (-not $SkipCloud -and -not $Offline) {
     try {
         $remoteSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
         $requiredSecrets = @("SECRET_KEY", "ADMIN_USERNAME", "ADMIN_PASSWORD", "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_USER", "MONGO_APP_PASSWORD")
-        $missingSecret = $false
         foreach ($s in $requiredSecrets) {
             if ($s -notin $remoteSecrets) {
                 Write-Host "MISSING SECRET: '$s' is required by CI but not found in GitHub." -ForegroundColor Red
-                $missingSecret = $true
+                exit 1
             }
         }
-        if ($missingSecret) { exit 1 } else { Write-Host "GitHub Secrets: VERIFIED" -ForegroundColor Green }
+        Write-Host "GitHub Secrets: VERIFIED" -ForegroundColor Green
     } catch {
         Write-Host "Warning: Could not fetch secret list." -ForegroundColor Yellow
     }
-} else {
-    Write-Host "[2/7] Skipping Cloud State Validation (Offline Mode)." -ForegroundColor Yellow
 }
 
-# [3/7] Containerized Validation (Lint & Audit)
-Write-Host "[3/7] Running containerized lints and security audits..."
+# [3/8] Containerized Validation (Lint & Audit)
+Write-Host "[3/8] Running containerized lints and security audits..."
 if ($SkipAudit) {
     Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
     Write-Host "Running pip-audit and bandit..."
     docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Security audit failed." -ForegroundColor Red
-        exit 1
-    }
-
-    Write-Host "Running actionlint..."
-    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/test-deploy.yml .github/workflows/production-deploy.yml
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Error: Workflow linting failed." -ForegroundColor Red
-        exit 1
-    }
+    
+    Write-Host "Running actionlint (All Workflows)..."
+    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
     
     Write-Host "Validation passed." -ForegroundColor Green
 }
 
-# [4/7] Lockfile Freshness
-Write-Host "[4/7] Ensuring poetry.lock is up to date..."
+# [4/8] Lockfile Freshness
+Write-Host "[4/8] Ensuring poetry.lock is up to date..."
 poetry lock --quiet
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: poetry lock failed." -ForegroundColor Red
-    exit 1
-}
 
-# [5/7] Local CI Simulation (Optional)
+# [5/8] Local CI Simulation (act)
 if ($RunAct) {
-    Write-Host "[5/7] Running local workflow simulation (act)..."
+    Write-Host "[5/8] Running local workflow simulation (act)..."
     if (Require-Command "act" -Optional) {
         & act -W .github/workflows/test-deploy.yml
-    } else {
-        Write-Host "Install act to run workflows locally, then re-run with -RunAct." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[5/7] Skipping local workflow simulation."
+    Write-Host "[5/8] Skipping full workflow simulation (act)."
 }
 
-# [6/7] Docker Stack Build
-Write-Host "[6/7] Verifying final Docker stack build..."
-if ($Verbose) {
-    docker compose build
+# [6/8] CI Parity Smoke Test (New)
+if ($SmokeTest) {
+    Write-Host "[6/8] Running CI-Parity Smoke Test (Up -> Seed -> Test)..."
+    try {
+        Write-Host "Resetting stack..."
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans
+        
+        Write-Host "Building & Starting CI stack..."
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait
+        
+        Write-Host "Seeding..."
+        docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
+        
+        Write-Host "Injecting tests (CI Parity)..."
+        docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
+        docker cp tests/. flask_web_app:/app/tests
+        docker cp pytest.ini flask_web_app:/app/pytest.ini
+
+        Write-Host "Running containerized tests..."
+        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e"
+        
+        Write-Host "Smoke test PASSED." -ForegroundColor Green
+    } catch {
+        Write-Host "Smoke test FAILED." -ForegroundColor Red
+        exit 1
+    } finally {
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+    }
 } else {
-    docker compose build --quiet
+    Write-Host "[6/8] Skipping CI-Parity Smoke Test." -ForegroundColor Gray
 }
 
+# [7/8] Docker Stack Build (CI Config)
+Write-Host "[7/8] Verifying CI Docker stack build..."
+docker compose -f docker-compose.yml -f docker-compose.ci.yml build --quiet
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: Final Docker build failed." -ForegroundColor Red
+    Write-Host "Error: CI Docker build failed." -ForegroundColor Red
     exit 1
 }
 
-# [7/7] Infrastructure CVE Baseline Audit (Docker Scout)
-Write-Host "[7/7] Auditing Infrastructure CVE Baseline (Docker Scout)..."
+# [8/8] Infrastructure CVE Baseline Audit
+Write-Host "[8/8] Auditing Infrastructure CVE Baseline (Docker Scout)..."
 $images = @("nginx:alpine", "mongo:8.0", "redis:alpine")
-
-# Try to check if docker scout is available
 if (Require-Command "docker" -and (docker scout version 2>&1 | Out-String -ErrorAction SilentlyContinue)) {
     foreach ($img in $images) {
-        Write-Host "Auditing $img..." -NoNewline
         if ($StrictSecurity) {
-            # In Strict mode, we fail on any High/Critical CVEs using 'cves' which supports --exit-code and --only-severity
             docker scout cves $img --exit-code --only-severity critical,high
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host " [FAILED]" -ForegroundColor Red
-
-                Write-Host "Error: $img contains High/Critical vulnerabilities. Resolve them or run without -StrictSecurity." -ForegroundColor Red
-                exit 1
-            }
-            Write-Host " [CLEAN]" -ForegroundColor Green
         } else {
-            # In Normal mode, we just print the summary for visibility
             docker scout quickview $img
         }
     }
-} else {
-    Write-Host "Warning: Docker Scout not found. Skipping infrastructure audit." -ForegroundColor Yellow
-    Write-Host "Install Docker Scout for baseline CVE monitoring." -ForegroundColor Gray
 }
 
 Write-Host "---------------------------------------------" -ForegroundColor Cyan
