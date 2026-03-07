@@ -89,6 +89,12 @@ export const HomeView = {
                                             ${data.statement || ""}
                                         </div>
 
+                                        <div class="d-flex flex-wrap gap-2 mb-4">
+                                            <a class="btn btn-primary btn-sm px-4 rounded-pill shadow-sm" href="/admin/profile">Edit Profile</a>
+                                            <a class="btn btn-outline-dark btn-sm px-4 rounded-pill shadow-sm" href="/admin/articles">Manage Articles</a>
+                                            <a class="btn btn-outline-primary btn-sm px-4 rounded-pill shadow-sm" href="/blog">Technical Blog</a>
+                                        </div>
+
                                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 pt-2 border-top">
                                             ${skillTags.length ? `
                                                 <div class="tags" data-test="profile-skills">

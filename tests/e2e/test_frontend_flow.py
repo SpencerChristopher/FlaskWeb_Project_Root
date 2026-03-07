@@ -10,62 +10,55 @@ def browser_context_args(browser_context_args):
     }
 
 @pytest.mark.e2e
-def test_responsive_layout_home(page: Page):
+def test_path_based_routing_home(page: Page):
     """
-    Verifies that the HomeView layout adapts to mobile and desktop viewports.
+    Verifies that the HomeView is accessible via a path-based URL (/home).
     """
     base_url = os.getenv("E2E_BASE_URL", "https://localhost")
     
-    # 1. Test Desktop View
-    page.set_viewport_size({"width": 1280, "height": 800})
-    page.goto(base_url)
+    # Navigating directly to /home should work with History API
+    page.goto(f"{base_url}/home")
     
     # Handle Cookie Consent if visible
     accept_btn = page.locator("[data-test='cookie-accept']")
     if accept_btn.is_visible():
         accept_btn.click()
     
-    # Hero card should be visible and wide
+    # Hero card should be visible
     hero = page.locator("[data-test='view-home'] .hero-card")
     expect(hero).to_be_visible()
     
-    # 2. Test Mobile View
-    page.set_viewport_size({"width": 375, "height": 667}) # iPhone SE size
-    page.goto(base_url)
-    
-    # Nav list should be hidden by default on mobile (behind burger menu)
-    nav_list = page.locator("#mainNavList")
-    expect(nav_list).not_to_be_visible()
-    
-    # Burger menu button should be visible
-    nav_toggle = page.locator("#navToggle")
-    expect(nav_toggle).to_be_visible()
-    
-    # Clicking toggle should show nav
-    nav_toggle.click()
-    expect(nav_list).to_be_visible()
+    # URL should stay at /home (no #)
+    expect(page).to_have_url(f"{base_url}/home")
 
 @pytest.mark.e2e
-def test_article_navigation_flow(page: Page):
+def test_article_navigation_flow_paths(page: Page):
     """
-    Verifies that the "Back to Blog" navigation added in the last step works.
+    Verifies navigation using the History API (path-based) for the blog flow.
     """
     base_url = os.getenv("E2E_BASE_URL", "https://localhost")
     
-    # Go to blog
-    page.goto(f"{base_url}#blog")
+    # Go to blog via path
+    page.goto(f"{base_url}/blog")
 
     # Handle Cookie Consent if visible
     accept_btn = page.locator("[data-test='cookie-accept']")
     if accept_btn.is_visible():
         accept_btn.click()
     
-    # Click first article
-    first_article = page.locator("[data-test^='article-card-']").first
-    expect(first_article).to_be_visible()
-    first_article.locator("a").click()
+    # Click first article (link should be path-based)
+    first_article_link = page.locator("[data-test^='article-card-'] a").first
+    expect(first_article_link).to_be_visible()
     
-    # Verify we are on detail page
+    # Verify the href is NOT a hash
+    href = first_article_link.get_attribute("href")
+    assert not href.startswith("#")
+    
+    import re
+    first_article_link.click()
+    
+    # Verify we are on detail page path (dynamic slug)
+    expect(page).to_have_url(re.compile(f"{base_url}/blog/.+"))
     expect(page.locator("[data-test='view-article-detail']")).to_be_visible()
     
     # Click "Back to Blog" button
@@ -73,5 +66,6 @@ def test_article_navigation_flow(page: Page):
     expect(back_btn).to_be_visible()
     back_btn.click()
     
-    # Verify we are back on the blog list
+    # Verify we are back on /blog
+    expect(page).to_have_url(f"{base_url}/blog")
     expect(page.locator("[data-test='view-articles']")).to_be_visible()

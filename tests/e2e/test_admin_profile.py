@@ -22,7 +22,7 @@ def test_admin_profile_workflow(page: Page):
 
     # 1. Login
     page.set_viewport_size({"width": 1440, "height": 900})
-    page.goto(f"{base_url}#login")
+    page.goto(f"{base_url}/login")
     
     # Accept cookies
     accept_btn = page.locator("[data-test='cookie-accept']")

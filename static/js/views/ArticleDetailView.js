@@ -10,7 +10,7 @@ export const ArticleDetailView = {
                     <div class="row g-4 justify-content-center">
                         <div class="col-12 col-lg-10 col-xl-8">
                             <div class="mb-4">
-                                <a href="#blog" class="btn btn-outline-primary btn-sm">&larr; Back to Blog</a>
+                                <a href="/blog" class="btn btn-outline-primary btn-sm">&larr; Back to Blog</a>
                             </div>
                             <article class="card">
                                 <div class="card-body">
