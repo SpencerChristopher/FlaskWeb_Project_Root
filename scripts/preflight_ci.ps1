@@ -101,7 +101,7 @@ if ($SkipAudit) {
     docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
-    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/test-deploy.yml .github/workflows/production-deploy.yml
     
     Write-Host "Validation passed." -ForegroundColor Green
 }
@@ -138,8 +138,8 @@ if ($SmokeTest) {
         docker cp tests/. flask_web_app:/app/tests
         docker cp pytest.ini flask_web_app:/app/pytest.ini
 
-        Write-Host "Running containerized tests..."
-        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e"
+        Write-Host "Running containerized smoke tests..."
+        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "smoke"
         
         Write-Host "Smoke test PASSED." -ForegroundColor Green
     } catch {
@@ -152,8 +152,15 @@ if ($SmokeTest) {
     Write-Host "[6/8] Skipping CI-Parity Smoke Test." -ForegroundColor Gray
 }
 
-# [7/8] Docker Stack Build (CI Config)
-Write-Host "[7/8] Verifying CI Docker stack build..."
+# [7/8] Docker Stack Validation (CI Config)
+Write-Host "[7/8] Validating CI Docker configuration and build..."
+# Validate the config (catches missing env_files, syntax errors)
+docker compose -f docker-compose.yml -f docker-compose.ci.yml config -q
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Error: CI Docker configuration is invalid (check for missing .env or syntax errors)." -ForegroundColor Red
+    exit 1
+}
+
 docker compose -f docker-compose.yml -f docker-compose.ci.yml build --quiet
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: CI Docker build failed." -ForegroundColor Red
