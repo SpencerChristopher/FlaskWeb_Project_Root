@@ -102,6 +102,10 @@ jobs:
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          provenance: false
+          network: host
+          provenance: false
+          network: host
 
       - name: Start containers
         run: |
