@@ -50,6 +50,13 @@ curl -L -o tests/axe/axe.min.js https://cdnjs.cloudflare.com/ajax/libs/axe-core/
 ### B. Performance & Heavy Tests
 Tests marked with `@pytest.mark.heavy` or `@pytest.mark.performance` should ideally be run in the container to avoid host-side network jitter.
 
+### C. Architectural Integrity (Design Gate)
+To ensure that code changes do not violate the boundaries defined in `docs/ARCHITECTURE.md`, run the design gate:
+```powershell
+# Fast, host-side AST scan (No DB or Container needed)
+$env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/domain_tests/test_arch_integrity.py -p no:flask -p no:base-url
+```
+
 ---
 
 ## 4. Engineering Standards
