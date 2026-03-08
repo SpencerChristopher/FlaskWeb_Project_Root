@@ -1,4 +1,4 @@
-﻿# Flask Web Project
+# Flask Web Project
 
 ## Description
 
@@ -7,248 +7,87 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 ## Features
 
 *   **API-First Design**: A comprehensive JSON API serves all public and administrative content.
-*   **Pydantic Validation**: All API inputs, especially for CRUD operations, are strictly validated using Pydantic models, ensuring data integrity and security.
-*   **Event-Driven Architecture**: Utilizes the **Blinker** signaling library to decouple application components. Events are dispatched for actions like user logins and article modifications, allowing for extensible and maintainable code.
-*   **User Authentication**: Secure JWT-based login with role-based access control (RBAC) implemented via custom claims in the JSON Web Token.
-*   **Admin Panel**: A secure area for administrators to perform full CRUD (Create, Read, Update, Delete) operations on blog articles.
-*   **Security Hardening**: Includes rate limiting on sensitive endpoints with **Flask-Limiter** and HTML sanitization with **Bleach** to prevent XSS attacks.
-*   **Single Page Application (SPA)**: The frontend dynamically renders content without full page reloads, providing a smooth user experience.
-*   **Dockerized Environment**: Easy setup and deployment using Docker Compose, with **Nginx** terminating HTTPS and proxying to the Flask API.
+*   **Pydantic Validation**: All API inputs strictly validated using Pydantic models.
+*   **Event-Driven Architecture**: Utilizes **Blinker** for decoupled application logic.
+*   **User Authentication**: Secure JWT-based login with RBAC.
+*   **Security Hardening**: Rate limiting, HTML sanitization, and HTTPS proxying.
+*   **Dockerized Environment**: Consistent setup and deployment via Docker Compose.
 
 ## Technologies Used
 
-*   **Backend**: Flask (Python)
-*   **Database**: MongoDB with Flask-MongoEngine
-*   **API Validation**: Pydantic
-*   **Authentication**: Flask-JWT-Extended, Flask-Bcrypt
-*   **Event Handling**: Blinker
-*   **Security**: Flask-Limiter, Bleach
-*   **Dependency Management**: Poetry
-*   **Containerization**: Docker, Docker Compose, Nginx
-*   **Testing**: Pytest, pytest-flask
-*   **Frontend**: HTML, CSS, JavaScript (Vanilla SPA)
+*   **Backend**: Flask (Python), MongoDB, Redis
+*   **Frontend**: Vanilla JS (SPA), CSS, HTML
+*   **DevOps**: Docker, Nginx, Poetry, GitHub Actions
 
-## Setup with Docker (Recommended for Local Development)
+---
 
-This is the recommended way to run the project for local development and QA. The environment is fully containerized, allowing for consistent setup. Nginx terminates HTTPS on `:443` and proxies to the Flask API.
+## Setup with Docker (Recommended)
 
-**Understanding Docker Compose Files:**
-*   **`docker-compose.yml`**: This is the base configuration file. For local development, it now directly contains the `build: .` context for the `web` service.
-*   **`docker-compose.override.yml`**: (Generated from `docker-compose.override.yml.template`) This file **overrides** settings in `docker-compose.yml` for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
+The project is fully containerized for consistent development and deployment. Nginx terminates HTTPS on `:443` and proxies to the Flask API.
 
+### 1. Prerequisites
+*   Docker Desktop (with Compose)
+*   Python 3.11+ (if running host-side tests)
 
-## Deployment & CI/CD
+### 2. Configuration & Secrets
+For local development, secrets and overrides are managed via a `.env` file.
+1. Create your local `.env`: `cp .env.template .env`
+2. Update `.env` with your secrets (`SECRET_KEY`, `ADMIN_PASSWORD`, etc.).
+3. Configure your local dev overrides: `cp docker-compose.override.yml.template docker-compose.override.yml`
 
-See `docs/DEPLOYMENT.md` for CI/CD flow, runner expectations, and production deployment notes.
+For a detailed explanation of the environment variable hierarchy, see [Deployment Guide](docs/DEPLOYMENT.md).
 
-## CI/CD Preflight (Local)
-
-To avoid trial-and-error on GitHub Actions, run a local preflight before pushing:
-
-Windows PowerShell:
-```powershell
-.\scripts\preflight_ci.ps1
-```
-
-macOS/Linux:
+### 3. Quick Start
 ```bash
-./scripts/preflight_ci.sh
-```
+# Generate self-signed SSL certs for local development
+mkdir -p certs && openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout certs/server.key -out certs/server.crt -subj "/CN=localhost"
 
-Optional local workflow run:
-```powershell
-.\scripts\preflight_ci.ps1 -RunAct
-```
-```bash
-./scripts/preflight_ci.sh -RunAct
-```
+# Build and start services
+docker compose up --build -d
 
-### Prerequisites
-
-*   Docker Desktop
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/your-username/your-repo-name.git # Replace with your actual repo URL
-cd FlaskWeb_Project_Root
-```
-
-### 2. Set up Environment Variables
-
-For local development, you will typically need a `.env` file to store sensitive secrets and to set local overrides for environment variables defined in `docker-compose.yml`.
-
-*   **`docker-compose.yml`**: This file now centrally defines all non-secret default environment variables for the application (e.g., `LOG_LEVEL`, `FLASK_ENV`, `GUNICORN_TIMEOUT`). These values are used by default in both CI/CD and local environments.
-*   **`.env`**: This file is for **local overrides and sensitive secrets only**. It is not committed to Git.
-*   **`config.env`**: This file serves as a **reference** for all non-secret defaults. You can copy its contents into your local `.env` file as a starting point if you wish to override `docker-compose.yml` defaults, then add your secrets.
-
-**Steps:**
-
-1.  **Create your local `.env` file:**
-    ```bash
-    cp .env.template .env
-    ```
-2.  **Edit the `.env` file:** Open the newly created `.env` file and fill in your specific values. **Ensure that `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, and `MONGO_APP_PASSWORD` are always set**, as these are critical for application functionality and security.
-
-**Required `.env` values (minimum):**
-- `SECRET_KEY`
-- `ADMIN_USERNAME`
-- `ADMIN_PASSWORD`
-- `MONGO_ROOT_USER`
-- `MONGO_ROOT_PASSWORD`
-- `MONGO_APP_USER`
-- `MONGO_APP_PASSWORD`
-
-### 3. Build and Run Containers
-
-Before running, ensure you have created your local `docker-compose.override.yml` and generated SSL certificates for Nginx.
-
-1.  **Create your local `docker-compose.override.yml`:**
-    ```bash
-    cp docker-compose.override.yml.template docker-compose.override.yml
-    ```
-2.  **Generate Self-Signed SSL Certificates:**
-    Nginx expects certs at `./certs/server.crt` and `./certs/server.key`.
-    ```bash
-    mkdir -p certs
-    openssl genrsa -out certs/server.key 2048
-    openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
-    ```
-3.  **Build and Run Services:**
-    Build the images and start the services in detached mode. Docker Compose will automatically detect and merge `docker-compose.override.yml`, ensuring the `web` service is built locally and source code volumes are mounted for live reloading.
-
-    ```bash
-    docker compose --env-file ./.env up --build -d
-    ```
-
-    The application will be available at `https://localhost` (self-signed cert in dev).
-
-    To verify:
-    ```bash
-    curl -k -I https://localhost/
-    ```
-
-### 4. Seed the Database
-
-Run the following commands to initialize the database by executing the scripts inside the running `web` container.
-
-```bash
-# 1. Drop existing database (optional, for a clean start)
-docker compose exec web /app/.venv/bin/python scripts/drop_db.py
-
-# 2. Create the initial admin user (credentials from .env)
+# Seed the database
 docker compose exec web /app/.venv/bin/python scripts/create_admin.py
-
-# 3. Seed initial data (sample articles)
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
-## Development Workflow
+The application will be available at `https://localhost`.
 
-### Viewing Logs
-To monitor the application and see real-time output from Flask/Gunicorn, Nginx, and MongoDB:
+---
 
+## Development & Testing
+
+Comprehensive documentation for developing and verifying the system is available in the `docs/` folder:
+
+*   **[Testing Strategy](docs/TESTING.md)**: How to run unit, integration, and E2E tests in both local and container environments.
+*   **[Deployment & CI/CD](docs/DEPLOYMENT.md)**: Details on the automated pipeline, environment injection, and production architecture.
+*   **[API Contract](docs/api-contract.yml)**: OpenAPI specification for the backend service.
+
+### Quick Test Execution
 ```bash
-# Follow all logs
-docker compose logs -f
-
-# Follow only the web application logs
-docker compose logs -f web
-```
-Application logs are also persisted locally in the `./logs` directory via volume mounting.
-
-### Running Tests
-To run the backend and integration test suite inside the container environment (ensuring exact parity with the CI environment):
-
-```bash
-# Run backend and integration tests
+# Run backend tests inside the container
 docker compose exec web /app/.venv/bin/pytest tests/ -m "not e2e"
 ```
-
-#### End-to-End (Browser) Tests
-E2E tests use **Playwright** and are typically run from the local host against the containerized application to utilize local browser binaries.
-
-**Prerequisites:**
-1. Install Playwright browsers locally: `playwright install`
-2. Ensure the Docker stack is running: `docker compose up -d`
-
-**Stable Execution Command (PowerShell):**
-```powershell
-$env:SKIP_DB_CHECK="1"; python -m pytest tests/e2e/ --base-url https://localhost -p no:flask
-```
-
-**Stable Execution Command (Bash/macOS):**
-```bash
-SKIP_DB_CHECK=1 python -m pytest tests/e2e/ --base-url https://localhost -p no:flask
-```
-
-*Note: The `-p no:flask` flag is required to prevent local configuration conflicts with the containerized Flask instance.*
-
-### Quick Reloading & Service Management
-The `docker-compose.override.yml` mounts your local `src/` directory into the container for live development.
-
-- **Auto-Reload**: When `FLASK_ENV=development` is set in your `.env`, the Flask development server (if used) or Gunicorn (with `--reload`) will automatically detect changes to Python files.
-- **Manual Restart**: If you need to force a restart of the web service (e.g., after changing environment variables or configuration files):
-  ```bash
-  docker compose restart web
-  ```
-- **Stop Services**: To stop the services and keep the data volumes:
-  ```bash
-  docker compose stop
-  ```
-- **Down/Clean Up**: To stop and remove containers (adding `-v` will also remove the database volumes):
-  ```bash
-  docker compose down
-  ```
-
-## Usage
-
-### Public Blog
-
-Navigate to `https://localhost`. The SPA will fetch and display a list of blog articles. Click on an article to view its full content.
-
-### Admin Panel
-
-1.  Go to `https://localhost/#login`.
-2.  Log in with the admin credentials set in your `.env` file.
-3.  Upon successful login, a JWT will be stored by the frontend, and you will be redirected to the admin dashboard to manage articles.
 
 ## Project Structure
 
 ```
 . # Project Root
 +-- src/                      # Main application source code
-¦   +-- models/               # MongoEngine database models (Post, User)
-¦   +-- routes/               # Flask blueprints for API routes
-¦   +-- schemas.py            # Pydantic schemas for API validation
-¦   +-- exceptions.py         # Custom application exception classes
-¦   +-- events.py             # Blinker signal definitions
-¦   +-- listeners.py          # Blinker signal listeners
-¦   +-- extensions.py         # Centralized Flask extension instances
-¦   +-- utils/                # Utility functions (e.g., logger)
-¦   +-- server.py             # Flask app factory and configuration
 +-- scripts/                  # Utility scripts (seeding, admin creation)
 +-- static/                   # Frontend static files (JS, CSS)
 +-- templates/                # Base Jinja2 template for the SPA shell
 +-- docker/                   # Docker assets (nginx config, mongo init)
-¦   +-- nginx/nginx.conf       # TLS proxy config
-¦   +-- mongo/mongo-init.js    # Mongo init script
++-- docs/                     # Architectural and workflow documentation
++-- tests/                    # Test suites (unit, integration, e2e)
 +-- certs/                    # TLS certs (self-signed for dev/CI)
-+-- .env                      # Environment variables (local, sensitive)
 +-- .env.template             # Template for .env
 +-- config.env                # Non-secret defaults shared across envs
 +-- docker-compose.yml        # Main Docker Compose (prod-like)
-+-- docker-compose.override.yml.template # Optional dev overrides
 +-- Dockerfile                # Dockerfile for the Flask application
-+-- main.py                   # Main application entry point (gunicorn)
++-- main.py                   # Main application entry point
 +-- pyproject.toml            # Poetry project configuration
-+-- pytest.ini                # Pytest configuration
 +-- README.md                 # This file
 ```
-
-## Contributing
-
-Contributions are welcome! Please fork the repository, create a feature branch, and open a pull request.
 
 ## License
 
@@ -257,5 +96,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## Acknowledgements
 
 *   Special thanks to Google and the Gemini team for the development and assistance provided through the Gemini CLI.
-
-
