@@ -1,5 +1,5 @@
 import pytest
-from tests.security_tests.conftest import admin_headers, user_headers, admin_user, regular_user, ops_admin_user, ops_admin_headers
+from tests.security_tests.conftest import admin_headers, user_headers, admin_user, regular_user
 
 @pytest.mark.usefixtures("clean_collections_per_function")
 def test_get_profile_default(client):

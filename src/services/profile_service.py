@@ -134,10 +134,14 @@ class ProfileService:
             profile.skills = profile_data.skills
             profile.social_links = normalized_social_links
             profile.work_history = work_history_models
-            if desired_image_url and desired_image_url != profile.image_url:
+            if profile_data.image_url and profile_data.image_url != profile.image_url:
                 if profile.image_url:
                     self._media_service.delete_image(profile.image_url)
-                profile.image_url = desired_image_url
+                profile.image_url = self._validate_image_url(profile_data.image_url)
+            elif not profile_data.image_url and profile.image_url:
+                # If image_url is explicitly cleared, delete the old file
+                self._media_service.delete_image(profile.image_url)
+                profile.image_url = None
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)

@@ -64,8 +64,24 @@ export const ProfileView = {
                                             <textarea id="p-statement" class="form-control" rows="4" required>${profile.statement || ""}</textarea>
                                         </div>
                                         <div class="col-12">
-                                            <label class="form-label small fw-bold">Profile Image URL</label>
-                                            <input type="text" id="p-image" class="form-control" value="${profile.image_url || ""}">
+                                            <label class="form-label small fw-bold">Profile Image</label>
+                                            <div class="d-flex align-items-center gap-3">
+                                                <div class="position-relative">
+                                                    <img id="p-image-preview" src="${profile.image_url || "/static/uploads/placeholder-profile.png"}" 
+                                                         class="rounded-circle shadow-sm border" style="width: 80px; height: 80px; object-fit: cover;"
+                                                         onerror="this.src='/static/uploads/placeholder-profile.png'">
+                                                </div>
+                                                <div class="flex-grow-1">
+                                                    <div class="input-group">
+                                                        <input type="text" id="p-image" class="form-control" value="${profile.image_url || ""}" placeholder="/static/uploads/...">
+                                                        <input type="file" id="p-image-file" class="d-none" accept="image/*">
+                                                        <button type="button" class="btn btn-outline-primary" id="p-image-upload-btn">
+                                                            <i class="bi bi-upload mr-1"></i> Upload New
+                                                        </button>
+                                                    </div>
+                                                    <div class="form-text small">Upload a new photo or provide a local URL.</div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -289,6 +305,51 @@ export const ProfileView = {
             }
             closeWorkModal();
         };
+
+        const uploadBtn = document.getElementById('p-image-upload-btn');
+        const fileInput = document.getElementById('p-image-file');
+        const urlInput = document.getElementById('p-image');
+        const previewImg = document.getElementById('p-image-preview');
+
+        if (uploadBtn && fileInput) {
+            uploadBtn.onclick = () => fileInput.click();
+            fileInput.onchange = async () => {
+                if (fileInput.files.length === 0) return;
+                
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+                try {
+                    // We can't use fetchAPI for FormData easily if it's strictly JSON-based
+                    // Check AuthService/fetchAPI capability. Usually fetch handles FormData automatically if headers aren't forced.
+                    const response = await fetch('/api/content/profile/photo', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            // Authorization is needed, fetchAPI handles it usually. 
+                            // If using raw fetch, we need the token.
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                        }
+                    });
+
+                    if (!response.ok) throw new Error('Upload failed');
+
+                    const result = await response.json();
+                    urlInput.value = result.url;
+                    previewImg.src = result.url;
+                    alert('Photo uploaded and updated successfully!');
+                } catch (err) {
+                    alert('Upload failed: ' + err.message);
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadBtn.innerHTML = '<i class="bi bi-upload mr-1"></i> Upload New';
+                }
+            };
+        }
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
