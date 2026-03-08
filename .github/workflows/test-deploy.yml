@@ -20,6 +20,10 @@ permissions:
 jobs:
   build-and-test:
     runs-on: wsl-staging
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
@@ -31,7 +35,7 @@ jobs:
       LOG_LEVEL: INFO
       FLASK_ENV: development
       TALISMAN_FORCE_HTTPS: "false"
-      PYTHON_VERSION: "3.11"
+      PYTHON_VERSION: ${{ matrix.python-version }}
 
     steps:
       - name: Checkout code
@@ -52,7 +56,12 @@ jobs:
           docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
 
       - name: Set image tag
-        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then
+            echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          else
+            echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}-py${{ matrix.python-version }}" >> "$GITHUB_ENV"
+          fi
 
       - name: Reset compose stack
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
@@ -102,10 +111,6 @@ jobs:
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false
-          network: host
-          provenance: false
-          network: host
 
       - name: Start containers
         run: |
@@ -136,7 +141,7 @@ jobs:
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
 
       - name: Push Verified Multi-platform Image
-        if: success()
+        if: success() && matrix.python-version == '3.11'
         uses: docker/build-push-action@v5
         with:
           context: .
