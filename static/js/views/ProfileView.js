@@ -324,21 +324,12 @@ export const ProfileView = {
                 uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
                 try {
-                    // We can't use fetchAPI for FormData easily if it's strictly JSON-based
-                    // Check AuthService/fetchAPI capability. Usually fetch handles FormData automatically if headers aren't forced.
-                    const response = await fetch('/api/content/profile/photo', {
+                    // Use the centralized fetchAPI from context to ensure CSRF and Auth are handled
+                    const result = await fetchAPI('/api/content/profile/photo', {
                         method: 'POST',
-                        body: formData,
-                        headers: {
-                            // Authorization is needed, fetchAPI handles it usually. 
-                            // If using raw fetch, we need the token.
-                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-                        }
+                        body: formData
                     });
 
-                    if (!response.ok) throw new Error('Upload failed');
-
-                    const result = await response.json();
                     urlInput.value = result.url;
                     previewImg.src = result.url;
                     alert('Photo uploaded and updated successfully!');

@@ -17,8 +17,10 @@ from src.utils.logger import setup_logging
 
 
 def load_environment() -> None:
-    """Load environment variables from the local environment and .env file."""
-    load_dotenv()
+    """Load environment variables from the local environment, .env, and config.env files."""
+    # Load config.env first so that .env can override its values (secrets vs defaults)
+    load_dotenv("config.env")
+    load_dotenv(".env")
 
 
 def create_flask_app(import_name: str) -> Flask:
