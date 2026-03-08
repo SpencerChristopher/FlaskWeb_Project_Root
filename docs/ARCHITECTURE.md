@@ -94,3 +94,20 @@ Side effects (logging article deletions, cleaning up media, auditing logins) are
 6.  **Listener** handles side effects (e.g., deleting old media files) asynchronously.
 7.  **Repository** executes optimized projected query to MongoDB.
 8.  **Pydantic** validates the final output before it leaves the API.
+
+---
+
+## 5. Architectural Verification
+
+To objectively confirm that the system design matches this documentation, you can generate automated UML diagrams and run dependency scans.
+
+### A. UML Class Diagrams
+Using `pyreverse` (bundled with `pylint`), you can visualize the class relationships and verify the implementation of interfaces.
+
+```powershell
+# Generate UML for the Repository Layer
+.venv/Scripts/python.exe -m pylint.pyreverse.main src/repositories -o dot -p repositories
+```
+
+### B. Dependency Enforcement (Design Gate)
+The project includes an automated **Architectural Integrity Gate** that uses Python AST to scan for boundary violations (e.g., repositories importing services). See `docs/TESTING.md` for execution details.
