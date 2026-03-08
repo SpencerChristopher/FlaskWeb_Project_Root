@@ -7,8 +7,19 @@ from __future__ import annotations
 import datetime
 from slugify import slugify
 
-from src.exceptions import ConflictException, NotFoundException, ForbiddenException, UnauthorizedException
-from src.events import dispatch_event, article_created, article_deleted, article_updated, article_published
+from src.exceptions import (
+    ConflictException,
+    NotFoundException,
+    ForbiddenException,
+    UnauthorizedException,
+)
+from src.events import (
+    dispatch_event,
+    article_created,
+    article_deleted,
+    article_updated,
+    article_published,
+)
 from src.repositories.interfaces import ArticleRepository, UserRepository
 from src.schemas import UserIdentity, ArticleCreateUpdate, ArticlePublic
 
@@ -16,18 +27,24 @@ from src.schemas import UserIdentity, ArticleCreateUpdate, ArticlePublic
 class ArticleService:
     """Application service that encapsulates article domain workflows."""
 
-    def __init__(self, article_repository: ArticleRepository, user_repository: UserRepository):
+    def __init__(
+        self, article_repository: ArticleRepository, user_repository: UserRepository
+    ):
         self._article_repository = article_repository
         self._user_repository = user_repository
 
-    def _require_ownership_or_admin(self, article, user: UserIdentity, action: str) -> None:
+    def _require_ownership_or_admin(
+        self, article, user: UserIdentity, action: str
+    ) -> None:
         """Helper to enforce resource ownership with admin override."""
         if user.role == "admin":
             return
         if not getattr(article, "author", None):
             raise NotFoundException("Article not found")
         if str(article.author.id) != user.id:
-            raise ForbiddenException(f"You do not have permission to {action} this article.")
+            raise ForbiddenException(
+                f"You do not have permission to {action} this article."
+            )
 
     def list_admin_articles(self, user: UserIdentity):
         """
@@ -40,7 +57,9 @@ class ArticleService:
         return [a for a in all_articles if str(a.author.id) == user.id]
 
     def list_published_articles(self, page: int, per_page: int):
-        return self._article_repository.get_published_paginated(page=page, per_page=per_page)
+        return self._article_repository.get_published_paginated(
+            page=page, per_page=per_page
+        )
 
     def to_public_dict(self, article) -> dict:
         """Map a persisted article to the public DTO to stabilize API shape."""
@@ -51,8 +70,14 @@ class ArticleService:
             content=article.content,
             slug=article.slug,
             is_published=article.is_published,
-            publication_date=article.publication_date.isoformat() if article.publication_date else None,
-            last_updated=article.last_updated.isoformat() if article.last_updated else None,
+            publication_date=(
+                article.publication_date.isoformat()
+                if article.publication_date
+                else None
+            ),
+            last_updated=(
+                article.last_updated.isoformat() if article.last_updated else None
+            ),
             author_id=str(article.author.id) if article.author else None,
             author_username=article.author.username if article.author else None,
         ).model_dump()
@@ -69,6 +94,7 @@ class ArticleService:
                 else None
             ),
         }
+
     def get_article_or_404(self, article_id: str):
         article = self._article_repository.get_by_id(article_id)
         if not article:
@@ -100,16 +126,16 @@ class ArticleService:
         # Optimization: Use a lazy reference instead of a full DB fetch.
         # MongoEngine allows assigning the ID string directly to a ReferenceField.
         from src.models.article import Article
-        
+
         new_article = Article(
             title=article_dto.title,
             slug=article_slug,
             content=article_dto.content,
             summary=article_dto.summary,
-            author=user.id, # MongoEngine handles ID-to-Proxy assignment
+            author=user.id,  # MongoEngine handles ID-to-Proxy assignment
             is_published=article_dto.is_published,
         )
-        
+
         # Handle Publication Logic
         now = datetime.datetime.now(datetime.timezone.utc)
         if new_article.is_published:
@@ -117,7 +143,7 @@ class ArticleService:
         new_article.last_updated = now
 
         created_article = self._article_repository.save(new_article)
-        
+
         dispatch_event(
             article_created,
             "article_service",
@@ -136,7 +162,9 @@ class ArticleService:
         self._require_ownership_or_admin(article, user, "update")
 
         article_slug = slugify(article_dto.title)
-        existing = self._article_repository.get_by_slug_excluding_id(article_slug, article_id)
+        existing = self._article_repository.get_by_slug_excluding_id(
+            article_slug, article_id
+        )
         if existing:
             raise ConflictException("An article with this title already exists")
 
@@ -145,17 +173,17 @@ class ArticleService:
         article.slug = article_slug
         article.content = article_dto.content
         article.summary = article_dto.summary
-        
+
         was_draft = not article.is_published
         article.is_published = article_dto.is_published
-        
+
         now = datetime.datetime.now(datetime.timezone.utc)
         if article.is_published and not article.publication_date:
             article.publication_date = now
         article.last_updated = now
 
         updated_article = self._article_repository.save(article)
-        
+
         if was_draft and updated_article.is_published:
             dispatch_event(
                 article_published,
@@ -179,7 +207,7 @@ class ArticleService:
         author_id = str(article.author.id)
         persisted_id = str(article.id)
         self._article_repository.delete(article)
-        
+
         dispatch_event(
             article_deleted,
             "article_service",

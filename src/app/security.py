@@ -22,14 +22,16 @@ def permission_required(permission: str | list[str]) -> Callable:
     Decorator to ensure the current user has at least one of the required permissions.
     Expects jwt_required() to be handled within or before this.
     """
+
     def decorator(f: Callable) -> Callable:
         @wraps(f)
         @jwt_required()
         def decorated_function(*args: Any, **kwargs: Any):
             from src.services import get_authz_service
             from flask import request, current_app
+
             authz_service = get_authz_service()
-            
+
             current_user_id = get_jwt_identity()
             current_user_claims = get_jwt()
 
@@ -46,9 +48,11 @@ def permission_required(permission: str | list[str]) -> Callable:
                     f"by User {current_user_id}. Reason: {str(e)}"
                 )
                 raise
-            
+
             return f(*args, **kwargs)
+
         return decorated_function
+
     return decorator
 
 
@@ -61,7 +65,12 @@ def register_jwt_loaders(jwt_manager) -> None:
 
     @jwt_manager.invalid_token_loader
     def invalid_token_response(callback_exception):
-        return UnauthorizedException("Signature verification failed or token is malformed.").to_dict(), 401
+        return (
+            UnauthorizedException(
+                "Signature verification failed or token is malformed."
+            ).to_dict(),
+            401,
+        )
 
     @jwt_manager.revoked_token_loader
     def revoked_token_response(jwt_header, jwt_payload):
@@ -123,7 +132,9 @@ def configure_http_security(app: Flask) -> None:
 
     @app.after_request
     def add_extra_security_headers(response):
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = (
+            "geolocation=(), microphone=(), camera=()"
+        )
         return response
 
 
@@ -131,7 +142,9 @@ def configure_cors(app: Flask) -> None:
     """Configure API CORS from environment list."""
     cors_origins = os.environ.get("CORS_ORIGINS", "")
     if cors_origins:
-        allowed_origins = [origin.strip() for origin in cors_origins.split(",") if origin.strip()]
+        allowed_origins = [
+            origin.strip() for origin in cors_origins.split(",") if origin.strip()
+        ]
     else:
         allowed_origins = []
     if allowed_origins:
@@ -156,8 +169,12 @@ def configure_jwt(app: Flask) -> None:
         return auth_service.is_token_revoked(jwt_payload)
 
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
-    app.config["JWT_COOKIE_SECURE"] = os.environ.get("JWT_COOKIE_SECURE", "true").lower() == "true"
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = os.environ.get("JWT_COOKIE_CSRF_PROTECT", "true").lower() == "true"
+    app.config["JWT_COOKIE_SECURE"] = (
+        os.environ.get("JWT_COOKIE_SECURE", "true").lower() == "true"
+    )
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = (
+        os.environ.get("JWT_COOKIE_CSRF_PROTECT", "true").lower() == "true"
+    )
     app.config["JWT_ACCESS_COOKIE_PATH"] = "/api/"
     app.config["JWT_REFRESH_COOKIE_PATH"] = "/api/auth/refresh"
     app.config["JWT_COOKIE_SAMESITE"] = os.environ.get("JWT_COOKIE_SAMESITE", "Lax")

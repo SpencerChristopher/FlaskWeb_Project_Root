@@ -22,6 +22,7 @@ _media_service = None
 
 
 def get_session_service() -> "SessionService":
+    """Return the singleton session service instance."""
     global _session_service
     if _session_service is None:
         from src.extensions import redis_client
@@ -32,6 +33,7 @@ def get_session_service() -> "SessionService":
 
 
 def get_auth_service() -> "AuthService":
+    """Return the singleton auth service instance."""
     global _auth_service
     if _auth_service is None:
         from src.repositories import (
@@ -51,6 +53,7 @@ def get_auth_service() -> "AuthService":
 
 
 def get_authz_service() -> "AuthzService":
+    """Return the singleton authz service instance."""
     global _authz_service
     if _authz_service is None:
         from src.repositories import get_user_repository
@@ -61,13 +64,17 @@ def get_authz_service() -> "AuthzService":
 
 
 def get_article_service() -> "ArticleService":
+    """Return the singleton article service instance."""
     global _article_service
     if _article_service is None:
         from src.repositories import get_article_repository, get_user_repository
         from src.services.article_service import ArticleService
 
-        _article_service = ArticleService(get_article_repository(), get_user_repository())
+        _article_service = ArticleService(
+            get_article_repository(), get_user_repository()
+        )
     return _article_service
+
 
 def get_post_service() -> "ArticleService":
     """Legacy alias for backward compatibility during refactor."""
@@ -75,15 +82,18 @@ def get_post_service() -> "ArticleService":
 
 
 def get_profile_service() -> "ProfileService":
+    """Return the singleton profile service instance."""
     global _profile_service
     if _profile_service is None:
         from src.repositories import get_profile_repository
         from src.services.profile_service import ProfileService
+
         _profile_service = ProfileService(get_profile_repository(), get_media_service())
     return _profile_service
 
 
 def get_media_service() -> "MediaService":
+    """Return the singleton media service instance."""
     global _media_service
     if _media_service is None:
         import os

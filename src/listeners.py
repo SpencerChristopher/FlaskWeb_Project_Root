@@ -1,11 +1,19 @@
 """
 This module defines and registers event listeners for the application.
 """
+
 import logging
 from flask import current_app
-from src.events import article_created, article_updated, article_deleted, user_logged_in, user_deleted
+from src.events import (
+    article_created,
+    article_updated,
+    article_deleted,
+    user_logged_in,
+    user_deleted,
+)
 
 logger = logging.getLogger(__name__)
+
 
 def cleanup_comments_on_article_delete(sender, **kwargs):
     """
@@ -16,6 +24,7 @@ def cleanup_comments_on_article_delete(sender, **kwargs):
         return
 
     from src.repositories import get_comment_repository
+
     comment_repo = get_comment_repository()
     try:
         delete_result = comment_repo.delete_by_article_id(article_id)
@@ -29,6 +38,7 @@ def cleanup_comments_on_article_delete(sender, **kwargs):
             e,
             exc_info=True,
         )
+
 
 def log_blinker_event(sender, **kwargs):
     """A generic listener that logs all dispatched Blinker events."""

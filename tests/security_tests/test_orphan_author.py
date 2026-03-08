@@ -18,7 +18,9 @@ def test_orphan_article_blocks_non_admin_access(client, app, content_admin_heade
         inserted_id = Article._get_collection().insert_one(raw_doc).inserted_id
         article_id = str(inserted_id)
 
-    resp = client.get(f"/api/content/articles/{article_id}", headers=content_admin_headers)
+    resp = client.get(
+        f"/api/content/articles/{article_id}", headers=content_admin_headers
+    )
     assert resp.status_code == 404
     data = resp.get_json()
     assert data["error_code"] == "NOT_FOUND"

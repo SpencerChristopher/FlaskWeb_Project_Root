@@ -3,15 +3,18 @@ from flask import g
 from src.schemas import UserIdentity
 from src.models.user import User
 
+
 class TestIdentityResilience:
     """
     Guardrail tests for Stage 2: Lightweight User Identity.
     Ensures that token versioning is strictly enforced.
     """
 
-    def test_token_version_mismatch_blocks_request(self, client, app, admin_user, admin_headers):
+    def test_token_version_mismatch_blocks_request(
+        self, client, app, admin_user, admin_headers
+    ):
         """
-        Gate 5.2.2: Changing the token_version in the DB must immediately invalidate 
+        Gate 5.2.2: Changing the token_version in the DB must immediately invalidate
         outstanding JWTs.
         """
         # 1. Verify access works initially
@@ -30,5 +33,7 @@ class TestIdentityResilience:
         assert resp.status_code == 401
         assert resp.get_json()["error_code"] == "UNAUTHORIZED"
         # Match message from AuthzService
-        assert "session has expired or been invalidated" in resp.get_json()["message"].lower()
-        
+        assert (
+            "session has expired or been invalidated"
+            in resp.get_json()["message"].lower()
+        )

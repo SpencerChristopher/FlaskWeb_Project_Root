@@ -37,14 +37,32 @@ class AuthService:
         test_results = password_policy.test(password)
         if test_results:
             error_messages = []
-            if 'length' in test_results: error_messages.append(f'Password must be at least {password_policy.length} characters long.')
-            if 'uppercase' in test_results: error_messages.append(f'Password must contain at least {password_policy.uppercase} uppercase letter(s).')
-            if 'numbers' in test_results: error_messages.append(f'Password must contain at least {password_policy.numbers} digit(s).')
-            if 'special' in test_results: error_messages.append(f'Password must contain at least {password_policy.special} special character(s).')
-            
+            if "length" in test_results:
+                error_messages.append(
+                    f"Password must be at least {password_policy.length} characters long."
+                )
+            if "uppercase" in test_results:
+                error_messages.append(
+                    f"Password must contain at least {password_policy.uppercase} uppercase letter(s)."
+                )
+            if "numbers" in test_results:
+                error_messages.append(
+                    f"Password must contain at least {password_policy.numbers} digit(s)."
+                )
+            if "special" in test_results:
+                error_messages.append(
+                    f"Password must contain at least {password_policy.special} special character(s)."
+                )
+
             # Use loc format consistent with Pydantic for frontend compatibility
-            details = [{"loc": ["password"], "msg": msg, "type": "value_error"} for msg in error_messages]
-            raise ValidationError(message="Password does not meet complexity requirements.", details=details)
+            details = [
+                {"loc": ["password"], "msg": msg, "type": "value_error"}
+                for msg in error_messages
+            ]
+            raise ValidationError(
+                message="Password does not meet complexity requirements.",
+                details=details,
+            )
 
     def authenticate(self, username: str, password: str) -> User:
         user = self._user_repository.get_by_username(username)
@@ -52,34 +70,31 @@ class AuthService:
             raise UnauthorizedException("Invalid username or password")
         return user
 
-    def register_user(self, *, username: str, email: str, password: str, role: str = "member") -> User:
+    def register_user(
+        self, *, username: str, email: str, password: str, role: str = "member"
+    ) -> User:
         """
         Registers a new user in the system.
         Only allowed for administrative users (enforced at route level).
         """
         if self._user_repository.get_by_username(username):
             raise ConflictException(f"Username '{username}' is already taken.")
-        
+
         self._validate_password_strength(password)
-        
+
         # In a real system, we'd also check email uniqueness if mandated
-        
-        new_user = User(
-            username=username,
-            email=email,
-            role=role,
-            token_version=0
-        )
+
+        new_user = User(username=username, email=email, role=role, token_version=0)
         new_user.set_password(password)
         created_user = self._user_repository.save(new_user)
-        
+
         # Stage 3: ID-based signaling
         dispatch_event(
-            user_created, 
-            "auth_service", 
-            user_id=str(created_user.id), 
+            user_created,
+            "auth_service",
+            user_id=str(created_user.id),
             username=created_user.username,
-            role=created_user.role
+            role=created_user.role,
         )
         return created_user
 
@@ -95,7 +110,7 @@ class AuthService:
     def build_token_claims(self, user: User) -> dict[str, Any]:
         """
         Build the claims to be included in the JWT.
-        Includes minimal role, username, and version info to enable stateless 
+        Includes minimal role, username, and version info to enable stateless
         authorization with backend-derived permissions and display metadata.
         """
         return {
@@ -125,10 +140,14 @@ class AuthService:
             self._user_repository.save(user)
             self._invalidate_cached_version(user_id)
             # Stage 3: ID-based signaling
-            dispatch_event(user_role_changed, "auth_service", user_id=str(user.id), new_role=role)
+            dispatch_event(
+                user_role_changed, "auth_service", user_id=str(user.id), new_role=role
+            )
         return user
 
-    def record_active_refresh_token(self, *, user_id: str, jti: str, ttl_seconds: int) -> None:
+    def record_active_refresh_token(
+        self, *, user_id: str, jti: str, ttl_seconds: int
+    ) -> None:
         if not self._session_service:
             return
         self._session_service.set_active_refresh_token(
@@ -185,12 +204,16 @@ class AuthService:
 
         # 1. Redis Check
         from src.exceptions import DatabaseConnectionException
+
         try:
             if self._token_repository.is_jti_revoked(jti):
                 return True
         except DatabaseConnectionException:
             # 2. Redis Down -> Mongo Fallback
-            if self._mongo_token_repository and self._mongo_token_repository.is_jti_revoked(jti):
+            if (
+                self._mongo_token_repository
+                and self._mongo_token_repository.is_jti_revoked(jti)
+            ):
                 return True
 
         if not user_id:
@@ -219,7 +242,9 @@ class AuthService:
         # Update Cache (5 minute TTL)
         if self._session_service and user.token_version is not None:
             try:
-                self._session_service._redis.setex(cache_key, 300, str(user.token_version))
+                self._session_service._redis.setex(
+                    cache_key, 300, str(user.token_version)
+                )
             except Exception:
                 pass
 

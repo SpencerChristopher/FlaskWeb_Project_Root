@@ -6,8 +6,8 @@ from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 load_dotenv()
 # Ensure test env disables HTTPS redirects before app creation
-os.environ.setdefault('FLASK_ENV', 'development')
-os.environ['TALISMAN_FORCE_HTTPS'] = 'false'
+os.environ.setdefault("FLASK_ENV", "development")
+os.environ["TALISMAN_FORCE_HTTPS"] = "false"
 from src.server import create_app
 from mongoengine import disconnect, connect, get_db
 from pymongo.errors import ServerSelectionTimeoutError
@@ -25,6 +25,7 @@ def _clear_test_collections() -> None:
 
     db.get_collection(TokenBlocklist._get_collection_name()).delete_many({})
     db.get_collection(Profile._get_collection_name()).delete_many({})
+
 
 def _build_test_mongo_uri(in_container: bool) -> str:
     if in_container:
@@ -54,6 +55,7 @@ def _build_test_mongo_uri(in_container: bool) -> str:
 
     return os.environ.get("PYTEST_MONGO_URI", "mongodb://mongo:27017/pytest_appdb")
 
+
 def _add_markers_by_path(item):
     path = str(item.fspath)
     if "tests\\risk_tests\\" in path or "tests/risk_tests/" in path:
@@ -76,14 +78,19 @@ def _add_markers_by_path(item):
     if "tests\\page_content_test\\" in path or "tests/page_content_test/" in path:
         item.add_marker(pytest.mark.integration)
         return
-    if "tests\\test_database_connection.py" in path or "tests/test_database_connection.py" in path:
+    if (
+        "tests\\test_database_connection.py" in path
+        or "tests/test_database_connection.py" in path
+    ):
         item.add_marker(pytest.mark.integration)
         return
     item.add_marker(pytest.mark.unit)
 
+
 def pytest_collection_modifyitems(config, items):
     for item in items:
         _add_markers_by_path(item)
+
 
 @pytest.fixture
 def prod_base_url():
@@ -93,7 +100,7 @@ def prod_base_url():
     return os.environ.get("PROD_BASE_URL", "https://localhost")
 
 
-@pytest.fixture(scope='session', autouse=True)
+@pytest.fixture(scope="session", autouse=True)
 def database_connection_check():
     """
     Gatekeeper fixture to check for database connection before running tests.
@@ -105,14 +112,16 @@ def database_connection_check():
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
 
     try:
-        client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000, uuidRepresentation='standard')
+        client = connect(
+            host=mongo_uri, serverSelectionTimeoutMS=2000, uuidRepresentation="standard"
+        )
         client.server_info()
         disconnect()
     except ServerSelectionTimeoutError as e:
         pytest.exit(f"Database connection failed: {e}. Aborting tests.")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def app():
     """Create and configure a new app instance for the test session."""
     if os.environ.get("SKIP_DB_CHECK") == "1":
@@ -123,18 +132,20 @@ def app():
     # Determine MONGO_URI based on environment
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
-    os.environ['SECRET_KEY'] = 'test-secret-key'
-    os.environ.setdefault('FLASK_ENV', 'production')
-    os.environ.setdefault('TALISMAN_FORCE_HTTPS', 'false')
+    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ.setdefault("FLASK_ENV", "production")
+    os.environ.setdefault("TALISMAN_FORCE_HTTPS", "false")
 
     app = create_app()
-    app.config.update({
-        'TESTING': True,
-        # RATELIMIT_STORAGE_URI is now loaded from .env
-        # RATELIMIT_KEY_FUNC is now loaded from extensions
-        'RATELIMIT_STRATEGY': 'fixed-window',
-        'RATELIMIT_DEFAULT': '100 per minute'
-    })
+    app.config.update(
+        {
+            "TESTING": True,
+            # RATELIMIT_STORAGE_URI is now loaded from .env
+            # RATELIMIT_KEY_FUNC is now loaded from extensions
+            "RATELIMIT_STRATEGY": "fixed-window",
+            "RATELIMIT_DEFAULT": "100 per minute",
+        }
+    )
 
     # Initialize and configure limiter for testing
     limiter.init_app(app)
@@ -155,6 +166,7 @@ def app():
             pass
         disconnect()
 
+
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Resets the Flask-Limiter storage before each test function."""
@@ -163,18 +175,18 @@ def reset_rate_limiter():
         limiter.reset()
 
 
-
-
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def setup_users(app):
     """Sets up test users for authentication tests."""
     with app.app_context():
-        admin_user = User(username='testadmin', email='admin@example.com', role='admin')
-        admin_user.set_password('testpassword')
+        admin_user = User(username="testadmin", email="admin@example.com", role="admin")
+        admin_user.set_password("testpassword")
         admin_user.save()
 
-        regular_user = User(username='testuser', email='user@example.com', role='member')
-        regular_user.set_password('testpassword')
+        regular_user = User(
+            username="testuser", email="user@example.com", role="member"
+        )
+        regular_user.set_password("testpassword")
         regular_user.save()
         yield admin_user, regular_user
 
@@ -197,35 +209,36 @@ def clean_collections_per_function(app):
 @pytest.fixture
 def login_user_fixture(client):
     def _login_user(username, password):
-        response = client.post('/api/auth/login', json={
-            'username': username,
-            'password': password
-        })
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
         assert response.status_code == 200
-        
+
         # Extract access token from Set-Cookie header
-        for cookie_header in response.headers.getlist('Set-Cookie'):
-            match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
+        for cookie_header in response.headers.getlist("Set-Cookie"):
+            match = re.search(r"access_token_cookie=([^;]+)", cookie_header)
             if match:
                 return match.group(1)
         raise Exception("Access token cookie not found in response headers")
+
     return _login_user
+
 
 @pytest.fixture
 def get_refresh_token_fixture(client):
     def _get_refresh_token(username, password):
-        response = client.post('/api/auth/login', json={
-            'username': username,
-            'password': password
-        })
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
         assert response.status_code == 200
 
         # Extract refresh token from Set-Cookie header
-        for cookie_header in response.headers.getlist('Set-Cookie'):
-            match = re.search(r'refresh_token_cookie=([^;]+)', cookie_header)
+        for cookie_header in response.headers.getlist("Set-Cookie"):
+            match = re.search(r"refresh_token_cookie=([^;]+)", cookie_header)
             if match:
                 return match.group(1)
         raise Exception("Refresh token cookie not found in response headers")
+
     return _get_refresh_token
 
 

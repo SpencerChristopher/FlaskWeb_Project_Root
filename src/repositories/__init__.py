@@ -19,11 +19,14 @@ _profile_repository = MongoProfileRepository()
 
 
 def get_user_repository() -> MongoUserRepository:
+    """Return the singleton user repository instance."""
     return _user_repository
 
 
 def get_article_repository() -> MongoArticleRepository:
+    """Return the singleton article repository instance."""
     return _article_repository
+
 
 def get_post_repository() -> MongoArticleRepository:
     """Legacy alias for backward compatibility."""
@@ -31,16 +34,20 @@ def get_post_repository() -> MongoArticleRepository:
 
 
 def get_comment_repository() -> MongoCommentRepository:
+    """Return the singleton comment repository instance."""
     return _comment_repository
 
 
 def get_token_repository() -> RedisTokenRepository:
+    """Return the singleton redis token repository instance."""
     return _token_repository
 
 
 def get_mongo_token_repository() -> MongoTokenRepository:
+    """Return the singleton mongo token repository instance."""
     return _mongo_token_repository
 
 
 def get_profile_repository() -> MongoProfileRepository:
+    """Return the singleton profile repository instance."""
     return _profile_repository

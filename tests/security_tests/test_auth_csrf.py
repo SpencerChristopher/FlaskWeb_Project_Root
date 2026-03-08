@@ -30,7 +30,9 @@ def test_protected_endpoint_succeeds_with_csrf(client: FlaskClient, setup_users)
             break
 
     assert csrf_token is not None, "CSRF token not found in login response cookies"
-    assert csrf_path_is_root, f"CSRF cookie path must be root ('/'). Found cookie: {cookie}"
+    assert (
+        csrf_path_is_root
+    ), f"CSRF cookie path must be root ('/'). Found cookie: {cookie}"
 
     headers = {"X-CSRF-TOKEN": csrf_token}
     res = client.post("/api/auth/logout", headers=headers)

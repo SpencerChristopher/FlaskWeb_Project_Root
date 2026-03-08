@@ -17,6 +17,7 @@ def test_admin_token_revoked_on_role_downgrade(client, setup_users, login_user_f
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     auth_service.change_role(user_id=str(admin_user.id), role="member")
 
@@ -40,6 +41,7 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     auth_service.delete_user(user_id=str(admin_user.id))
 
@@ -50,7 +52,9 @@ def test_admin_token_revoked_on_user_deletion(client, setup_users, login_user_fi
     assert data["error_code"] == "UNAUTHORIZED"
 
 
-def test_token_revoked_after_role_change_on_status(client, setup_users, login_user_fixture):
+def test_token_revoked_after_role_change_on_status(
+    client, setup_users, login_user_fixture
+):
     """
     Tokens should be revoked if the user's role changes, even on non-admin endpoints.
     """
@@ -60,6 +64,7 @@ def test_token_revoked_after_role_change_on_status(client, setup_users, login_us
     admin_user = User.objects(username="testadmin").first()
     assert admin_user is not None
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     auth_service.change_role(user_id=str(admin_user.id), role="member")
 

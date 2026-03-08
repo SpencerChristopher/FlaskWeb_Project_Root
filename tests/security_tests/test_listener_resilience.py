@@ -42,6 +42,7 @@ def test_revocation_still_works_when_user_deleted_listener_fails(
         admin_user = User.objects(username="testadmin").first()
         assert admin_user is not None
         from src.services import get_auth_service
+
         auth_service = get_auth_service()
         auth_service.delete_user(user_id=str(admin_user.id))
     finally:

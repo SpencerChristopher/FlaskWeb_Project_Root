@@ -33,7 +33,9 @@ def test_article_repository_published_pagination_and_slug_helpers(app):
     article_repository = MongoArticleRepository()
 
     with app.app_context():
-        author = User(username="repo_author", email="repo_author@example.com", role="admin")
+        author = User(
+            username="repo_author", email="repo_author@example.com", role="admin"
+        )
         author.set_password("Password123!")
         author.save()
 

@@ -1,5 +1,8 @@
+"""Model for revoked JWT tokens."""
+
 from src.extensions import db
 import datetime
+
 
 class TokenBlocklist(db.Document):
     jti = db.StringField(required=True, unique=True)
@@ -7,8 +10,6 @@ class TokenBlocklist(db.Document):
     expires_at = db.DateTimeField(required=True)
 
     meta = {
-        'collection': 'token_blocklist',
-        'indexes': [
-            {'fields': ['expires_at'], 'expireAfterSeconds': 0} # TTL index
-        ]
+        "collection": "token_blocklist",
+        "indexes": [{"fields": ["expires_at"], "expireAfterSeconds": 0}],  # TTL index
     }

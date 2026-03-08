@@ -2,12 +2,11 @@ import os
 import pytest
 from playwright.sync_api import Page, expect
 
+
 @pytest.fixture(scope="session")
 def browser_context_args(browser_context_args):
-    return {
-        **browser_context_args,
-        "ignore_https_errors": True
-    }
+    return {**browser_context_args, "ignore_https_errors": True}
+
 
 @pytest.mark.e2e
 def test_silent_refresh_interceptor(page: Page):
@@ -21,7 +20,7 @@ def test_silent_refresh_interceptor(page: Page):
 
     # 1. Login
     page.goto(f"{base_url}/login")
-    
+
     # Accept cookies
     accept_btn = page.locator("[data-test='cookie-accept']")
     if accept_btn.is_visible():
@@ -33,31 +32,34 @@ def test_silent_refresh_interceptor(page: Page):
 
     # Wait for login to complete and stay on Home
     page.wait_for_selector("[data-test='view-home']")
-    
+
     # 2. Simulate Token Expiry
     # We intercept the network request to force a 401 ONCE.
     def handle_route(route):
         # Check if this is the first attempt (no X-Is-Retry header)
-        if "/api/content/profile" in route.request.url and not route.request.headers.get("x-is-retry"):
+        if (
+            "/api/content/profile" in route.request.url
+            and not route.request.headers.get("x-is-retry")
+        ):
             # Force a 401 for the first attempt
             route.fulfill(
                 status=401,
                 content_type="application/json",
-                body='{"message": "Token expired", "error_code": "TOKEN_EXPIRED"}'
+                body='{"message": "Token expired", "error_code": "TOKEN_EXPIRED"}',
             )
         else:
             route.continue_()
 
     # Navigate to profile edit (triggers a GET /api/content/profile)
     page.route("**/api/content/profile", handle_route)
-    
+
     # Trigger navigation to profile
     page.click("text=Edit Profile")
-    
-    # Expectation: The page should eventually load the Profile view 
+
+    # Expectation: The page should eventually load the Profile view
     # even though the first request was a 401.
-    page.wait_for_selector("[data-test='view-admin-profile']") # Corrected selector
-    
+    page.wait_for_selector("[data-test='view-admin-profile']")  # Corrected selector
+
     # Verify we are NOT on the login page or home page
     expect(page).not_to_have_url(f"{base_url}/login")
     expect(page.locator("[data-test='view-admin-profile']")).to_be_visible()

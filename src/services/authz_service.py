@@ -28,7 +28,9 @@ class AuthzService:
         """Retrieve and verify the existence of the user from the database."""
         user = self._user_repository.get_by_id(user_id)
         if not user:
-            raise UnauthorizedException("Authentication required or invalid credentials.")
+            raise UnauthorizedException(
+                "Authentication required or invalid credentials."
+            )
         return user
 
     def require_permission(
@@ -46,7 +48,9 @@ class AuthzService:
         # Fetch minimal identity fields from DB (Lazy Hydration)
         user_doc = self._user_repository.get_identity(user_id)
         if not user_doc:
-            raise UnauthorizedException("Authentication required or invalid credentials.")
+            raise UnauthorizedException(
+                "Authentication required or invalid credentials."
+            )
 
         # 1. Token Version Check (Live Revocation)
         claim_version = user_claims.get("tv")
@@ -58,7 +62,9 @@ class AuthzService:
             raise UnauthorizedException("Session has expired or been invalidated.")
 
         # Normalize required permissions to a set
-        required_permissions = {permission} if isinstance(permission, str) else set(permission)
+        required_permissions = (
+            {permission} if isinstance(permission, str) else set(permission)
+        )
 
         # 2. DB Role Check (Authoritative)
         user_permissions = get_permissions_for_role(user_doc.role)
@@ -85,7 +91,7 @@ class AuthzService:
             id=str(user_doc.id),
             username=user_claims.get("un", "Unknown"),
             role=user_doc.role,
-            token_version=user_doc.token_version
+            token_version=user_doc.token_version,
         )
 
     def require_admin(self, user_id: str, user_claims: dict[str, Any]) -> UserIdentity:

@@ -1,7 +1,7 @@
 import pytest
 from flask import json
-from src.server import create_app # Import create_app from the actual application
-from src.extensions import limiter # Import the limiter instance
+from src.server import create_app  # Import create_app from the actual application
+from src.extensions import limiter  # Import the limiter instance
 import time
 
 # Use the main app fixture from conftest.py
@@ -22,6 +22,7 @@ import time
 # def client_with_rate_limit(app_with_rate_limit):
 #     return app_with_rate_limit.test_client()
 
+
 class TestRateLimiting:
     """Tests for Rate Limiting & Abuse Control."""
 
@@ -31,65 +32,95 @@ class TestRateLimiting:
         # Assuming a rate limit of 5 requests per minute on /api/auth/login
         # This test should pass once rate limiting is correctly implemented
         for _ in range(5):
-            response = client.post('/api/auth/login', json={'username': 'test', 'password': 'password'})
-            assert response.status_code == 401 # Expecting 401 Invalid credentials, not 429
+            response = client.post(
+                "/api/auth/login", json={"username": "test", "password": "password"}
+            )
+            assert (
+                response.status_code == 401
+            )  # Expecting 401 Invalid credentials, not 429
 
     def test_rate_limit_blocks_requests_beyond_limit(self, client):
         """Test that requests beyond the rate limit are blocked (429) for /api/auth/login."""
         # Current limit is 20 per minute for testing/E2E stability
         for _ in range(20):
-            client.post('/api/auth/login', json={'username': 'test', 'password': 'password'})
+            client.post(
+                "/api/auth/login", json={"username": "test", "password": "password"}
+            )
 
         # The 21st request should be blocked
-        response = client.post('/api/auth/login', json={'username': 'test', 'password': 'password'})
+        response = client.post(
+            "/api/auth/login", json={"username": "test", "password": "password"}
+        )
         assert response.status_code == 429
         data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
+        assert data["error_code"] == "TOO_MANY_REQUESTS"
+        assert data["message"] == "Too Many Requests"
 
     def test_rate_limit_on_contact_form(self, client):
         """Test rate limiting on the /api/contact endpoint."""
         # Assuming a rate limit of 5 per minute on /api/contact
         for _ in range(5):
-            response = client.post('/api/contact', json={'name': 'test', 'email': 'test@example.com', 'message': 'hello'})
-            assert response.status_code == 200 # Expecting 200 OK for valid submission
+            response = client.post(
+                "/api/contact",
+                json={"name": "test", "email": "test@example.com", "message": "hello"},
+            )
+            assert response.status_code == 200  # Expecting 200 OK for valid submission
 
         # The 6th request should be blocked
-        response = client.post('/api/contact', json={'name': 'test', 'email': 'test@example.com', 'message': 'hello'})
+        response = client.post(
+            "/api/contact",
+            json={"name": "test", "email": "test@example.com", "message": "hello"},
+        )
         assert response.status_code == 429
         data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
+        assert data["error_code"] == "TOO_MANY_REQUESTS"
+        assert data["message"] == "Too Many Requests"
 
     def test_rate_limit_per_user_or_ip(self, client):
         """Test rate limiting based on user identity or IP address."""
         # Simulate requests from two different IP addresses
-        ip1_headers = {'X-Forwarded-For': '192.168.1.1'}
-        ip2_headers = {'X-Forwarded-For': '192.168.1.2'}
+        ip1_headers = {"X-Forwarded-For": "192.168.1.1"}
+        ip2_headers = {"X-Forwarded-For": "192.168.1.2"}
 
         # IP 1 makes requests within its limit
         for _ in range(5):
-            response = client.post('/api/contact', json={'name': 'test', 'email': 'test1@example.com', 'message': 'hello'}, headers=ip1_headers)
+            response = client.post(
+                "/api/contact",
+                json={"name": "test", "email": "test1@example.com", "message": "hello"},
+                headers=ip1_headers,
+            )
             assert response.status_code == 200
 
         # IP 1's 6th request should be blocked
-        response = client.post('/api/contact', json={'name': 'test', 'email': 'test1@example.com', 'message': 'hello'}, headers=ip1_headers)
+        response = client.post(
+            "/api/contact",
+            json={"name": "test", "email": "test1@example.com", "message": "hello"},
+            headers=ip1_headers,
+        )
         assert response.status_code == 429
         data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
+        assert data["error_code"] == "TOO_MANY_REQUESTS"
+        assert data["message"] == "Too Many Requests"
 
         # IP 2 should still be able to make requests
         for _ in range(5):
-            response = client.post('/api/contact', json={'name': 'test', 'email': 'test2@example.com', 'message': 'hello'}, headers=ip2_headers)
+            response = client.post(
+                "/api/contact",
+                json={"name": "test", "email": "test2@example.com", "message": "hello"},
+                headers=ip2_headers,
+            )
             assert response.status_code == 200
 
         # IP 2's 6th request should be blocked
-        response = client.post('/api/contact', json={'name': 'test', 'email': 'test2@example.com', 'message': 'hello'}, headers=ip2_headers)
+        response = client.post(
+            "/api/contact",
+            json={"name": "test", "email": "test2@example.com", "message": "hello"},
+            headers=ip2_headers,
+        )
         assert response.status_code == 429
         data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
+        assert data["error_code"] == "TOO_MANY_REQUESTS"
+        assert data["message"] == "Too Many Requests"
 
     def test_login_rate_limiting(self, client, login_user_fixture):
         """Test rate limiting on the login endpoint for a specific user."""
@@ -98,21 +129,26 @@ class TestRateLimiting:
 
         # Create a dummy user for this test
         from src.models.user import User
+
         user = User(username=username, email=f"{username}@example.com", role="member")
         user.set_password(password)
         user.save()
 
         # Make requests within the limit for this user
-        for _ in range(20): 
-            response = client.post('/api/auth/login', json={'username': username, 'password': password})
-            assert response.status_code == 200 # Successful login
+        for _ in range(20):
+            response = client.post(
+                "/api/auth/login", json={"username": username, "password": password}
+            )
+            assert response.status_code == 200  # Successful login
 
         # The 21st request should be blocked
-        response = client.post('/api/auth/login', json={'username': username, 'password': password})
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
         assert response.status_code == 429
         data = response.get_json()
-        assert data['error_code'] == 'TOO_MANY_REQUESTS'
-        assert data['message'] == 'Too Many Requests'
+        assert data["error_code"] == "TOO_MANY_REQUESTS"
+        assert data["message"] == "Too Many Requests"
 
         # Clean up the dummy user
         user.delete()

@@ -13,17 +13,17 @@ from blinker import NamedSignal
 logger = logging.getLogger(__name__)
 
 # --- User Events ---
-user_logged_in = NamedSignal('user-logged-in')
-user_logged_out = NamedSignal('user-logged-out')
-user_created = NamedSignal('user-created')
-user_deleted = NamedSignal('user-deleted')
-user_role_changed = NamedSignal('user-role-changed')
+user_logged_in = NamedSignal("user-logged-in")
+user_logged_out = NamedSignal("user-logged-out")
+user_created = NamedSignal("user-created")
+user_deleted = NamedSignal("user-deleted")
+user_role_changed = NamedSignal("user-role-changed")
 
 # --- Article Events ---
-article_created = NamedSignal('article-created')
-article_updated = NamedSignal('article-updated')
-article_deleted = NamedSignal('article-deleted')
-article_published = NamedSignal('article-published')
+article_created = NamedSignal("article-created")
+article_updated = NamedSignal("article-updated")
+article_deleted = NamedSignal("article-deleted")
+article_published = NamedSignal("article-published")
 
 # Legacy Aliases
 post_created = article_created
@@ -32,7 +32,8 @@ post_deleted = article_deleted
 post_published = article_published
 
 # --- Profile Events ---
-profile_updated = NamedSignal('profile-updated')
+profile_updated = NamedSignal("profile-updated")
+
 
 def dispatch_event(signal: NamedSignal, sender: Any, **payload: Any) -> dict[str, Any]:
     """

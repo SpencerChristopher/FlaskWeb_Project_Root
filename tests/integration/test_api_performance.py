@@ -3,6 +3,7 @@ import time
 import requests
 import os
 
+
 @pytest.mark.performance
 class TestAPIPerformance:
     """
@@ -12,11 +13,11 @@ class TestAPIPerformance:
 
     def test_bootstrap_latency(self, prod_base_url):
         """
-        Verify that the bootstrap endpoint (combined Auth + Profile) 
+        Verify that the bootstrap endpoint (combined Auth + Profile)
         responds within the performance budget.
         """
         url = f"{prod_base_url}/api/bootstrap"
-        
+
         # Measure 5 samples to get an average
         latencies = []
         for _ in range(5):
@@ -24,11 +25,11 @@ class TestAPIPerformance:
             resp = requests.get(url, verify=False)
             end = time.perf_counter()
             assert resp.status_code == 200
-            latencies.append((end - start) * 1000) # Convert to ms
-        
+            latencies.append((end - start) * 1000)  # Convert to ms
+
         avg_latency = sum(latencies) / len(latencies)
         print(f"\nAverage Bootstrap Latency: {avg_latency:.2f}ms")
-        
+
         # Threshold: 200ms for initial combined load
         assert avg_latency < 200, f"Bootstrap API too slow: {avg_latency:.2f}ms"
 
@@ -37,14 +38,14 @@ class TestAPIPerformance:
         Verify that the blog listing (paginated) responds efficiently.
         """
         url = f"{prod_base_url}/api/blog?page=1&per_page=6"
-        
+
         start = time.perf_counter()
         resp = requests.get(url, verify=False)
         end = time.perf_counter()
-        
+
         latency = (end - start) * 1000
         assert resp.status_code == 200
         print(f"Blog List Latency: {latency:.2f}ms")
-        
+
         # Threshold: 150ms for paginated list
         assert latency < 150, f"Blog List API too slow: {latency:.2f}ms"

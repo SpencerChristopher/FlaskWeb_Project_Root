@@ -3,7 +3,10 @@ import pytest
 
 
 if os.environ.get("RUN_PROD_CONFIG_TESTS") != "1":
-    pytest.skip("Prod-config tests are opt-in. Set RUN_PROD_CONFIG_TESTS=1.", allow_module_level=True)
+    pytest.skip(
+        "Prod-config tests are opt-in. Set RUN_PROD_CONFIG_TESTS=1.",
+        allow_module_level=True,
+    )
 
 
 def test_http_redirects_to_https_when_forced(client):

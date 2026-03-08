@@ -12,17 +12,27 @@ from io import BytesIO
 
 from PIL import Image, ImageOps
 
+
 class MediaService:
     """Application service for binary asset management."""
 
     def __init__(self, upload_dir: str, allowed_extensions: set[str] | None = None):
         self._upload_dir = Path(upload_dir)
-        self._allowed_extensions = allowed_extensions or {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-        self._max_size_bytes = 2 * 1024 * 1024 # 2MB Limit
+        self._allowed_extensions = allowed_extensions or {
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+        }
+        self._max_size_bytes = 2 * 1024 * 1024  # 2MB Limit
         self._max_dimension_px = 1600
 
     def _is_allowed_file(self, filename: str) -> bool:
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in self._allowed_extensions
+        return (
+            "." in filename
+            and filename.rsplit(".", 1)[1].lower() in self._allowed_extensions
+        )
 
     def save_image(self, file_stream: BinaryIO, original_filename: str) -> str:
         """
@@ -36,7 +46,9 @@ class MediaService:
         size = file_stream.tell()
         file_stream.seek(0)
         if size > self._max_size_bytes:
-            raise ValueError(f"File too large. Maximum size is {self._max_size_bytes // 1024 // 1024}MB.")
+            raise ValueError(
+                f"File too large. Maximum size is {self._max_size_bytes // 1024 // 1024}MB."
+            )
 
         # Ensure directory exists (Defensive check)
         self._upload_dir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +81,7 @@ class MediaService:
         file_path = self._upload_dir / new_filename
 
         # Save the processed file
-        with open(file_path, 'wb') as f:
+        with open(file_path, "wb") as f:
             f.write(output.read())
 
         # Return the path relative to static
@@ -82,7 +94,7 @@ class MediaService:
         """
         if not image_url or not image_url.startswith("/static/uploads/"):
             return False
-        
+
         # Extract filename and resolve to absolute path
         filename = image_url.replace("/static/uploads/", "")
         file_path = (self._upload_dir / filename).resolve()

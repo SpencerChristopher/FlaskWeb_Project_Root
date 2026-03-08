@@ -54,6 +54,7 @@ def ops_admin_user(client):
 def admin_headers(app, admin_user):
     """Return headers for an admin user."""
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(admin_user.id),
@@ -66,6 +67,7 @@ def admin_headers(app, admin_user):
 def user_headers(app, regular_user):
     """Return headers for a regular user."""
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(regular_user.id),
@@ -78,6 +80,7 @@ def user_headers(app, regular_user):
 def content_admin_headers(app, content_admin_user):
     """Return headers for a content user (Author)."""
     from src.services import get_auth_service
+
     auth_service = get_auth_service()
     access_token = create_access_token(
         identity=str(content_admin_user.id),
@@ -89,6 +92,7 @@ def content_admin_headers(app, content_admin_user):
 @pytest.fixture
 def admin_article(app, admin_user):
     from src.models.article import Article
+
     with app.app_context():
         art = Article(
             title="Admin Draft",

@@ -40,4 +40,3 @@ def create_app():
     register_error_handlers(app)
 
     return app
-

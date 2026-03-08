@@ -26,4 +26,6 @@ class MongoCommentRepository(CommentRepository):
         try:
             return comment.save()
         except PyMongoError as e:
-            raise DatabaseConnectionException(f"Database error while saving comment: {e}") from e
+            raise DatabaseConnectionException(
+                f"Database error while saving comment: {e}"
+            ) from e

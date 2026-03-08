@@ -10,7 +10,11 @@ from typing import TYPE_CHECKING, BinaryIO
 
 from src.models.profile import Profile, WorkHistoryItem as WorkHistoryModel
 from src.repositories.interfaces import ProfileRepository
-from src.schemas import ProfilePublic, ProfileSchema, WorkHistoryItem as WorkHistorySchema
+from src.schemas import (
+    ProfilePublic,
+    ProfileSchema,
+    WorkHistoryItem as WorkHistorySchema,
+)
 from src.exceptions import BadRequestException
 
 if TYPE_CHECKING:
@@ -19,10 +23,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class ProfileService:
     """Application service for developer profile orchestration."""
 
-    def __init__(self, profile_repository: ProfileRepository, media_service: "MediaService"):
+    def __init__(
+        self, profile_repository: ProfileRepository, media_service: "MediaService"
+    ):
         self._profile_repository = profile_repository
         self._media_service = media_service
 
@@ -35,11 +42,14 @@ class ProfileService:
                 end_date=item.end_date,
                 location=item.location,
                 description=item.description,
-                skills=item.skills
-            ) for item in history
+                skills=item.skills,
+            )
+            for item in history
         ]
 
-    def _map_dto_to_work_history_model(self, history: list[WorkHistorySchema]) -> list[WorkHistoryModel]:
+    def _map_dto_to_work_history_model(
+        self, history: list[WorkHistorySchema]
+    ) -> list[WorkHistoryModel]:
         return [
             WorkHistoryModel(
                 company=item.company,
@@ -48,8 +58,9 @@ class ProfileService:
                 end_date=item.end_date,
                 location=item.location,
                 description=item.description,
-                skills=item.skills
-            ) for item in history
+                skills=item.skills,
+            )
+            for item in history
         ]
 
     def _normalize_social_links(self, links: dict[str, str]) -> dict[str, str]:
@@ -66,7 +77,9 @@ class ProfileService:
         if not image_url:
             return None
         if not image_url.startswith("/static/uploads/"):
-            raise BadRequestException("Profile image URL must reference a local upload.")
+            raise BadRequestException(
+                "Profile image URL must reference a local upload."
+            )
         return image_url
 
     def get_profile(self) -> ProfilePublic:
@@ -86,9 +99,9 @@ class ProfileService:
                 social_links={},
                 work_history=[],
                 image_url=None,
-                last_updated=None
+                last_updated=None,
             )
-        
+
         return ProfilePublic(
             name=profile.name,
             headline_role=profile.headline_role,
@@ -99,17 +112,25 @@ class ProfileService:
             social_links=profile.social_links or {},
             work_history=self._map_work_history_to_dto(profile.work_history),
             image_url=profile.image_url,
-            last_updated=profile.last_updated.isoformat() if profile.last_updated else None
+            last_updated=(
+                profile.last_updated.isoformat() if profile.last_updated else None
+            ),
         )
 
-    def update_profile(self, profile_data: ProfileSchema, user: "UserIdentity") -> ProfilePublic:
+    def update_profile(
+        self, profile_data: ProfileSchema, user: "UserIdentity"
+    ) -> ProfilePublic:
         """
         Updates the singleton profile. Creates it if it doesn't exist.
         """
         profile = self._profile_repository.get_profile()
-        
-        work_history_models = self._map_dto_to_work_history_model(profile_data.work_history)
-        normalized_social_links = self._normalize_social_links(profile_data.social_links)
+
+        work_history_models = self._map_dto_to_work_history_model(
+            profile_data.work_history
+        )
+        normalized_social_links = self._normalize_social_links(
+            profile_data.social_links
+        )
         desired_image_url = self._validate_image_url(profile_data.image_url)
 
         if not profile:
@@ -123,7 +144,7 @@ class ProfileService:
                 social_links=normalized_social_links,
                 work_history=work_history_models,
                 image_url=desired_image_url,
-                last_updated=datetime.datetime.now(datetime.timezone.utc)
+                last_updated=datetime.datetime.now(datetime.timezone.utc),
             )
         else:
             profile.name = profile_data.name
@@ -145,17 +166,21 @@ class ProfileService:
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)
-        logger.info(f"Developer profile updated by user: {user.username} (ID: {user.id})")
-        
-        return self.get_profile() # Returns the hydrated Public DTO
+        logger.info(
+            f"Developer profile updated by user: {user.username} (ID: {user.id})"
+        )
 
-    def update_profile_photo(self, file_stream: BinaryIO, original_filename: str, user: "UserIdentity") -> str:
+        return self.get_profile()  # Returns the hydrated Public DTO
+
+    def update_profile_photo(
+        self, file_stream: BinaryIO, original_filename: str, user: "UserIdentity"
+    ) -> str:
         """
         Specialized method to replace the existing profile photo with a new one.
         Ensures only one photo exists by deleting the previous file.
         """
         profile_doc = self._profile_repository.get_profile()
-        
+
         # 1. Cleanup old photo if it exists
         if profile_doc and profile_doc.image_url:
             self._media_service.delete_image(profile_doc.image_url)
@@ -169,12 +194,14 @@ class ProfileService:
                 name="Developer Name",
                 location="Remote / City",
                 statement="Welcome to my developer profile.",
-                image_url=new_url
+                image_url=new_url,
             )
         else:
             profile_doc.image_url = new_url
             profile_doc.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         self._profile_repository.save(profile_doc)
-        logger.info(f"Profile photo replaced by user: {user.username} (ID: {user.id}). URL: {new_url}")
+        logger.info(
+            f"Profile photo replaced by user: {user.username} (ID: {user.id}). URL: {new_url}"
+        )
         return new_url

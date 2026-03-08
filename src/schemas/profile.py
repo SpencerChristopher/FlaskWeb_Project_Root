@@ -1,7 +1,10 @@
+"""Pydantic schemas for profile data validation."""
+
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 
 _MAX_URL_LENGTH = 2048
+
 
 def _validate_url(value: str) -> str:
     if not value.startswith(("http://", "https://")):
@@ -9,6 +12,7 @@ def _validate_url(value: str) -> str:
     if len(value) > _MAX_URL_LENGTH:
         raise ValueError("URL exceeds maximum length.")
     return value
+
 
 class WorkHistoryItem(BaseModel):
     company: str
@@ -18,6 +22,7 @@ class WorkHistoryItem(BaseModel):
     location: str
     description: Optional[str] = None
     skills: list[str] = Field(default_factory=list)
+
 
 class ProfileSchema(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
@@ -41,6 +46,7 @@ class ProfileSchema(BaseModel):
                 raise ValueError("Social link URLs must be non-empty strings.")
             cleaned[key] = _validate_url(url.strip())
         return cleaned
+
 
 class ProfilePublic(BaseModel):
     name: str

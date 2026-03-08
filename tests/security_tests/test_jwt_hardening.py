@@ -36,8 +36,9 @@ class TestJWTAuthentication:
             decoded_token = decode_token(access_token)
             jti = decoded_token["jti"]
             expires = datetime.fromtimestamp(decoded_token["exp"], tz=timezone.utc)
-            
+
             from src.services import get_auth_service
+
             get_auth_service().revoke_token(jti, expires)
 
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -56,7 +57,10 @@ class TestJWTAuthentication:
         headers = {"Authorization": f"Bearer {access_token}"}
         response = client.get("/api/content/articles", headers=headers)
         assert response.status_code == 403
-        assert any(term in response.json["message"] for term in ["Admin", "Access denied", "permissions"])
+        assert any(
+            term in response.json["message"]
+            for term in ["Admin", "Access denied", "permissions"]
+        )
 
     def test_admin_required_with_non_list_roles_claim(self, client, app, regular_user):
         with app.app_context():
@@ -67,4 +71,7 @@ class TestJWTAuthentication:
         headers = {"Authorization": f"Bearer {access_token}"}
         response = client.get("/api/content/articles", headers=headers)
         assert response.status_code == 403
-        assert any(term in response.json["message"] for term in ["Admin", "Access denied", "permissions"])
+        assert any(
+            term in response.json["message"]
+            for term in ["Admin", "Access denied", "permissions"]
+        )

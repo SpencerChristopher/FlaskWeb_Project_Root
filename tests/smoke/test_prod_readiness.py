@@ -9,6 +9,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # These tests are intended to run against a LIVE production/staging instance.
 # They verify that the 'Double Gate' and core infrastructure are operational.
 
+
 class TestProdReadiness:
     """Smoke tests for production environments."""
 

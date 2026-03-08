@@ -26,11 +26,15 @@ class MongoProfileRepository(ProfileRepository):
                 profile.save()
             return profile
         except PyMongoError as e:
-            raise DatabaseConnectionException(f"Database error while fetching profile: {e}") from e
+            raise DatabaseConnectionException(
+                f"Database error while fetching profile: {e}"
+            ) from e
 
     def save(self, profile: Profile) -> Profile:
         try:
             profile.singleton_key = PROFILE_SINGLETON_KEY
             return profile.save()
         except PyMongoError as e:
-            raise DatabaseConnectionException(f"Database error while saving profile: {e}") from e
+            raise DatabaseConnectionException(
+                f"Database error while saving profile: {e}"
+            ) from e

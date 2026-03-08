@@ -5,7 +5,9 @@ import pytest
 pytestmark = pytest.mark.risk
 
 if os.environ.get("RUN_RISK_TESTS") != "1":
-    pytest.skip("Risk tests are opt-in. Set RUN_RISK_TESTS=1 to run.", allow_module_level=True)
+    pytest.skip(
+        "Risk tests are opt-in. Set RUN_RISK_TESTS=1 to run.", allow_module_level=True
+    )
 
 
 def test_risk_csp_header_present(client):
@@ -39,11 +41,15 @@ def test_risk_rate_limit_storage_configured():
 
 
 def test_risk_jwt_cookie_secure_enabled(app):
-    assert app.config["JWT_COOKIE_SECURE"] is True, "JWT_COOKIE_SECURE should be true in prod."
+    assert (
+        app.config["JWT_COOKIE_SECURE"] is True
+    ), "JWT_COOKIE_SECURE should be true in prod."
 
 
 def test_risk_jwt_csrf_enabled(app):
-    assert app.config["JWT_COOKIE_CSRF_PROTECT"] is True, "JWT_COOKIE_CSRF_PROTECT should be true in prod."
+    assert (
+        app.config["JWT_COOKIE_CSRF_PROTECT"] is True
+    ), "JWT_COOKIE_CSRF_PROTECT should be true in prod."
 
 
 def test_risk_access_token_ttl_short(app):
