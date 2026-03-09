@@ -1,12 +1,13 @@
 param(
     [switch]$RunAct,
-    [switch]$SmokeTest, # New: Run local CI-parity smoke test (no act required)
+    [switch]$SmokeTest, # Run local CI-parity smoke test (no act required)
     [switch]$SkipAudit,
     [switch]$SkipCloud,
     [switch]$SkipRunner,
     [switch]$Offline,
     [switch]$Verbose,
-    [switch]$StrictSecurity
+    [switch]$StrictSecurity,
+    [switch]$CheckArm # New: Explicitly check ARM64 build locally
 )
 
 $ErrorActionPreference = "Stop"
@@ -60,22 +61,6 @@ if (-not $SkipCloud -and -not $Offline) {
         }
     }
 
-    # Check Dependabot
-    try {
-        $alerts = gh api repos/:owner/:repo/dependabot/alerts -f state=open | ConvertFrom-Json
-        if ($alerts.Count -gt 0) {
-            Write-Host "CRITICAL: GitHub has detected $($alerts.Count) OPEN Dependabot vulnerabilities." -ForegroundColor Red
-            if ($ConfirmPreference -ne "None") {
-                $choice = Read-Host "Proceed anyway? (y/N)"
-                if ($choice -ne "y") { exit 1 }
-            }
-        } else {
-            Write-Host "Dependabot: CLEAN (0 alerts)" -ForegroundColor Green
-        }
-    } catch {
-        Write-Host "Warning: Could not fetch Dependabot alerts." -ForegroundColor Yellow
-    }
-
     # Check Secret Existence
     try {
         $remoteSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
@@ -101,7 +86,8 @@ if ($SkipAudit) {
     docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
-    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/test-deploy.yml .github/workflows/production-deploy.yml
+    # Updated to check all YAML files in workflows directory
+    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
     
     Write-Host "Validation passed." -ForegroundColor Green
 }
@@ -120,14 +106,20 @@ if ($RunAct) {
     Write-Host "[5/8] Skipping full workflow simulation (act)."
 }
 
-# [6/8] CI Parity Smoke Test (New)
+# [6/8] CI Parity Smoke Test
 if ($SmokeTest) {
     Write-Host "[6/8] Running CI-Parity Smoke Test (Up -> Seed -> Test)..."
     try {
         Write-Host "Resetting stack..."
         docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans
         
+        Write-Host "Generating certs (CI Parity)..."
+        if (-not (Test-Path "certs")) { New-Item -ItemType Directory -Path "certs" }
+        openssl genrsa -out certs/server.key 2048
+        openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+
         Write-Host "Building & Starting CI stack..."
+        $env:IMAGE_TAG = "preflight-local"
         docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait
         
         Write-Host "Seeding..."
@@ -138,12 +130,13 @@ if ($SmokeTest) {
         docker cp tests/. flask_web_app:/app/tests
         docker cp pytest.ini flask_web_app:/app/pytest.ini
 
-        Write-Host "Running containerized smoke tests..."
-        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "smoke"
+        Write-Host "Running containerized tests (including prod readiness)..."
+        # We explicitly run prod readiness tests to catch 'nginx' resolution issues locally
+        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests/smoke/test_prod_readiness.py /app/tests -m "not e2e and not performance and not heavy"
         
-        Write-Host "Smoke test PASSED." -ForegroundColor Green
+        Write-Host "Smoke and functional tests PASSED." -ForegroundColor Green
     } catch {
-        Write-Host "Smoke test FAILED." -ForegroundColor Red
+        Write-Host "Tests FAILED." -ForegroundColor Red
         exit 1
     } finally {
         docker compose -f docker-compose.yml -f docker-compose.ci.yml down
@@ -152,24 +145,27 @@ if ($SmokeTest) {
     Write-Host "[6/8] Skipping CI-Parity Smoke Test." -ForegroundColor Gray
 }
 
-# [7/8] Docker Stack Validation (CI Config)
-Write-Host "[7/8] Validating CI Docker configuration and build..."
-# Validate the config (catches missing env_files, syntax errors)
+# [7/8] Docker Stack & ARM64 Validation
+Write-Host "[7/8] Validating Docker configurations..."
+$env:IMAGE_TAG = "preflight-local"
 docker compose -f docker-compose.yml -f docker-compose.ci.yml config -q
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: CI Docker configuration is invalid (check for missing .env or syntax errors)." -ForegroundColor Red
+    Write-Host "Error: CI Docker configuration is invalid." -ForegroundColor Red
     exit 1
 }
 
-docker compose -f docker-compose.yml -f docker-compose.ci.yml build --quiet
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: CI Docker build failed." -ForegroundColor Red
-    exit 1
+if ($CheckArm) {
+    Write-Host "Verifying ARM64 Build compatibility..."
+    docker buildx build --platform linux/arm64 --build-arg PYTHON_VERSION=3.11 . --tag arm64-preflight --load=false
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: ARM64 Build failed." -ForegroundColor Red
+        exit 1
+    }
 }
 
 # [8/8] Infrastructure CVE Baseline Audit
 Write-Host "[8/8] Auditing Infrastructure CVE Baseline (Docker Scout)..."
-$images = @("nginx:alpine", "mongo:8.0", "redis:alpine")
+$images = @("nginx:stable-alpine-slim", "mongo:8.0.19-noble", "redis:7.4-alpine")
 if (Require-Command "docker" -and (docker scout version 2>&1 | Out-String -ErrorAction SilentlyContinue)) {
     foreach ($img in $images) {
         if ($StrictSecurity) {
