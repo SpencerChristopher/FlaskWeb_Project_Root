@@ -79,7 +79,7 @@ async function fetchAPI(url, options = {}) {
     try {
         const response = await fetch(url, options);
 
-        if (response.status === 401 && !headers['X-Is-Retry'] && !url.includes('/api/auth/refresh')) {
+        if (response.status === 401 && !headers['X-Is-Retry'] && !url.includes('/api/auth/refresh') && !url.includes('/api/auth/logout')) {
             console.warn('Session expired, attempting silent refresh...');
             try {
                 const refreshRes = await fetch('/api/auth/refresh', { 
@@ -98,6 +98,14 @@ async function fetchAPI(url, options = {}) {
             }
             auth.logout(); // Use service to notify listeners
             throw new Error('Session expired. Please login again.');
+        }
+
+        if (response.status === 401 && (url.includes('/api/auth/refresh') || url.includes('/api/auth/logout'))) {
+            console.warn('Authentication failed on refresh/logout. Clearing local state.');
+            auth.user = null;
+            auth.loggedIn = false;
+            auth.notify();
+            throw new Error('Session invalidated.');
         }
 
         if (!response.ok) {
