@@ -18,10 +18,12 @@ permissions:
   packages: write
 
 jobs:
-  # --- PRIMARY JOB: Functional Verification on Native Architecture ---
-  amd64-verify:
-    name: Verify Functional (amd64)
+  build-and-test:
     runs-on: wsl-staging
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
@@ -33,7 +35,7 @@ jobs:
       LOG_LEVEL: INFO
       FLASK_ENV: development
       TALISMAN_FORCE_HTTPS: "false"
-      PYTHON_VERSION: "3.11"
+      PYTHON_VERSION: ${{ matrix.python-version }}
 
     steps:
       - name: Checkout code
@@ -51,18 +53,45 @@ jobs:
 
       - name: Workflow Lint (actionlint)
         run: |
-          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/test-deploy.yml
+          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
 
       - name: Set image tag
-        run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+        run: |
+          if [ "${{ matrix.python-version }}" = "3.11" ]; then
+            echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
+          else
+            echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}-py${{ matrix.python-version }}" >> "$GITHUB_ENV"
+          fi
 
       - name: Reset compose stack
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          driver: docker
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Generate Self-Signed Certificates (CI)
+        run: |
+          mkdir -p certs
+          openssl genrsa -out certs/server.key 2048
+          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+          chmod 600 certs/server.key
+          chmod 644 certs/server.crt
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -76,7 +105,6 @@ jobs:
         with:
           context: .
           load: true
-          pull: false # Force usage of warmed-up local cache
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
@@ -88,6 +116,17 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
 
+      - name: Assert web healthy before seed
+        run: |
+          health_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app)"
+          echo "flask_web_app health status: ${health_status}"
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
+          if [ "${health_status}" != "healthy" ]; then
+            echo "flask_web_app did not reach healthy state."
+            docker logs --tail 200 flask_web_app || true
+            exit 1
+          fi
+
       - name: Seed Database (CI)
         run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
 
@@ -96,53 +135,41 @@ jobs:
           docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
           docker cp tests/. flask_web_app:/app/tests
           docker cp pytest.ini flask_web_app:/app/pytest.ini
+          docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
 
-      - name: Run tests (exclude e2e, performance, smoke, and heavy)
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
+      - name: Run tests (exclude e2e)
+        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e"
 
-      - name: Push Verified Image
-        if: success()
+      - name: Push Verified Multi-platform Image
+        if: success() && matrix.python-version == '3.11'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
           cache-from: type=gha
 
+      - name: Capture logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose.log
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-compose.log
+
       - name: Stop containers
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
 
-  # --- COMPATIBILITY JOB: Check ARM64 Build (Wheels & Compilation) ---
-  arm64-compatibility-check:
-    name: Check ARM64 Wheels
-    runs-on: ubuntu-latest # GitHub-hosted: No TLS issues
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Dry-run ARM64 Build
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          platforms: linux/arm64
-          push: false # Do not push, just verify build
-          build-args: |
-            PYTHON_VERSION=3.11
-          cache-from: type=gha
-
-  # --- DEPLOY JOB ---
   deploy-to-wsl:
     name: Deploy to WSL
-    needs: [amd64-verify, arm64-compatibility-check]
+    needs: build-and-test
     runs-on: wsl-staging
     timeout-minutes: 30
     env:
@@ -159,11 +186,32 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
-      - name: Login to GHCR
+      - name: Reset staging compose stack
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+
+      - name: Make deploy script executable
+        run: chmod +x ./scripts/deploy.sh
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -171,9 +219,68 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy to WSL
-        run: chmod +x ./scripts/deploy.sh && ./scripts/deploy.sh
+        env:
+          DEPLOY_CLEAN_START: "true"
+          DEPLOY_RESET_VOLUMES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_BACKUP_BEFORE_RESET: "true"
+          DEPLOY_REQUIRE_BACKUP: "true"
+          DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
+        run: |
+          ./scripts/deploy.sh
 
       - name: Verify staging health
         run: |
           curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
           curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
+
+      - name: Detect seed-relevant changes
+        id: seed_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            before="$(git rev-parse HEAD~1)"
+          fi
+          changed_files="$(git diff --name-only "$before" "$after")"
+          echo "Changed files:"
+          echo "$changed_files"
+          if echo "$changed_files" | grep -E -q "^(scripts/seed_db.py|src/models/|src/schemas/|docs/api-contract.yml)"; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_seed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create Admin User
+        if: ${{ steps.seed_changes.outputs.should_seed == 'true' }}
+        run: |
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/create_admin.py
+
+      - name: Seed Database
+        if: ${{ steps.seed_changes.outputs.should_seed == 'true' }}
+        run: |
+          docker exec \
+            -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
+            -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+
+      - name: Verify API after seed
+        if: ${{ steps.seed_changes.outputs.should_seed == 'true' }}
+        run: |
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/blog
+          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/auth/status
+
+      - name: Capture deploy logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-deploy.log
+
+      - name: Upload deploy logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-deploy-logs
+          path: docker-compose-deploy.log
