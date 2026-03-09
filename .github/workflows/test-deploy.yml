@@ -134,12 +134,13 @@ jobs:
       - name: Run tests (exclude e2e, performance, smoke, and heavy)
         run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
 
-      - name: Push Verified Image
+      - name: Push Verified Multi-platform Image
         if: success()
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
