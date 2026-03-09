@@ -35,11 +35,21 @@ Run from inside the `web` container.
 | **Pytest** | Functional validation, TDD, and debugging. | **Always** during dev. | Local/Container |
 | **Preflight** | Final gatekeeper. Checks linting, audit logs, and CI parity. | **Before Push** only. | Host (calls Docker) |
 
-**Note:** Do not use `scripts/preflight.sh` as your primary test runner. It performs heavy cleanup and environment resets that will slow down your development loop.
+### Preflight CI Script (`scripts/preflight_ci.ps1`)
+The preflight script has been enhanced to catch CI-specific failures locally:
+*   `.\scripts\preflight_ci.ps1`: Default run (Static Analysis + Linting).
+*   `.\scripts\preflight_ci.ps1 -CheckArm`: Performs a local dry-run build for `linux/arm64` to verify dependency compatibility.
+*   `.\scripts\preflight_ci.ps1 -SmokeTest`: Triggers a targeted functional check that verifies the `web -> nginx` network bridge, catching the "NameResolutionError" locally.
+*   `.\scripts\preflight_ci.ps1 -RunAct`: (Optional) Runs the entire GitHub Actions workflow locally using `act`.
 
 ---
 
 ## 3. Special Test Requirements
+
+### A. Multi-Platform Verification
+To ensure the application runs on both staging (AMD64) and production (ARM64/Raspberry Pi), the CI pipeline performs separate checks:
+1.  **ARM64 Dry-Run:** Verified on GitHub-hosted runners to ensure wheels/binaries are valid.
+2.  **AMD64 Functional:** Verified on the self-hosted WSL runner to ensure the full integration stack works as expected.
 
 ### A. Accessibility (Axe)
 E2E tests include accessibility checks via `axe-core`. To enable these, you must download the script to the local directory:

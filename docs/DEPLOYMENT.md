@@ -24,19 +24,32 @@ Configuration values are sourced in a hierarchical manner:
 ## CI Pipeline (dev branch)
 **Workflow:** `.github/workflows/test-deploy.yml`
 **Trigger:** `push` events to `dev` or `main` branches.
-**Runs on:** `ubuntu-latest`
 
-**Key Steps:**
-1.  **Checkout Code:** Retrieves the repository content.
-2.  **Setup QEMU & Docker Buildx:** Prepares the environment for multi-platform Docker builds.
-3.  **Login to GitHub Container Registry (`ghcr.io`):** Authenticates Docker with `ghcr.io` using `GITHUB_TOKEN` to allow pushing and pulling images.
-4.  **Generate Self-Signed Certificates (CI Only):** Creates temporary SSL certificates for the Nginx service within the CI environment.
-5.  **Build and Push Multi-platform Docker Image:** Builds the `web` service image for `linux/amd64` and `linux/arm64` platforms, then pushes the multi-architecture image manifest to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` (derived from `IMAGE_TAG`).
-6.  **Start Containers:** Uses `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build` to start `mongo`, `redis`, and `web`. It pulls the `web` image from `ghcr.io` (via `docker-compose.ci.yml`) and waits for all services (including the `web` service's health check) to become `healthy`.
-7.  **Seed Database:** Executes `scripts/seed_db.py` to populate the database with initial data (articles + profile).
-8.  **Inject and Run Tests:** Copies test files into the running `web` container and executes `pytest`. By default, performance-intensive tests (marked `@pytest.mark.heavy`) are skipped for Pi optimization.
-9.  **Heavy Test Opt-in:** These can be manually triggered via `workflow_dispatch` by setting `run_heavy_tests: true`.
-10. **Teardown:** Stops and removes all services created by Docker Compose.
+To ensure both reliability and speed, the pipeline is split into four modular jobs across different runners.
+
+### 1. Security & Linting (Static Analysis)
+*   **Runner:** `ubuntu-latest` (GitHub-hosted)
+*   **Tasks:** Runs `pip-audit` for dependency vulnerabilities and `actionlint` for workflow syntax validation. This job fails fast if there are security or configuration issues.
+
+### 2. Check ARM64 Wheels (Compatibility)
+*   **Runner:** `ubuntu-latest` (GitHub-hosted)
+*   **Tasks:** Performs a dry-run Docker build specifically for `linux/arm64`.
+*   **Rationale:** Uses QEMU on GitHub-hosted runners to verify that all Python wheels and C-extensions (like `argon2-cffi` or `cryptography`) are available for ARM64 without being affected by local networking issues on self-hosted infrastructure. **Does not push to registry.**
+
+### 3. Verify Functional (amd64)
+*   **Runner:** `wsl-staging` (Self-hosted)
+*   **Tasks:**
+    *   Builds the `linux/amd64` image natively (no QEMU overhead).
+    *   Starts the full stack (`nginx`, `web`, `mongo`, `redis`).
+    *   **Smoke Test:** Explicitly verifies that the `web` container can reach the `nginx` proxy via the internal Docker network.
+    *   **Pytest:** Runs the functional test suite (excluding e2e/performance).
+    *   **Push:** If all tests pass, the verified image is pushed to `ghcr.io` for deployment.
+*   **Rationale:** Functional verification happens on the self-hosted runner to mirror the production-like environment (WSL/Linux).
+
+### 4. Deploy to WSL (Staging)
+*   **Runner:** `wsl-staging` (Self-hosted)
+*   **Trigger:** Only runs if *both* `Check ARM64 Wheels` and `Verify Functional (amd64)` succeed.
+*   **Tasks:** Executes `scripts/deploy.sh` to update the staging environment with the newly verified image.
 
 ## Staging Deployment (WSL Runner)
 **Triggered by:** Runs after the `build-and-test` job successfully completes.

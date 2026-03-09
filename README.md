@@ -17,7 +17,7 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 
 *   **Backend**: Flask (Python), MongoDB, Redis
 *   **Frontend**: Vanilla JS (SPA), CSS, HTML
-*   **DevOps**: Docker, Nginx, Poetry, GitHub Actions
+*   **DevOps**: Docker, Nginx, Poetry, GitHub Actions, Multi-platform (AMD64/ARM64) Verification
 
 ---
 
