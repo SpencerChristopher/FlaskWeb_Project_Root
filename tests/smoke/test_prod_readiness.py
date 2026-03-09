@@ -2,9 +2,63 @@ import pytest
 import requests
 import os
 import urllib3
+import socket
+from requests.adapters import HTTPAdapter
+from urllib3.connectionpool import HTTPSConnectionPool
 
-# Suppress insecure request warnings for self-signed certs in staging
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+# Use local certificate for verification if it exists to avoid warnings
+CERT_PATH = "/app/certs/server.crt" if os.getenv("DOCKER_CONTAINER") == "true" else "certs/server.crt"
+VERIFY = CERT_PATH if os.path.exists(CERT_PATH) else False
+
+class HostResolverAdapter(HTTPAdapter):
+    """
+    Adapter that forces 'localhost' requests to a specific IP while 
+    preserving the 'localhost' hostname for SSL SNI and verification.
+    """
+    def __init__(self, target_ip, **kwargs):
+        self.target_ip = target_ip
+        super().__init__(**kwargs)
+
+    def get_connection(self, url, proxies=None):
+        # This is for requests < 2.30; for newer versions we might need to 
+        # override different methods, but let's try this or use a custom 
+        # urllib3 PoolManager.
+        return super().get_connection(url, proxies)
+
+    def send(self, request, **kwargs):
+        # The simplest way to do this in modern requests/urllib3 is to 
+        # spoof the 'Host' header and use the IP in the URL, BUT that 
+        # fails certificate verification because 'requests' matches the 
+        # URL hostname against the cert.
+        
+        # Instead, we keep 'localhost' in the URL but we use a custom 
+        # resolver if possible, or we just use the 'verify=False' with 
+        # warnings suppressed if this complexity fails.
+        return super().send(request, **kwargs)
+
+# Setup session
+session = requests.Session()
+
+# Since the previous HostHeaderAdapter failed with IP mismatch, 
+# let's try the 'urllib3' way of forcing the resolution of 'localhost' 
+# to the nginx IP globally within this process.
+if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
+    try:
+        nginx_ip = socket.gethostbyname("nginx")
+        
+        # Monkeypatching socket.getaddrinfo to force localhost -> nginx_ip
+        original_getaddrinfo = socket.getaddrinfo
+        def patched_getaddrinfo(*args, **kwargs):
+            if args[0] == "localhost":
+                return original_getaddrinfo(nginx_ip, *args[1:], **kwargs)
+            return original_getaddrinfo(*args, **kwargs)
+        socket.getaddrinfo = patched_getaddrinfo
+    except Exception:
+        pass
+
+# Only suppress warnings if we are NOT verifying
+if not VERIFY:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # These tests are intended to run against a LIVE production/staging instance.
 # They verify that the 'Double Gate' and core infrastructure are operational.
@@ -13,40 +67,45 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 class TestProdReadiness:
     """Smoke tests for production environments."""
 
+    def _get_base_url(self, prod_base_url):
+        if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
+            # We use localhost because the cert is issued to localhost
+            return "https://localhost"
+        return prod_base_url
+
     def test_api_bootstrap_public(self, prod_base_url):
         """Verify that bootstrap endpoint is reachable and returns public data."""
-        url = f"{prod_base_url}/api/bootstrap"
-        # We use verify=False for self-signed certs in staging/WSL
-        resp = requests.get(url, verify=False)
+        base = self._get_base_url(prod_base_url)
+        url = f"{base}/api/bootstrap"
+        resp = session.get(url, verify=VERIFY)
         assert resp.status_code == 200
         data = resp.json()
         assert "profile" in data
         assert "auth" in data
-        # Corrected key from 'authenticated' to 'logged_in'
         assert data["auth"]["logged_in"] is False
 
     def test_db_connectivity_via_blog_api(self, prod_base_url):
         """Verify that the blog API can fetch posts (DB Check)."""
-        url = f"{prod_base_url}/api/blog"
-        resp = requests.get(url, verify=False)
+        base = self._get_base_url(prod_base_url)
+        url = f"{base}/api/blog"
+        resp = session.get(url, verify=VERIFY)
         assert resp.status_code == 200
         data = resp.json()
-        # Corrected key from 'articles' to 'posts'
         assert "posts" in data
         assert isinstance(data["posts"], list)
 
     def test_unauthorized_content_access_blocked(self, prod_base_url):
         """Verify that administrative endpoints are correctly gated."""
-        url = f"{prod_base_url}/api/content/articles"
-        resp = requests.get(url, verify=False)
-        # Should be 401 (Unauthorized) not 404 or 500
+        base = self._get_base_url(prod_base_url)
+        url = f"{base}/api/content/articles"
+        resp = session.get(url, verify=VERIFY)
         assert resp.status_code == 401
         assert resp.json()["error_code"] == "UNAUTHORIZED"
 
     def test_static_assets_available(self, prod_base_url):
         """Verify that Nginx is correctly serving static files."""
-        # Check app.js (the core of our SPA)
-        url = f"{prod_base_url}/static/app.js"
-        resp = requests.get(url, verify=False)
+        base = self._get_base_url(prod_base_url)
+        url = f"{base}/static/app.js"
+        resp = session.get(url, verify=VERIFY)
         assert resp.status_code == 200
         assert "application/javascript" in resp.headers.get("Content-Type", "")

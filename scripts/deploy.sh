@@ -79,8 +79,19 @@ fi
 echo "Ensuring certs directory..."
 mkdir -p certs
 if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
+  cat > certs/san.conf <<EOF
+[req]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+[req_distinguished_name]
+CN = localhost
+[v3_req]
+subjectAltName = DNS:localhost, DNS:nginx
+EOF
   openssl genrsa -out certs/server.key 2048
-  openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
+  openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -config certs/san.conf
+  rm certs/san.conf
   chmod 600 certs/server.key
   chmod 644 certs/server.crt
 fi
