@@ -226,7 +226,7 @@ const ROUTES = {
             return data;
         } 
     },
-    '/login': { view: LoginView, auth: true },
+    '/login': { view: LoginView },
     '/admin/profile': { view: ProfileView, auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/admin/articles': { view: ContentManagerView, auth: true },
     '/about': { view: AboutView, fetch: () => fetchAPI('/api/about') },
@@ -292,6 +292,12 @@ async function router() {
 
         if (route.auth && !consentState.allowsAuth) {
             mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3></div>`;
+            return;
+        }
+
+        if (route.auth && !auth.loggedIn) {
+            console.warn(`Unauthorized access to ${path}. Redirecting...`);
+            navigate('/login');
             return;
         }
 
