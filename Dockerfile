@@ -17,6 +17,16 @@ COPY poetry.lock pyproject.toml ./
 ENV POETRY_VIRTUALENVS_IN_PROJECT=true
 RUN poetry install --no-root
 
+# --- Static Assets Obfuscation Stage ---
+# This stage minifies and obfuscates Vanilla JS using Terser
+FROM node:20-slim AS static-builder
+WORKDIR /app
+COPY ./static ./static
+# Install Terser globally
+RUN npm install -g terser
+# Minify and obfuscate JS files in place (excluding non-JS files)
+RUN find ./static -name "*.js" -exec sh -c 'terser "$1" --compress --mangle -o "$1"' _ {} \;
+
 # --- Final Stage ---
 # This stage creates the lean, high-integrity production/staging image
 ARG PYTHON_VERSION=3.11
@@ -48,7 +58,7 @@ ENV LOG_LEVEL=$LOG_LEVEL \
 COPY --from=builder --chown=appuser:appuser /app/.venv ./.venv
 COPY --chown=appuser:appuser ./src ./src
 COPY --chown=appuser:appuser ./scripts ./scripts
-COPY --chown=appuser:appuser ./static ./static
+COPY --from=static-builder --chown=appuser:appuser /app/static ./static
 COPY --chown=appuser:appuser ./templates ./templates
 COPY --chown=appuser:appuser ./main.py ./
 COPY --chown=appuser:appuser ./pytest.ini ./

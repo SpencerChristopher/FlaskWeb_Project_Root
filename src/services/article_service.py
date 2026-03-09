@@ -78,7 +78,6 @@ class ArticleService:
             last_updated=(
                 article.last_updated.isoformat() if article.last_updated else None
             ),
-            author_id=str(article.author.id) if article.author else None,
             author_username=article.author.username if article.author else None,
         ).model_dump()
 

@@ -36,5 +36,4 @@ class ArticlePublic(BaseModel):
     is_published: bool
     publication_date: Optional[str] = None
     last_updated: Optional[str] = None
-    author_id: str
     author_username: str
