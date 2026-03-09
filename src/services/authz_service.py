@@ -19,13 +19,33 @@ from src.services.roles import (
 
 
 class AuthzService:
-    """Domain-level authorization checks decoupled from route modules."""
+    """Domain-level authorization checks decoupled from route modules.
+
+    This service provides centralized logic for permission enforcement,
+    role-based access control (RBAC), and identity verification using both
+    database state and JWT claims.
+    """
 
     def __init__(self, user_repository: UserRepository):
+        """Initialize the AuthzService.
+
+        Args:
+            user_repository: Repository for identity lookups.
+        """
         self._user_repository = user_repository
 
     def get_authenticated_user(self, user_id: str):
-        """Retrieve and verify the existence of the user from the database."""
+        """Retrieve and verify the existence of the user from the database.
+
+        Args:
+            user_id: Unique identifier for the user.
+
+        Returns:
+            User: The persisted user instance.
+
+        Raises:
+            UnauthorizedException: If the user no longer exists in the system.
+        """
         user = self._user_repository.get_by_id(user_id)
         if not user:
             raise UnauthorizedException(
@@ -40,10 +60,25 @@ class AuthzService:
         permission: str | list[str],
         error_message: str = "Access denied: insufficient permissions.",
     ) -> UserIdentity:
-        """
-        Enforce a granular permission check.
-        Supports single permission string or a list of allowed permissions.
-        User must possess at least one of the provided permissions.
+        """Enforce a granular permission check against both DB and JWT claims.
+
+        This method ensures 'dual-validation':
+        1. Validates that the token version matches the DB (Live Revocation).
+        2. Validates that the authoritative DB role has the required permission.
+        3. Validates that the JWT claims also possess the required permission.
+
+        Args:
+            user_id: The ID of the user attempting the action.
+            user_claims: The decoded JWT payload.
+            permission: A single permission string or a list of required permissions.
+            error_message: Custom message for the ForbiddenException.
+
+        Returns:
+            UserIdentity: A lightweight DTO representing the verified user.
+
+        Raises:
+            UnauthorizedException: If the user is invalid or the token is expired/revoked.
+            ForbiddenException: If the user lacks the required permissions.
         """
         # Fetch minimal identity fields from DB (Lazy Hydration)
         user_doc = self._user_repository.get_identity(user_id)
@@ -95,7 +130,15 @@ class AuthzService:
         )
 
     def require_admin(self, user_id: str, user_claims: dict[str, Any]) -> UserIdentity:
-        """Legacy helper for admin-level routes."""
+        """Enforce administrator-level access.
+
+        Args:
+            user_id: The ID of the user.
+            user_claims: The decoded JWT payload.
+
+        Returns:
+            UserIdentity: The verified identity.
+        """
         return self.require_permission(
             user_id=user_id,
             user_claims=user_claims,
@@ -104,7 +147,15 @@ class AuthzService:
         )
 
     def require_content_admin(self, user_id: str, user_claims: dict[str, Any]):
-        """Transitional helper mapping to content management."""
+        """Enforce content management access.
+
+        Args:
+            user_id: The ID of the user.
+            user_claims: The decoded JWT payload.
+
+        Returns:
+            UserIdentity: The verified identity.
+        """
         return self.require_permission(
             user_id=user_id,
             user_claims=user_claims,
@@ -113,8 +164,14 @@ class AuthzService:
         )
 
     def get_user_capabilities(self, user_claims: dict[str, Any]) -> list[str]:
-        """
-        Extract the list of granular permissions available to the user.
-        Used for dynamic frontend UI discovery.
+        """Extract the list of granular permissions available to the user.
+
+        Used primarily for dynamic frontend UI discovery based on token claims.
+
+        Args:
+            user_claims: The decoded JWT payload.
+
+        Returns:
+            list[str]: Sorted list of permission strings.
         """
         return sorted(list(get_permissions_from_claims(user_claims)))
