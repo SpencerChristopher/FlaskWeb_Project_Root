@@ -90,13 +90,23 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 
 ## Production Deployment (Raspberry Pi & Cloudflare)
 
-The production environment leverages **Cloudflare Tunnels (Zero Trust)** for secure edge routing.
+The production environment leverages **Cloudflare Tunnels (Zero Trust)** for secure edge routing and identity-aware access.
 
-### **Architecture**
-1.  **Edge TLS**: Cloudflare handles the public SSL certificate (your-domain.com) and terminates TLS at the edge.
-2.  **Secure Tunnel**: The `cloudflared` container establishes an outbound-only connection to Cloudflare. No inbound ports (80/443) need to be opened on the Raspberry Pi.
-3.  **Internal TLS**: Traffic from the tunnel to Nginx is encrypted using the project's **self-signed certificates**. This ensures "In-Flight" encryption across the internal Docker network.
-4.  **2FA (Zero Trust)**: Email OTP (One-Time Password) authentication is enforced at the Cloudflare Edge before a request ever reaches the tunnel.
+### **1. Cloudflare Tunnels (The "Outbound-Only" Bridge)**
+Instead of opening inbound ports (80/443) on your home router or server, the `cloudflared` container creates an **outbound-only** persistent connection to the Cloudflare Edge.
+- **Security Benefit:** Your server's public IP remains hidden. There is no "attack surface" for port-scanners or traditional DDoS attacks because the server is not listening for connections from the internet.
+- **Connectivity:** The tunnel acts as a virtual bridge, allowing Cloudflare to route traffic from your domain name directly to the Nginx container inside the Docker network.
+
+### **2. Cloudflare Registered Domain & Edge TLS**
+By using a domain registered with or managed by Cloudflare, you gain several "Edge" capabilities:
+- **Automatic TLS Termination:** Cloudflare provides and automatically renews a globally trusted SSL/TLS certificate for your domain. Traffic from the user's browser to the Cloudflare Edge is encrypted using this certificate.
+- **Internal Encryption ("Full" SSL Mode):** Traffic from the Cloudflare Edge through the tunnel to your Nginx container is encrypted using the project's **self-signed certificates** (generated during deployment). This ensures end-to-end encryption even within your local network.
+- **Caching & Optimization:** Static assets (JS/CSS) are cached at Cloudflare's edge locations, reducing latency and offloading traffic from your Raspberry Pi.
+
+### **3. Zero Trust Access (Identity-Aware Gate)**
+Cloudflare Tunnels allow you to wrap the entire application in **Access Policies** before a single packet reaches your server:
+- **Email OTP / 2FA:** You can configure a policy that requires users to authenticate via Email OTP or a supported SSO provider (GitHub, Google, etc.) at the Cloudflare Edge.
+- **Authorization Matrix:** This acts as the first "gate" in our multi-layered security model. If a user is not authorized by Cloudflare, their request is blocked at the edge, protecting the application from unauthorized probes and recursive 401 hammering.
 
 ### **Production Service Stack**
 In production, use the base and production override files:
@@ -111,8 +121,8 @@ In addition to the base secrets, production requires:
 
 ### **Nginx Production Hardening**
 Nginx is configured to trust Cloudflare headers:
-- `CF-Connecting-IP`: Used to identify the true client IP.
-- `X-Forwarded-For`: Preserved through the tunnel.
+- `CF-Connecting-IP`: Used to identify the true client IP for audit logging and rate limiting.
+- `X-Forwarded-For`: Preserved through the tunnel to maintain request context.
 
 ## Certificates
 *   Nginx expects SSL certificates at `./certs/server.crt` and `./certs/server.key`.
