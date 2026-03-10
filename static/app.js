@@ -1,13 +1,4 @@
 // app.js - Modern SPA Core with Design Patterns
-import { ProfileView } from './js/views/ProfileView.js';
-import { HomeView } from './js/views/HomeView.js';
-import { ArticleListView } from './js/views/ArticleListView.js';
-import { ArticleDetailView } from './js/views/ArticleDetailView.js';
-import { LoginView } from './js/views/LoginView.js';
-import { ContentManagerView } from './js/views/ContentManagerView.js';
-import { AboutView } from './js/views/AboutView.js';
-import { LicenseView } from './js/views/LicenseView.js';
-import { ContactView } from './js/views/ContactView.js';
 import { AuthService } from './js/services/AuthService.js';
 
 console.log("App.js Module Loaded - initializing with Patterns...");
@@ -36,13 +27,6 @@ const mainContentElement = document.getElementById('main-content');
 auth.subscribe((user, loggedIn) => {
     console.info("Auth state changed. Updating UI...", { loggedIn });
     updateNavUI();
-    
-    // Only re-route if we are already fully initialized AND on the home page.
-    const isHomePage = window.location.pathname === '/' || window.location.pathname === '/home';
-    if (isHomePage && consentState.decided && !consentState.initializing) {
-        console.debug("Home page auth change detected. Refreshing view...");
-        router();
-    }
 });
 
 // --- Helper Functions ---
@@ -182,9 +166,10 @@ document.addEventListener('click', (e) => {
 
 async function handleLogin(e) {
     e.preventDefault();
-    const [u, p] = [document.getElementById('username').value, document.getElementById('password').value];
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
     try {
-        await auth.login(u, p); // Observer triggers re-render/nav-update
+        await auth.login(username, password); // Observer triggers re-render/nav-update
         navigate('/home');
     } catch (err) { alert(err.message); }
 }
@@ -212,12 +197,13 @@ async function startApp(allowAuth) {
     router();
 }
 
-// --- Router Registry ---
+// --- Router Registry (Dynamic Path Map) ---
 const ROUTES = {
-    '/': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
-    '/home': { view: HomeView, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
+    '/': { module: './js/views/HomeView.js', name: 'HomeView', fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
+    '/home': { module: './js/views/HomeView.js', name: 'HomeView', fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
     '/blog': { 
-        view: ArticleListView, 
+        module: './js/views/ArticleListView.js', 
+        name: 'ArticleListView',
         fetch: async () => {
             const data = await fetchAPI('/api/blog');
             if (data?.posts) {
@@ -226,12 +212,12 @@ const ROUTES = {
             return data;
         } 
     },
-    '/login': { view: LoginView },
-    '/admin/profile': { view: ProfileView, auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
-    '/admin/articles': { view: ContentManagerView, auth: true },
-    '/about': { view: AboutView, fetch: () => fetchAPI('/api/about') },
-    '/license': { view: LicenseView, fetch: () => fetchAPI('/api/license') },
-    '/contact': { view: ContactView },
+    '/login': { module: './js/views/LoginView.js', name: 'LoginView' },
+    '/admin/profile': { module: './js/views/ProfileView.js', name: 'ProfileView', auth: true, fetch: () => bootstrapCache || fetchAPI('/api/content/profile') },
+    '/admin/articles': { module: './js/views/ContentManagerView.js', name: 'ContentManagerView', auth: true },
+    '/about': { module: './js/views/AboutView.js', name: 'AboutView', fetch: () => fetchAPI('/api/about') },
+    '/license': { module: './js/views/LicenseView.js', name: 'LicenseView', fetch: () => fetchAPI('/api/license') },
+    '/contact': { module: './js/views/ContactView.js', name: 'ContactView' },
 };
 
 function navigate(path) {
@@ -242,11 +228,6 @@ function navigate(path) {
 async function router() {
     const path = window.location.pathname;
     
-    // Reset Infinite Scroll state if we navigate AWAY from the blog
-    if (path !== '/blog' && !path.startsWith('/blog/')) {
-        ArticleListView.resetState?.();
-    }
-
     if (currentViewCleanup) {
         currentViewCleanup();
         currentViewCleanup = null;
@@ -264,32 +245,40 @@ async function router() {
     try {
         let route = ROUTES[path];
         let data = null;
+        let ViewClass = null;
 
+        // Special case for dynamic blog detail
         if (!route && path.startsWith('/blog/')) {
             const slug = path.replace('/blog/', '');
-            // Check cache for metadata, but we still need the full content if not cached or if cache is partial
             const cached = articleCache.get(slug);
+            
+            const module = await import('./js/views/ArticleDetailView.js');
+            ViewClass = module.ArticleDetailView;
+
             route = { 
-                view: ArticleDetailView, 
                 fetch: async () => {
                     const full = await fetchAPI(`/api/blog/${slug}`);
-                    articleCache.set(slug, full); // Upgrade cache to full content
+                    articleCache.set(slug, full);
                     return full;
                 } 
             };
             
-            // If we have a cached version with content, use it immediately
             if (cached && cached.content) {
                 data = cached;
-                route.fetch = null; // Skip fetch
+                route.fetch = null;
             }
+        } else if (route) {
+            // Lazy load the module using explicit export name
+            const module = await import(route.module);
+            ViewClass = module[route.name];
         }
 
-        if (!route) {
+        if (!ViewClass) {
             mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>404 - Not Found</h3></div>`;
             return;
         }
 
+        // --- Route Guards ---
         if (route.auth && !consentState.allowsAuth) {
             mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Consent Required</h3></div>`;
             return;
@@ -301,25 +290,33 @@ async function router() {
             return;
         }
 
+        // Reset Infinite Scroll state if we navigate AWAY from the blog
+        if (path !== '/blog') {
+            const listModule = await import('./js/views/ArticleListView.js').catch(() => null);
+            if (listModule && listModule.ArticleListView) {
+                listModule.ArticleListView.resetState?.();
+            }
+        }
+
         if (route.fetch) {
             mainContentElement.innerHTML = renderLoading();
-            // Data can be a promise or an object (cached)
             data = await (typeof route.fetch === 'function' ? route.fetch() : route.fetch);
             
-            // Clear cache after first use to ensure freshness on subsequent navigations
             if (bootstrapCache && (path === '/' || path === '/home')) {
                 bootstrapCache = null;
             }
         }
 
-        mainContentElement.innerHTML = route.view.template(data, auth);
-        route.view.mount?.(viewContext, route.view === LoginView ? handleLogin : undefined);
+        mainContentElement.innerHTML = ViewClass.template(data, auth);
+        ViewClass.mount?.(viewContext, route.name === 'LoginView' ? handleLogin : undefined);
 
     } catch (err) {
         console.error("Router error:", err);
         mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Page not available</h3><p>${err.message}</p></div>`;
     }
 }
+
+
 
 window.addEventListener('popstate', router);
 
