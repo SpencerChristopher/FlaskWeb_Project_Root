@@ -75,7 +75,6 @@ def test_contract_blog_detail_shape(client, contract_article):
         "is_published",
         "publication_date",
         "last_updated",
-        "author_id",
         "author_username",
     }
     assert "author" not in data
@@ -102,7 +101,6 @@ def test_contract_admin_article_crud_shapes(client, admin_headers):
         "is_published",
         "publication_date",
         "last_updated",
-        "author_id",
         "author_username",
     }
     assert "author" not in created
