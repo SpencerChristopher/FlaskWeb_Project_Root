@@ -1,4 +1,5 @@
 import { ComponentFactory } from '../components/ComponentFactory.js';
+import { escapeHTML } from '../utils/SecurityUtils.js';
 
 /**
  * ArticleListView.js
@@ -22,10 +23,10 @@ export const ArticleListView = {
         }
 
         const articlesHtml = this._state.articles.map((a, idx) => ComponentFactory.createCard({
-            title: a.title,
+            title: escapeHTML(a.title),
             badge: "Article",
-            meta: `📅 ${a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft'}`,
-            body: `<p class="mb-0">${a.summary}</p>`,
+            meta: `📅 ${escapeHTML(a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft')}`,
+            body: `<p class="mb-0">${escapeHTML(a.summary)}</p>`,
             link: `/blog/${a.slug}`,
             dataTest: `article-card-${idx}`
         })).join("");
@@ -96,10 +97,10 @@ export const ArticleListView = {
                 const newCardsHtml = data.posts.map((a, idx) => {
                     const globalIdx = this._state.articles.length - data.posts.length + idx;
                     return ComponentFactory.createCard({
-                        title: a.title,
+                        title: escapeHTML(a.title),
                         badge: "Article",
-                        meta: `📅 ${a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft'}`,
-                        body: `<p class="mb-0">${a.summary}</p>`,
+                        meta: `📅 ${escapeHTML(a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft')}`,
+                        body: `<p class="mb-0">${escapeHTML(a.summary)}</p>`,
                         link: `/blog/${a.slug}`,
                         dataTest: `article-card-${globalIdx}`
                     });

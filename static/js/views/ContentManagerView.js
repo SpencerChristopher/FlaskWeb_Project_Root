@@ -1,3 +1,5 @@
+import { escapeHTML } from '../utils/SecurityUtils.js';
+
 /**
  * ContentManagerView.js
  * Manages the article lifecycle: listing, creating, editing, and deleting.
@@ -108,14 +110,14 @@ export const ContentManagerView = {
             : '<span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-2 rounded-pill">Draft</span>';
         
         return `
-            <tr data-id="${a.id}">
-                <td class="ps-4 fw-bold">${a.title}</td>
+            <tr data-id="${escapeHTML(a.id)}">
+                <td class="ps-4 fw-bold">${escapeHTML(a.title)}</td>
                 <td>${statusBadge}</td>
-                <td class="text-muted small">${date}</td>
+                <td class="text-muted small">${escapeHTML(date)}</td>
                 <td class="pe-4 text-end">
                     <div class="btn-group">
-                        <button class="btn btn-sm btn-outline-primary edit-article-btn" data-id="${a.id}">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger delete-article-btn" data-id="${a.id}">Delete</button>
+                        <button class="btn btn-sm btn-outline-primary edit-article-btn" data-id="${escapeHTML(a.id)}">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger delete-article-btn" data-id="${escapeHTML(a.id)}">Delete</button>
                     </div>
                 </td>
             </tr>`;
@@ -136,7 +138,7 @@ export const ContentManagerView = {
                     listBody.innerHTML = articles.map(a => this.articleRowTemplate(a)).join('');
                 }
             } catch (err) {
-                listBody.innerHTML = `<tr><td colspan="4" class="text-center py-5 text-danger">Failed to load articles: ${err.message}</td></tr>`;
+                listBody.innerHTML = `<tr><td colspan="4" class="text-center py-5 text-danger">Failed to load articles: ${escapeHTML(err.message)}</td></tr>`;
             }
         };
 

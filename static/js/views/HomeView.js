@@ -1,4 +1,5 @@
 import { ComponentFactory } from '../components/ComponentFactory.js';
+import { escapeHTML, validateURL } from '../utils/SecurityUtils.js';
 
 const socialLabelMap = {
     github: "GH",
@@ -16,10 +17,11 @@ function renderSocialLinks(links = {}) {
         .map(([key, url]) => {
             const label = key.replace(/[-_]+/g, " ").trim();
             const short = socialLabelMap[key] || (label ? label[0].toUpperCase() : "?");
+            const safeUrl = validateURL(url);
             return `
-                <a class="social-link" href="${url}" target="_blank" rel="noopener" data-test="social-link-${key}">
-                    <span class="social-pill" aria-hidden="true">${short}</span>
-                    <span class="visually-hidden">${label}</span>
+                <a class="social-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer" data-test="social-link-${key}">
+                    <span class="social-pill" aria-hidden="true">${escapeHTML(short)}</span>
+                    <span class="visually-hidden">${escapeHTML(label)}</span>
                 </a>`;
         })
         .join("");
@@ -52,6 +54,8 @@ export const HomeView = {
         }
         
         const skillTags = Array.isArray(data.skills) ? data.skills : [];
+        const safeImageUrl = validateURL(data.image_url);
+
         return `
             <section id="view-home" class="py-5" data-test="view-home">
                 <header class="py-5">
@@ -61,34 +65,34 @@ export const HomeView = {
                                 <div class="row g-4 align-items-start">
                                     <div class="col-12 col-md-auto text-center">
                                         <div class="profile-circle mx-auto mb-3 mb-md-0" style="width: 160px; height: 160px;">
-                                            ${data.image_url ? `<img class="profile-img" src="${data.image_url}" alt="Profile image" data-test="profile-image" />` : ""}
+                                            ${data.image_url ? `<img class="profile-img" src="${safeImageUrl}" alt="Profile image" data-test="profile-image" />` : ""}
                                         </div>
                                     </div>
                                     <div class="col-12 col-md">
                                         <div class="hero-header mb-3">
                                             <h1 class="profile-name mb-2" data-test="profile-name">
-                                                ${data.name || ""}
+                                                ${escapeHTML(data.name || "")}
                                             </h1>
                                             
                                             <div class="d-flex flex-wrap align-items-center gap-3">
                                                 ${data.location ? `
                                                     <span class="badge location-badge">
-                                                        📍 ${data.location}
+                                                        📍 ${escapeHTML(data.location)}
                                                     </span>
                                                 ` : ""}
                                                 
                                                 ${data.social_links?.linkedin ? `
-                                                    <a href="${data.social_links.linkedin}" target="_blank" class="btn btn-linkedin btn-sm">
+                                                    <a href="${validateURL(data.social_links.linkedin)}" target="_blank" rel="noopener noreferrer" class="btn btn-linkedin btn-sm">
                                                         Follow on LinkedIn
                                                     </a>
                                                 ` : ""}
                                             </div>
                                         </div>
 
-                                        ${roleTitle ? `<p class="role-title mb-4">${roleTitle}</p>` : ""}
+                                        ${roleTitle ? `<p class="role-title mb-4">${escapeHTML(roleTitle)}</p>` : ""}
                                         
                                         <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement" style="line-height: 1.6; max-width: 800px; text-align: justify;">
-                                            ${data.statement || ""}
+                                            ${escapeHTML(data.statement || "")}
                                         </div>
 
                                         <div class="d-flex flex-wrap gap-2 mb-4">
@@ -104,7 +108,7 @@ export const HomeView = {
                                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-4 pt-2 border-top">
                                             ${skillTags.length ? `
                                                 <div class="tags" data-test="profile-skills">
-                                                    ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${s}</span>`).join("")}
+                                                    ${skillTags.map((s, idx) => `<span class="tag ${idx % 2 ? 'secondary' : ''}">${escapeHTML(s)}</span>`).join("")}
                                                 </div>
                                             ` : ""}
                                             
@@ -127,10 +131,10 @@ export const HomeView = {
                         <div class="row justify-content-center">
                             <div class="col-12">
                                 ${workItems.map((w, idx) => ComponentFactory.createCard({
-                                    title: w.role || "",
-                                    subtitle: w.company || "",
-                                    meta: `📅 ${w.start_date || ""} — ${w.end_date || ""} &nbsp;&bull;&nbsp; 📍 ${w.location || ""}`,
-                                    body: w.description ? `<p class="mb-0">${w.description}</p>` : "",
+                                    title: escapeHTML(w.role || ""),
+                                    subtitle: escapeHTML(w.company || ""),
+                                    meta: `📅 ${escapeHTML(w.start_date || "")} — ${escapeHTML(w.end_date || "")} &nbsp;&bull;&nbsp; 📍 ${escapeHTML(w.location || "")}`,
+                                    body: w.description ? `<p class="mb-0">${escapeHTML(w.description)}</p>` : "",
                                     tags: Array.isArray(w.skills) ? w.skills : [],
                                     dataTest: `work-card-${idx}`
                                 })).join("")}

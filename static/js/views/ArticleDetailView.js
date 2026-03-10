@@ -1,3 +1,5 @@
+import { escapeHTML, sanitizeHTML } from '../utils/SecurityUtils.js';
+
 export const ArticleDetailView = {
     template(article, auth) {
         const data = article || {};
@@ -15,13 +17,13 @@ export const ArticleDetailView = {
                             <article class="card">
                                 <div class="card-body">
                                     <header class="mb-4">
-                                        <h1 class="profile-name mb-2" data-test="article-title">${data.title || ""}</h1>
+                                        <h1 class="profile-name mb-2" data-test="article-title">${escapeHTML(data.title || "")}</h1>
                                         <div class="text-muted" data-test="article-date">
-                                            Published on ${published}
+                                            Published on ${escapeHTML(published)}
                                         </div>
                                     </header>
                                     <section class="article-content" data-test="article-content">
-                                        ${data.content || ""}
+                                        ${sanitizeHTML(data.content || "")}
                                     </section>
                                 </div>
                             </article>
