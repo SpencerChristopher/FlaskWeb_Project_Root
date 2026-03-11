@@ -6,8 +6,9 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 WORKDIR /app
 
 # Install poetry and secure system tools
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir poetry && \
+# Hadolint: Pin versions in pip (DL3013)
+RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.0.3 wheel==0.42.0 && \
+    pip install --no-cache-dir poetry==1.7.1 && \
     poetry self add poetry-plugin-export
 
 # Copy dependency definition files to leverage Docker cache
@@ -22,10 +23,10 @@ RUN poetry install --no-root
 FROM node:20-slim AS static-builder
 WORKDIR /app
 COPY ./static ./static
-# Install Terser globally
-RUN npm install -g terser
-# Minify and obfuscate JS files in place (excluding non-JS files)
-RUN find ./static -name "*.js" -exec sh -c 'terser "$1" --compress --mangle -o "$1"' _ {} \;
+# Install Terser globally and minify in a single layer
+# Hadolint: Pin versions in npm (DL3016), Consolidate RUNs (DL3059)
+RUN npm install -g terser@5.27.0 && \
+    find ./static -name "*.js" -exec sh -c 'terser "$1" --compress --mangle -o "$1"' _ {} \;
 
 # --- Final Stage ---
 # This stage creates the lean, high-integrity production/staging image
@@ -40,7 +41,8 @@ RUN useradd --create-home appuser && \
     chown -R appuser:appuser /app
 
 # Secure system tools (as root) then switch to non-root
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+# Hadolint: Pin versions in pip (DL3013)
+RUN pip install --no-cache-dir --upgrade pip==24.0 setuptools==69.0.3 wheel==0.42.0
 USER appuser
 
 # Environment configuration
@@ -66,5 +68,6 @@ COPY --chown=appuser:appuser ./pytest.ini ./
 EXPOSE 8000
 
 # Define the command to run the application
-# Preload is used for fail-fast behavior on bootstrap errors
-CMD exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} --log-level ${LOG_LEVEL} --limit-request-line 4094 --limit-request-fields 100 --max-requests 1000 --forwarded-allow-ips="${FORWARDED_ALLOW_IPS}" --preload --access-logfile - 'main:create_app()'
+# Hadolint: Use arguments JSON notation (DL3025)
+# We use 'sh -c' within JSON to allow ENV variable expansion safely
+CMD ["sh", "-c", "exec /app/.venv/bin/gunicorn --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS} --threads ${GUNICORN_THREADS} --timeout ${GUNICORN_TIMEOUT} --log-level ${LOG_LEVEL} --limit-request-line 4094 --limit-request-fields 100 --max-requests 1000 --forwarded-allow-ips=\"${FORWARDED_ALLOW_IPS}\" --preload --access-logfile - 'main:create_app()'"]

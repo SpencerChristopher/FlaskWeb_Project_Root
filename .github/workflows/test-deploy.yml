@@ -251,6 +251,7 @@ jobs:
         run: |
           echo "Waiting for cloudflared to connect..."
           for i in {1..10}; do
+            echo "Attempt $i: Checking connectivity..."
             if docker logs cloudflared_tunnel 2>&1 | grep -q "Connected to"; then
               echo "Tunnel connected successfully."
               exit 0

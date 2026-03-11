@@ -86,8 +86,17 @@ if ($SkipAudit) {
     docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
-    # Updated to check all YAML files in workflows directory
-    docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+    # Resolve file paths explicitly so they are passed to the container correctly
+    $workflowFiles = Get-ChildItem -Path ".github/workflows/*.yml" | ForEach-Object { ".github/workflows/$($_.Name)" }
+    if ($workflowFiles.Count -gt 0) {
+        docker run --rm -v "${PWD}:/app" -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml $workflowFiles
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Error: Workflow linting failed." -ForegroundColor Red
+            exit 1
+        }
+    } else {
+        Write-Host "Warning: No workflow files found to lint." -ForegroundColor Yellow
+    }
     
     Write-Host "Validation passed." -ForegroundColor Green
 }
@@ -142,10 +151,24 @@ if ($SmokeTest) {
 
 # [7/8] Docker Stack & ARM64 Validation
 Write-Host "[7/8] Validating Docker configurations..."
+
+# Lint Dockerfile
+Write-Host "Linting Dockerfile (hadolint)..."
+if (Require-Command "docker") {
+    Get-Content Dockerfile | docker run --rm -i hadolint/hadolint
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Error: Dockerfile linting failed." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Validate Compose Stack (Full Staging Parity)
+Write-Host "Validating Compose Configuration (Staging Parity)..."
 $env:IMAGE_TAG = "preflight-local"
-docker compose -f docker-compose.yml -f docker-compose.ci.yml config -q
+# Include all staging-relevant files to ensure they merge correctly
+docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml config -q
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Error: CI Docker configuration is invalid." -ForegroundColor Red
+    Write-Host "Error: Docker Compose configuration is invalid or files do not merge correctly." -ForegroundColor Red
     exit 1
 }
 
