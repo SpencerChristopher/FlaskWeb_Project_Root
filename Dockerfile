@@ -7,8 +7,8 @@ WORKDIR /app
 
 # Install poetry and secure system tools
 # hadolint ignore=DL3013
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir "poetry>=2.0.0" && \
+RUN pip install --no-cache-dir --upgrade --default-timeout=100 pip setuptools wheel && \
+    pip install --no-cache-dir --default-timeout=100 "poetry>=2.0.0" && \
     poetry self add poetry-plugin-export
 
 # Copy dependency definition files to leverage Docker cache
@@ -24,7 +24,11 @@ FROM node:20-slim AS static-builder
 WORKDIR /app
 COPY ./static ./static
 # Install Terser globally and minify in a single layer
-RUN npm install -g terser@5.27.0 && \
+# Use npm configuration to handle flaky network
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm install -g terser@5.27.0 && \
     find ./static -name "*.js" -exec sh -c 'terser "$1" --compress --mangle -o "$1"' _ {} \;
 
 # --- Final Stage ---
@@ -41,7 +45,7 @@ RUN useradd --create-home appuser && \
 
 # Secure system tools (as root) then switch to non-root
 # hadolint ignore=DL3013
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir --upgrade --default-timeout=100 pip setuptools wheel
 USER appuser
 
 # Environment configuration

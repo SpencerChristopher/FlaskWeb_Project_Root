@@ -96,6 +96,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker
+          buildkitd-config: |
+            [worker.oci]
+              max-parallelism = 4
+            [worker.containerd]
+              network = "host"
 
       - name: Validate required secrets
         run: |
