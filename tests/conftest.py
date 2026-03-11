@@ -96,8 +96,8 @@ def pytest_collection_modifyitems(config, items):
 def prod_base_url():
     """Returns the live URL for smoke and performance testing."""
     if os.environ.get("DOCKER_CONTAINER") in ["1", "true"]:
-        return os.environ.get("PROD_BASE_URL", "https://nginx")
-    return os.environ.get("PROD_BASE_URL", "https://localhost")
+        return os.environ.get("PROD_BASE_URL", "http://nginx")
+    return os.environ.get("PROD_BASE_URL", "http://localhost:5000")
 
 
 @pytest.fixture(scope="session", autouse=True)

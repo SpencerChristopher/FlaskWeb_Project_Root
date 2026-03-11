@@ -18,7 +18,7 @@ def test_mobile_hamburger_menu(page: Page):
     """
     Verifies that the hamburger menu appears and functions on mobile devices.
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     
     # Set viewport to iPhone 12 size
     page.set_viewport_size({"width": 390, "height": 844})
@@ -56,7 +56,7 @@ def test_mobile_overflow_and_layout(page: Page):
     """
     Checks for horizontal overflow and element clipping on various mobile sizes.
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     
     viewports = [
         {"width": 320, "height": 568},  # iPhone 5/SE
@@ -91,7 +91,7 @@ def test_mobile_scroll_resilience(page: Page):
     Verifies that the page remains scrollable and doesn't exhibit "bad scroll"
     (e.g., sticking, jumping, or locking) on mobile.
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     page.set_viewport_size({"width": 375, "height": 667})
     
     page.goto(f"{base_url}/home")

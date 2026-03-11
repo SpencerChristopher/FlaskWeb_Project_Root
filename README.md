@@ -39,9 +39,6 @@ For a detailed explanation of the environment variable hierarchy, see [Deploymen
 
 ### 3. Quick Start
 ```bash
-# Generate self-signed SSL certs for local development
-mkdir -p certs && openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout certs/server.key -out certs/server.crt -subj "/CN=localhost"
-
 # Build and start services
 docker compose up --build -d
 
@@ -50,7 +47,7 @@ docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
-The application will be available at `https://localhost`.
+The application will be available at `http://localhost:5000`.
 
 ---
 

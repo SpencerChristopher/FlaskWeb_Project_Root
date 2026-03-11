@@ -13,7 +13,7 @@ def test_article_lifecycle_admin(page: Page):
     """
     Test the full lifecycle of an article: Create, Edit, Publish, Delete.
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 

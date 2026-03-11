@@ -13,7 +13,7 @@ def test_path_based_routing_home(page: Page):
     """
     Verifies that the HomeView is accessible via a path-based URL (/home).
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
 
     # Navigating directly to /home should work with History API
     page.goto(f"{base_url}/home")
@@ -36,7 +36,7 @@ def test_article_navigation_flow_paths(page: Page):
     """
     Verifies navigation using the History API (path-based) for the blog flow.
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
 
     # Go to blog via path
     page.goto(f"{base_url}/blog")

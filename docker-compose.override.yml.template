@@ -1,9 +1,10 @@
 services:
   nginx:
     ports:
-      - "443:443" # Expose HTTPS port for local development
-    volumes:
-      - ./certs:/etc/nginx/certs:ro # Mount local certs directory into proxy container
+      - "5000:80" # Map host port 5000 to Nginx container port 80
+      # - "443:443" # Uncomment to test HTTPS locally (requires certs)
+    # volumes:
+      # - ./certs:/etc/nginx/certs:ro # Uncomment to test with local certs
 
   mongo:
     ports:

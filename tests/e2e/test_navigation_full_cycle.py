@@ -11,7 +11,7 @@ def browser_context_args(browser_context_args):
 @pytest.mark.e2e
 def test_guest_navigation_from_login(page: Page):
     """Verifies a guest can navigate away from the login page."""
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
 
     # Go to Login
     page.goto(f"{base_url}/login")
@@ -41,7 +41,7 @@ def test_guest_navigation_from_login(page: Page):
 @pytest.mark.e2e
 def test_admin_navigation_after_login(page: Page):
     """Verifies an admin can navigate after logging in."""
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 

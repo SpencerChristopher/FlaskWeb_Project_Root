@@ -65,7 +65,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
     *   Auto-recovers once from Mongo auth/volume drift on staging (`DEPLOY_AUTO_RECOVER_MONGO_AUTH=true`) by performing a guarded hard reset if Mongo healthcheck reports `Authentication failed`.
     *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
     *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
-5.  **Verify Staging Health:** Runs `curl -k -f` check against `https://localhost/` to ensure the application stack is responsive.
+5.  **Verify Staging Health:** Runs `curl -f` check against `http://localhost:5000/` to ensure the application stack is responsive.
 6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data (articles + profile) in the staging environment.
 
 ## Docker & Application Configuration

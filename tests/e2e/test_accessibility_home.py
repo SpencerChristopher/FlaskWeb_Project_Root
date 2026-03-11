@@ -12,7 +12,7 @@ def browser_context_args(browser_context_args):
 @pytest.mark.e2e
 @pytest.mark.a11y
 def test_homepage_accessibility(page: Page):
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     axe_path = pathlib.Path("tests/axe/axe.min.js")
 
     if not axe_path.exists():

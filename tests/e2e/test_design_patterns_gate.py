@@ -14,7 +14,7 @@ def test_ui_consistency_factory_gate(page: Page):
     Verifies that cards in both Home and Blog views share the same
     foundational styling (the 'Factory' requirement).
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
 
     # 1. Check Experience Cards on Home
     page.goto(f"{base_url}/home")
@@ -46,7 +46,7 @@ def test_reactive_state_observer_gate(page: Page):
     Verifies that logging in updates MULTIPLE areas of the UI
     (the 'Observer' requirement).
     """
-    base_url = os.getenv("E2E_BASE_URL", "https://localhost")
+    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 

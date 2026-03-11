@@ -41,7 +41,7 @@ class TestAPIPerformance:
 
     def _get_base_url(self, prod_base_url):
         if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
-            return "https://localhost"
+            return "http://localhost:5000"
         return prod_base_url
 
     def test_bootstrap_latency(self, prod_base_url):

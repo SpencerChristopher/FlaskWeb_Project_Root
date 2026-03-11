@@ -8,12 +8,12 @@ The project supports two testing perspectives. Choosing the wrong one will cause
 
 ### A. Host-Side Testing (Standard)
 Run from your local terminal/IDE.
-*   **Target:** `https://localhost` (via Nginx proxy)
+*   **Target:** `http://localhost:5000` (via Nginx proxy)
 *   **Scope:** Best for E2E (Playwright) and quick iterative unit tests.
 *   **Command:** 
     ```powershell
     # End-to-End (Requires Playwright installed on host)
-    $env:SKIP_DB_CHECK="1"; python -m pytest tests/e2e/ --base-url https://localhost -p no:flask
+    $env:SKIP_DB_CHECK="1"; python -m pytest tests/e2e/ --base-url http://localhost:5000 -p no:flask
     ```
 
 ### B. Container-Side Testing (CI Parity)

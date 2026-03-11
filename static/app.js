@@ -1,5 +1,6 @@
 // app.js - Modern SPA Core with Design Patterns
 import { AuthService } from './js/services/AuthService.js';
+import { escapeHTML } from './js/utils/SecurityUtils.js';
 
 console.log("App.js Module Loaded - initializing with Patterns...");
 
@@ -312,7 +313,7 @@ async function router() {
 
     } catch (err) {
         console.error("Router error:", err);
-        mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Page not available</h3><p>${err.message}</p></div>`;
+        mainContentElement.innerHTML = `<div class="p-5 text-center"><h3>Page not available</h3><p>${escapeHTML(err.message)}</p></div>`;
     }
 }
 

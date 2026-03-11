@@ -113,23 +113,6 @@ if ($SmokeTest) {
         Write-Host "Resetting stack..."
         docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans
         
-        Write-Host "Generating certs (CI Parity)..."
-        if (-not (Test-Path "certs")) { New-Item -ItemType Directory -Path "certs" }
-        $sanConfig = @"
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-[req_distinguished_name]
-CN = localhost
-[v3_req]
-subjectAltName = DNS:localhost, DNS:nginx
-"@
-        $sanConfig | Out-File -FilePath "certs/san.conf" -Encoding ascii
-        openssl genrsa -out certs/server.key 2048
-        openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -config certs/san.conf
-        Remove-Item "certs/san.conf"
-
         Write-Host "Building & Starting CI stack..."
         $env:IMAGE_TAG = "preflight-local"
         docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait

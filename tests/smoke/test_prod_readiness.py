@@ -70,7 +70,7 @@ class TestProdReadiness:
     def _get_base_url(self, prod_base_url):
         if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
             # We use localhost because the cert is issued to localhost
-            return "https://localhost"
+            return "http://localhost:5000"
         return prod_base_url
 
     def test_api_bootstrap_public(self, prod_base_url):

@@ -4,20 +4,24 @@ This document defines the architectural patterns, data flow, and structural boun
 
 ## 1. High-Level Container Diagram
 
-The system follows a containerized micro-stack approach, with Nginx acting as the secure gateway.
+The system follows a containerized micro-stack approach, with Cloudflare Tunnels providing a secure entry point and Nginx acting as the internal HTTP bridge.
 
 ```mermaid
 graph TD
     User((User/Browser))
+    CF[Cloudflare Edge TLS]
     
     subgraph Docker_Network [Docker Bridge Network]
-        Nginx[Nginx Proxy :443]
+        Tunnel[Cloudflare Tunnel]
+        Nginx[Nginx Proxy :80]
         Flask[Flask API :8000]
         Mongo[(MongoDB :27017)]
         Redis[(Redis :6379)]
     end
 
-    User -- HTTPS --> Nginx
+    User -- HTTPS --> CF
+    CF -- Tunnel --> Tunnel
+    Tunnel -- HTTP --> Nginx
     Nginx -- Proxy Pass --> Flask
     Flask -- ODM --> Mongo
     Flask -- Cache/Blocklist --> Redis
@@ -86,14 +90,15 @@ Side effects (logging article deletions, cleaning up media, auditing logins) are
 
 ## 4. Data Flow: Authenticated Request
 
-1.  **Client** sends request with an `access_token` cookie.
-2.  **Nginx** terminates SSL and forwards to **Gunicorn**.
-3.  **Flask Blueprint** catches the request and runs `@permission_required`.
-4.  **AuthzService** performs the "Double Gate" check.
-5.  **Service** executes business logic and dispatches a **Blinker Signal**.
-6.  **Listener** handles side effects (e.g., deleting old media files) asynchronously.
-7.  **Repository** executes optimized projected query to MongoDB.
-8.  **Pydantic** validates the final output before it leaves the API.
+1.  **Client** sends HTTPS request to Cloudflare Edge.
+2.  **Cloudflare** terminates TLS and forwards through the tunnel to **Nginx** (HTTP).
+3.  **Nginx** forwards the request to **Gunicorn**.
+4.  **Flask Blueprint** catches the request and runs `@permission_required`.
+5.  **AuthzService** performs the "Double Gate" check.
+6.  **Service** executes business logic and dispatches a **Blinker Signal**.
+7.  **Listener** handles side effects (e.g., deleting old media files) asynchronously.
+8.  **Repository** executes optimized projected query to MongoDB.
+9.  **Pydantic** validates the final output before it leaves the API.
 
 ---
 

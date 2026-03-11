@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml)
+COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml)
 
 backup_before_reset() {
   if ! docker ps --format '{{.Names}}' | grep -q '^mongodb$'; then
@@ -74,26 +74,6 @@ perform_mongo_auth_recovery() {
 if [ -z "${IMAGE_TAG:-}" ]; then
   echo "IMAGE_TAG is not set."
   exit 1
-fi
-
-echo "Ensuring certs directory..."
-mkdir -p certs
-if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
-  cat > certs/san.conf <<EOF
-[req]
-distinguished_name = req_distinguished_name
-x509_extensions = v3_req
-prompt = no
-[req_distinguished_name]
-CN = localhost
-[v3_req]
-subjectAltName = DNS:localhost, DNS:nginx
-EOF
-  openssl genrsa -out certs/server.key 2048
-  openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -config certs/san.conf
-  rm certs/san.conf
-  chmod 600 certs/server.key
-  chmod 644 certs/server.crt
 fi
 
 if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
