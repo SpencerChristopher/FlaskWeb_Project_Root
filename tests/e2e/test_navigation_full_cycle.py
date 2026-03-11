@@ -3,11 +3,6 @@ import pytest
 from playwright.sync_api import Page, expect
 
 
-@pytest.fixture(scope="session")
-def browser_context_args(browser_context_args):
-    return {**browser_context_args, "ignore_https_errors": True}
-
-
 @pytest.mark.e2e
 def test_guest_navigation_from_login(page: Page):
     """Verifies a guest can navigate away from the login page."""

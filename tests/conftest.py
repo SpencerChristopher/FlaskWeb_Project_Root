@@ -242,6 +242,32 @@ def get_refresh_token_fixture(client):
     return _get_refresh_token
 
 
+@pytest.fixture(scope="session")
+def browser_context_args(browser_context_args):
+    """
+    Override browser context arguments to include Cloudflare Access headers.
+    Supports Service Tokens (ID/Secret) or direct JWT assertions.
+    """
+    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
+    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+    cf_jwt = os.environ.get("CF_ACCESS_JWT")
+
+    headers = browser_context_args.get("extraHTTPHeaders", {})
+    
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    
+    if cf_jwt:
+        headers["Cf-Access-Jwt-Assertion"] = cf_jwt
+
+    return {
+        **browser_context_args,
+        "ignore_https_errors": True,
+        "extraHTTPHeaders": headers,
+    }
+
+
 @pytest.fixture
 def signal_tracker():
     """

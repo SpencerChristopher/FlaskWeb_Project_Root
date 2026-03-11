@@ -4,11 +4,6 @@ import pytest
 from playwright.sync_api import Page, expect
 
 
-@pytest.fixture(scope="session")
-def browser_context_args(browser_context_args):
-    return {**browser_context_args, "ignore_https_errors": True}
-
-
 @pytest.mark.e2e
 @pytest.mark.a11y
 def test_homepage_accessibility(page: Page):

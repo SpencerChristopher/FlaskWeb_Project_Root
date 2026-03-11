@@ -323,3 +323,37 @@ jobs:
         with:
           name: docker-deploy-logs
           path: docker-compose-deploy.log
+
+  # --- 5. E2E VERIFICATION (Staging): Final functional gate behind Cloudflare ---
+  e2e-verify-staging:
+    name: E2E Verify Staging
+    needs: deploy-to-wsl
+    runs-on: ubuntu-latest
+    env:
+      E2E_BASE_URL: https://staging.spencerscooking.uk
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
+      # We still need admin creds for internal app login tests
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install poetry
+          poetry install --with dev
+
+      - name: Install Playwright Browsers
+        run: poetry run playwright install --with-deps chromium
+
+      - name: Run E2E Tests against Staging
+        run: |
+          poetry run pytest tests/e2e/ -m e2e --base-url ${{ env.E2E_BASE_URL }}

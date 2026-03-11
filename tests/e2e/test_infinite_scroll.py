@@ -2,12 +2,6 @@ import pytest
 from playwright.sync_api import Page, expect
 
 
-@pytest.fixture
-def browser_context_args(browser_context_args):
-    """Override playwright context to ignore HTTPS errors for self-signed certs."""
-    return {**browser_context_args, "ignore_https_errors": True}
-
-
 @pytest.mark.e2e
 def test_blog_infinite_scroll(page: Page, base_url: str):
     """

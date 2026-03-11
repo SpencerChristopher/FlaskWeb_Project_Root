@@ -3,12 +3,6 @@ import time
 from playwright.sync_api import Page, expect
 
 
-@pytest.fixture
-def browser_context_args(browser_context_args):
-    """Override playwright context to ignore HTTPS errors for self-signed certs."""
-    return {**browser_context_args, "ignore_https_errors": True}
-
-
 @pytest.mark.performance
 @pytest.mark.e2e
 def test_spa_time_to_interactive(page: Page, base_url: str):
