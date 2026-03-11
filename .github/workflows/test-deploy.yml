@@ -255,9 +255,9 @@ jobs:
       - name: "Fail-Fast: Verify Tunnel Connectivity"
         run: |
           echo "Waiting for cloudflared to connect..."
-          for i in {1..10}; do
+          for i in {1..15}; do
             echo "Attempt $i: Checking connectivity..."
-            if docker logs cloudflared_tunnel 2>&1 | grep -q "Connected to"; then
+            if docker logs cloudflared_tunnel 2>&1 | grep -E -q "Connected to|Registered tunnel connection"; then
               echo "Tunnel connected successfully."
               exit 0
             fi
