@@ -1,6 +1,7 @@
 import re
 import pytest
 import os
+from flask import Flask
 from dotenv import load_dotenv
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
@@ -125,8 +126,11 @@ def database_connection_check():
 def app():
     """Create and configure a new app instance for the test session."""
     if os.environ.get("SKIP_DB_CHECK") == "1":
-        # Return a dummy object or None if we are just doing E2E against a remote/container URL
-        yield None
+        # Return a minimal Flask app to satisfy pytest-flask autouse fixtures
+        # This app will not be used by E2E tests but prevents pytest-flask from crashing.
+        dummy_app = Flask(__name__)
+        dummy_app.config["TESTING"] = True
+        yield dummy_app
         return
 
     # Determine MONGO_URI based on environment
