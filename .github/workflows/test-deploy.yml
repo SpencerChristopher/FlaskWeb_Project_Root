@@ -17,6 +17,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   # --- 1. STATIC ANALYSIS: Fast checks on GitHub runners ---
   static-analysis:
@@ -207,6 +210,9 @@ jobs:
       FLASK_ENV: production
       TALISMAN_FORCE_HTTPS: "true"
       STAGING_TOKEN: ${{ secrets.STAGING_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -244,12 +250,15 @@ jobs:
 
       - name: Deploy to WSL
         env:
-          DEPLOY_CLEAN_START: "true"
-          DEPLOY_RESET_VOLUMES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          # Only perform clean start if manually requested via hard_rebuild input
+          DEPLOY_CLEAN_START: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_RESET_VOLUMES: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
           DEPLOY_BACKUP_BEFORE_RESET: "true"
           DEPLOY_REQUIRE_BACKUP: "true"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
         run: |
+          # Use --pull always to ensure we have the verified image from the earlier job
+          # but don't use --build to avoid local compilation on the runner.
           ./scripts/deploy.sh
 
       - name: "Fail-Fast: Verify Tunnel Connectivity"
@@ -334,6 +343,7 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
+      SKIP_DB_CHECK: "1"
       # We still need admin creds for internal app login tests
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}

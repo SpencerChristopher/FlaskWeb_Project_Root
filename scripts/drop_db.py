@@ -21,16 +21,17 @@ def drop_database():
     # get_flask_app_context also loads .env and ensures MONGO_URI is set
     app_context = get_flask_app_context()
     
-    mongo_uri = os.environ.get('MONGO_URI')
+    host = os.environ.get("MONGO_HOST", "mongo")
+    root_user = os.environ.get("MONGO_ROOT_USER", "root")
+    root_password = os.environ.get("MONGO_ROOT_PASSWORD", "changeme")
+    mongo_uri = f"mongodb://{root_user}:{root_password}@{host}:27017/?authSource=admin"
     print(f"Attempting to connect to MongoDB at: {mongo_uri}")
 
     try:
-        # Use pymongo directly to drop the database
         client = MongoClient(mongo_uri)
-        db_name = client.get_default_database().name
-        
-        client.drop_database(db_name)
-        print(f"Database '{db_name}' dropped successfully.")
+        for db_name in ["appdb", "pytest_appdb"]:
+            client.drop_database(db_name)
+            print(f"Database '{db_name}' dropped successfully.")
 
     except Exception as e:
         print(f"An error occurred while trying to drop the database: {e}")

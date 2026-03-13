@@ -242,7 +242,7 @@ def get_refresh_token_fixture(client):
     return _get_refresh_token
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def browser_context_args(browser_context_args):
     """
     Override browser context arguments to include Cloudflare Access headers.
@@ -252,10 +252,10 @@ def browser_context_args(browser_context_args):
     cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
     cf_jwt = os.environ.get("CF_ACCESS_JWT")
 
-    headers = browser_context_args.get("extraHTTPHeaders", {})
+    headers = browser_context_args.get("extra_http_headers", {})
     
     if cf_id and cf_secret:
-        headers["CF-Access-Client-Id"] = cf_id
+        headers["CF-Access-Client-ID"] = cf_id
         headers["CF-Access-Client-Secret"] = cf_secret
     
     if cf_jwt:
@@ -264,7 +264,7 @@ def browser_context_args(browser_context_args):
     return {
         **browser_context_args,
         "ignore_https_errors": True,
-        "extraHTTPHeaders": headers,
+        "extra_http_headers": headers,
     }
 
 
