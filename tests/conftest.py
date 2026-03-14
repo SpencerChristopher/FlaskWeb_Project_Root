@@ -81,6 +81,8 @@ def _add_markers_by_path(item):
     if "tests\\e2e\\" in path or "tests/e2e/" in path:
         item.add_marker(pytest.mark.e2e)
         return
+    # Default: treat uncategorized files as unit tests so -m selectors keep them
+    item.add_marker(pytest.mark.unit)
 
 
 def pytest_collection_modifyitems(config, items):
@@ -254,8 +256,9 @@ def browser_context_args(browser_context_args):
     cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
     cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
     cf_jwt = os.environ.get("CF_ACCESS_JWT")
+    require_cf = os.environ.get("REQUIRE_CF_ACCESS", "").lower() in {"1", "true", "yes"}
 
-    headers = browser_context_args.get("extra_http_headers", {})
+    headers = dict(browser_context_args.get("extra_http_headers") or {})
     
     if cf_id and cf_secret:
         headers["CF-Access-Client-ID"] = cf_id
@@ -263,6 +266,9 @@ def browser_context_args(browser_context_args):
     
     if cf_jwt:
         headers["Cf-Access-Jwt-Assertion"] = cf_jwt
+
+    if require_cf and not headers:
+        pytest.skip("CF Access credentials required for this run (set CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET).")
 
     return {
         **browser_context_args,

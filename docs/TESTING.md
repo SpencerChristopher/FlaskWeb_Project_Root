@@ -26,6 +26,23 @@ Run from inside the `web` container.
     docker compose exec -T web /app/.venv/bin/pytest tests/ -m "not e2e"
     ```
 
+### C. Staging with Cloudflare Access (Service Token)
+Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while bypassing Zero Trust via a service token.
+*   **Env (required):**
+    * `E2E_BASE_URL=https://staging.spencerscooking.uk`
+    * `PROD_BASE_URL=https://staging.spencerscooking.uk`
+    * `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (or `CF_ACCESS_JWT`)
+*   **Command (smoke/perf/e2e):**
+    ```bash
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/infra/smoke -m smoke
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/integration -m performance
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/e2e -m e2e
+    ```
+*   Quick token sanity check: `python debug_playwright_headers.py`
+
 ---
 
 ## 2. Testing vs. Preflight
@@ -41,6 +58,7 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 *   `.\scripts\preflight_ci.ps1 -CheckArm`: Performs a local dry-run build for `linux/arm64` to verify dependency compatibility.
 *   `.\scripts\preflight_ci.ps1 -SmokeTest`: Triggers a targeted functional check that verifies the `web -> nginx` network bridge, catching the "NameResolutionError" locally.
 *   `.\scripts\preflight_ci.ps1 -RunAct`: (Optional) Runs the entire GitHub Actions workflow locally using `act`.
+*   **Note:** The GitHub Actions workflow intentionally skips `smoke`, `performance/heavy`, and `e2e` markers; run those manually (see Staging section).
 
 ---
 
@@ -64,7 +82,7 @@ Tests marked with `@pytest.mark.heavy` or `@pytest.mark.performance` should idea
 To ensure that code changes do not violate the boundaries defined in `docs/ARCHITECTURE.md`, run the design gate:
 ```powershell
 # Fast, host-side AST scan (No DB or Container needed)
-$env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/domain_tests/test_arch_integrity.py -p no:flask -p no:base-url
+    $env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/integration/domain/test_arch_integrity.py -p no:flask -p no:base-url
 ```
 
 ---

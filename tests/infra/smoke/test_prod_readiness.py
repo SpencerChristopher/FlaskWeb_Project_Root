@@ -10,6 +10,16 @@ from urllib3.connectionpool import HTTPSConnectionPool
 CERT_PATH = "/app/certs/server.crt" if os.getenv("DOCKER_CONTAINER") == "true" else "certs/server.crt"
 VERIFY = CERT_PATH if os.path.exists(CERT_PATH) else False
 
+CF_HEADERS = {}
+cid = os.environ.get("CF_ACCESS_CLIENT_ID")
+csecret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+cjwt = os.environ.get("CF_ACCESS_JWT")
+if cid and csecret:
+    CF_HEADERS["CF-Access-Client-ID"] = cid
+    CF_HEADERS["CF-Access-Client-Secret"] = csecret
+if cjwt:
+    CF_HEADERS["Cf-Access-Jwt-Assertion"] = cjwt
+
 class HostResolverAdapter(HTTPAdapter):
     """
     Adapter that forces 'localhost' requests to a specific IP while 
@@ -38,6 +48,8 @@ class HostResolverAdapter(HTTPAdapter):
 
 # Setup session
 session = requests.Session()
+if CF_HEADERS:
+    session.headers.update(CF_HEADERS)
 
 # Since the previous HostHeaderAdapter failed with IP mismatch, 
 # let's try the 'urllib3' way of forcing the resolution of 'localhost' 

@@ -9,8 +9,20 @@ import socket
 CERT_PATH = "/app/certs/server.crt" if os.getenv("DOCKER_CONTAINER") == "true" else "certs/server.crt"
 VERIFY = CERT_PATH if os.path.exists(CERT_PATH) else False
 
-# Setup session
+CF_HEADERS = {}
+cid = os.environ.get("CF_ACCESS_CLIENT_ID")
+csecret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+cjwt = os.environ.get("CF_ACCESS_JWT")
+if cid and csecret:
+    CF_HEADERS["CF-Access-Client-ID"] = cid
+    CF_HEADERS["CF-Access-Client-Secret"] = csecret
+if cjwt:
+    CF_HEADERS["Cf-Access-Jwt-Assertion"] = cjwt
+
+# Setup session with optional CF Access headers
 session = requests.Session()
+if CF_HEADERS:
+    session.headers.update(CF_HEADERS)
 
 # Force resolution of 'localhost' to the nginx IP globally within this process
 # to allow certificate verification (which expects 'localhost') while 

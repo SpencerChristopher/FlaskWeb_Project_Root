@@ -46,7 +46,7 @@ def test_database_connection(caplog, monkeypatch):  # Removed 'app' fixture
     env_uri = os.environ.get("MONGO_URI")
     if env_uri:
         candidates.append(("env", env_uri))
-    candidates.append(("localhost", "mongodb://mongo:27017/appdb"))
+    candidates.append(("localhost", "mongodb://localhost:27017/appdb"))
 
     test_app = None
     mongo_host = None
