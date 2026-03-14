@@ -8,3 +8,12 @@ services:
     depends_on:
       nginx:
         condition: service_started
+
+  # Thin helper to ensure Playwright browsers are available for staging e2e runs
+  playwright-install:
+    image: ${IMAGE_TAG:-flaskweb_project_root-web:latest}
+    command: ["/bin/sh", "-c", ". /app/.venv/bin/activate && playwright install chromium --with-deps"]
+    profiles: ["e2e-install"]
+    depends_on:
+      web:
+        condition: service_started

@@ -43,9 +43,17 @@ RUN useradd --create-home appuser && \
     mkdir -p logs static/uploads && \
     chown -R appuser:appuser /app
 
-# Secure system tools (as root) then switch to non-root
-# hadolint ignore=DL3013
-RUN pip install --no-cache-dir --upgrade --default-timeout=100 pip setuptools wheel
+# Install system deps needed for Playwright/Chromium headless and secure tools
+# hadolint ignore=DL3008,DL3013
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      libglib2.0-0 libnss3 libatk-bridge2.0-0 libatk1.0-0 libcups2 \
+      libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+      libgbm1 libpango-1.0-0 libcairo2 libasound2 fonts-liberation \
+      libxshmfence1 libxcb1 libx11-6 libxext6 libxtst6 libxss1 libgtk-3-0 \
+      wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    pip install --no-cache-dir --upgrade --default-timeout=100 pip setuptools wheel
 USER appuser
 
 # Environment configuration
