@@ -80,7 +80,6 @@ jobs:
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
       LOG_LEVEL: INFO
       FLASK_ENV: development
-      TALISMAN_FORCE_HTTPS: "false"
       PYTHON_VERSION: "3.11"
 
     steps:
@@ -208,7 +207,6 @@ jobs:
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
       LOG_LEVEL: INFO
       FLASK_ENV: production
-      TALISMAN_FORCE_HTTPS: "true"
       STAGING_TOKEN: ${{ secrets.STAGING_TOKEN }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}

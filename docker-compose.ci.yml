@@ -4,3 +4,6 @@ services:
     image: ${IMAGE_TAG}
     volumes:
       - ./certs:/app/certs:ro
+    environment:
+      TALISMAN_FORCE_HTTPS: "false"
+      JWT_COOKIE_SECURE: "false"

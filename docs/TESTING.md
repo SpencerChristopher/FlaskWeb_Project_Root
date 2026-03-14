@@ -1,29 +1,56 @@
 # Testing Strategy & Execution Guide
 
-This document defines the standards for verifying the Flask Web Project. It distinguishes between continuous development testing and pre-push validation (Preflight).
+This document defines the standards for verifying the Flask Web Project. It distinguishes between continuous development testing and pre-push validation (Preflight), with clear runbooks for local, container, and staging contexts.
+
+## 0. Environment Quick Matrix
+
+| Environment | Where you run tests | Target URL | TLS behavior | Recommended use |
+| :--- | :--- | :--- | :--- | :--- |
+| **Local (Host)** | Local venv | `http://localhost:5005` | HTTP only (no HTTPS redirect, no Secure cookies) | E2E and fast iteration |
+| **Local (Container)** | `docker compose exec web` | `http://nginx` | HTTP only | Integration, smoke, performance |
+| **Staging** | Local venv | `https://staging.spencerscooking.uk` | HTTPS via Cloudflare edge | Real-world smoke/e2e/perf |
 
 ## 1. Execution Environments
 
-The project supports two testing perspectives. Choosing the wrong one will cause network failures for integration and smoke tests.
+The project supports three testing perspectives. Choosing the wrong one will cause network failures for integration and smoke tests.
 
-### A. Host-Side Testing (Standard)
+### A. Host-Side Testing (Standard, Recommended for E2E)
 Run from your local terminal/IDE.
-*   **Target:** `http://localhost:5000` (via Nginx proxy)
+*   **Target:** `http://localhost:5005` (via Nginx proxy)
 *   **Scope:** Best for E2E (Playwright) and quick iterative unit tests.
+*   **Requirement:** App stack running via Docker (nginx on port 5005).
+*   **Tip:** Local dev uses HTTP, so the container override should set:
+    * `TALISMAN_FORCE_HTTPS=false`
+    * `JWT_COOKIE_SECURE=false`
 *   **Command:** 
     ```powershell
     # End-to-End (Requires Playwright installed on host)
-    $env:SKIP_DB_CHECK="1"; python -m pytest tests/e2e/ --base-url http://localhost:5000 -p no:flask
+    $env:SKIP_DB_CHECK="1"
+    $env:E2E_BASE_URL="http://localhost:5005"
+    $env:PYTEST_BASE_URL="http://localhost:5005"
+    python -m pytest tests/e2e/ -m e2e -p no:flask
+    ```
+*   **Seed data (required for blog/infinite scroll tests):**
+    ```powershell
+    docker compose exec web /app/.venv/bin/python scripts/seed_db.py --heavy
+    ```
+*   **Playwright install (host):**
+    ```powershell
+    python -m playwright install chromium
     ```
 
 ### B. Container-Side Testing (CI Parity)
 Run from inside the `web` container.
-*   **Target:** `https://nginx` (Internal Docker network)
+*   **Target:** `http://nginx` (Internal Docker network)
 *   **Scope:** Best for verifying integration, infrastructure risks (chaos), and performance benchmarks.
 *   **Requirement:** The container detects it is inside Docker and automatically switches routing.
 *   **Command:** 
     ```bash
     docker compose exec -T web /app/.venv/bin/pytest tests/ -m "not e2e"
+    ```
+*   **Full suite in container (including E2E):**
+    ```bash
+    docker compose exec -e E2E_BASE_URL=http://nginx -e PYTEST_BASE_URL=http://nginx web /app/.venv/bin/pytest /app/tests
     ```
 
 ### C. Staging with Cloudflare Access (Service Token)
@@ -32,6 +59,8 @@ Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while 
     * `E2E_BASE_URL=https://staging.spencerscooking.uk`
     * `PROD_BASE_URL=https://staging.spencerscooking.uk`
     * `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (or `CF_ACCESS_JWT`)
+    * Optional hard-fail: `REQUIRE_CF_ACCESS=1`
+    * HTTPS-only tests: `REQUIRE_HTTPS=1`
 *   **Command (smoke/perf/e2e):**
     ```bash
     CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
@@ -42,6 +71,11 @@ Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while 
       python -m pytest tests/e2e -m e2e
     ```
 *   Quick token sanity check: `python debug_playwright_headers.py`
+*   **Runbook (repeatable/frozen):**
+    1. Run from local venv (not container) to avoid Playwright reinstall on recreate.
+    2. Export the same env vars every run (including `E2E_BASE_URL`/`PROD_BASE_URL`).
+    3. Use a dedicated service token for staging only.
+    4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
 
 ---
 
@@ -77,12 +111,13 @@ curl -L -o tests/axe/axe.min.js https://cdnjs.cloudflare.com/ajax/libs/axe-core/
 
 ### B. Performance & Heavy Tests
 Tests marked with `@pytest.mark.heavy` or `@pytest.mark.performance` should ideally be run in the container to avoid host-side network jitter.
+Heavy datasets require seeding with `scripts/seed_db.py --heavy` before running the suite.
 
 ### C. Architectural Integrity (Design Gate)
 To ensure that code changes do not violate the boundaries defined in `docs/ARCHITECTURE.md`, run the design gate:
 ```powershell
 # Fast, host-side AST scan (No DB or Container needed)
-    $env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/integration/domain/test_arch_integrity.py -p no:flask -p no:base-url
+$env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/integration/domain/test_arch_integrity.py -p no:flask -p no:base-url
 ```
 
 ---
@@ -107,4 +142,6 @@ Tests verifying access must account for both gates.
 ## 5. Common Pitfalls
 
 *   **401 Unauthorized in E2E:** Usually caused by a `SECRET_KEY` mismatch between the Host `.env` and the Container environment. Ensure they match.
+*   **Login works but UI stays guest (local HTTP):** Ensure `JWT_COOKIE_SECURE=false` for local dev and use `http://localhost:5005`.
 *   **Connection Refused (Container):** Occurs if a test tries to hit `localhost` while running inside the container. Use the `prod_base_url` fixture which handles this automatically.
+*   **HTTPS-only checks skipped locally:** Set `REQUIRE_HTTPS=1` when running against HTTPS (staging) to enforce cookie/security expectations.

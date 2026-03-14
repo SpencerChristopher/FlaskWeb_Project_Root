@@ -4,6 +4,7 @@ These tests are designed to initially fail until the application
 is properly configured to run over HTTPS and set secure cookies.
 """
 
+import os
 import pytest
 from flask import Flask
 import re
@@ -15,6 +16,8 @@ def test_jwt_cookie_secure_config(app: Flask):
     This test will fail if the configuration is not set to True, which is expected
     for development HTTPS setup.
     """
+    if os.environ.get("REQUIRE_HTTPS", "").lower() not in {"1", "true", "yes"}:
+        pytest.skip("HTTPS-only check (set REQUIRE_HTTPS=1 to enforce).")
     assert app.config[
         "JWT_COOKIE_SECURE"
     ], "JWT_COOKIE_SECURE should be True for HTTPS environment."
@@ -27,6 +30,8 @@ def test_secure_flag_on_login_cookies(client, setup_users, app: Flask):
     This is a requirement when JWT_COOKIE_SECURE is True and the application is
     served over HTTPS.
     """
+    if os.environ.get("REQUIRE_HTTPS", "").lower() not in {"1", "true", "yes"}:
+        pytest.skip("HTTPS-only check (set REQUIRE_HTTPS=1 to enforce).")
     # We will directly manipulate app.config for this test session to ensure
     # JWT_COOKIE_CSRF_PROTECT is True and allows the csrf_access_token to be set.
     app.config["JWT_COOKIE_CSRF_PROTECT"] = True

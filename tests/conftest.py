@@ -3,6 +3,9 @@ import os
 # Talisman and other extensions initialize with test-safe defaults.
 os.environ.setdefault("FLASK_ENV", "development")
 os.environ["TALISMAN_FORCE_HTTPS"] = "false"
+# Default E2E base URL for in-container runs when not explicitly set.
+if os.environ.get("DOCKER_CONTAINER") in {"1", "true"} and "E2E_BASE_URL" not in os.environ:
+    os.environ["E2E_BASE_URL"] = "http://nginx"
 
 import re
 import pytest
@@ -96,6 +99,25 @@ def prod_base_url():
     if os.environ.get("DOCKER_CONTAINER") in ["1", "true"]:
         return os.environ.get("PROD_BASE_URL", "http://nginx")
     return os.environ.get("PROD_BASE_URL", "http://localhost:5000")
+
+
+@pytest.fixture(scope="session")
+def base_url(request):
+    """
+    Provide a stable base URL for e2e tests.
+    Prefers explicit env vars, then pytest-base-url option, then sensible defaults.
+    """
+    env_url = os.environ.get("PYTEST_BASE_URL") or os.environ.get("E2E_BASE_URL")
+    if env_url:
+        return env_url
+
+    opt_url = getattr(request.config.option, "base_url", None)
+    if opt_url:
+        return opt_url
+
+    if os.environ.get("DOCKER_CONTAINER") in {"1", "true"}:
+        return "http://nginx"
+    return "http://localhost:5005"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -199,6 +221,10 @@ def setup_users(app):
 @pytest.fixture(autouse=True)
 def clean_collections_per_function(app):
     """Cleans up specific collections after each test function."""
+    # For host-side E2E runs we skip DB entirely.
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        yield
+        return
     yield
     if app is None:
         return

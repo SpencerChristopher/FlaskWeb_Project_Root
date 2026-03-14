@@ -126,6 +126,9 @@ static/uploads/
 # Temporary commit message file
 commit_message.txt
 
+# Preflight artifacts
+constraints.txt
+
 docker-compose.override.yml
 Phased_plan_DEVOPs.md
 phased_plan_backend.md
