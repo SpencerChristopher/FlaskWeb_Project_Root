@@ -1,5 +1,5 @@
 import pytest
-from tests.security_tests.conftest import (
+from tests.security.conftest import (
     admin_headers,
     user_headers,
     admin_user,

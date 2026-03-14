@@ -57,12 +57,39 @@ class ArticleService:
         return [a for a in all_articles if str(a.author.id) == user.id]
 
     def list_published_articles(self, page: int, per_page: int):
+        """
+        Retrieves a paginated list of published articles for public consumption.
+
+        Logic:
+        1. Filters by is_published=True.
+        2. Projects only necessary fields for performance (via Repository).
+        3. Orders by publication_date descending.
+
+        Args:
+            page (int): The page number to retrieve.
+            per_page (int): The number of items per page.
+
+        Returns:
+            Pagination: A MongoEngine pagination object containing Article models.
+        """
         return self._article_repository.get_published_paginated(
             page=page, per_page=per_page
         )
 
     def to_public_dict(self, article) -> dict:
-        """Map a persisted article to the public DTO to stabilize API shape."""
+        """
+        Maps a persisted Article model to the ArticlePublic DTO.
+        
+        This stabilizes the API shape by ensuring internal model changes 
+        don't leak to the frontend. It converts MongoEngine IDs to strings 
+        and formats date fields.
+
+        Args:
+            article (Article): The persisted article model instance.
+
+        Returns:
+            dict: The serialized public article data validated by ArticlePublic.
+        """
         return ArticlePublic(
             id=str(article.id),
             title=article.title,
@@ -117,6 +144,26 @@ class ArticleService:
         article_dto: ArticleCreateUpdate,
         user: UserIdentity,
     ):
+        """
+        Orchestrates the creation of a new article.
+
+        Logic:
+        1. Generates a URL-safe slug from the title.
+        2. Checks for slug collisions (ConflictException).
+        3. Assigns ownership to the current user (using lazy proxy).
+        4. Sets publication date if is_published=True.
+        5. Dispatches 'article_created' signal on success.
+
+        Args:
+            article_dto (ArticleCreateUpdate): Validated data transfer object.
+            user (UserIdentity): Identity of the user creating the article.
+
+        Returns:
+            Article: The persisted article instance.
+
+        Raises:
+            ConflictException: If an article with the same slug already exists.
+        """
         article_slug = slugify(article_dto.title)
 
         if self._article_repository.get_by_slug(article_slug):
@@ -157,6 +204,28 @@ class ArticleService:
         article_dto: ArticleCreateUpdate,
         user: UserIdentity,
     ):
+        """
+        Updates an existing article, enforcing ownership and handling state transitions.
+
+        Logic:
+        1. Verifies article existence and ownership/admin permission.
+        2. Checks if the new title creates a slug collision with a different article.
+        3. Updates fields and handles publication timestamping (draft -> published).
+        4. Dispatches 'article_published' if status changed, otherwise 'article_updated'.
+
+        Args:
+            article_id (str): The ID of the article to update.
+            article_dto (ArticleCreateUpdate): The new data for the article.
+            user (UserIdentity): Identity of the user performing the update.
+
+        Returns:
+            Article: The updated and persisted article instance.
+
+        Raises:
+            NotFoundException: If the article does not exist.
+            ForbiddenException: If the user lacks permission.
+            ConflictException: If the new title/slug is taken by another article.
+        """
         article = self.get_article_or_404(article_id)
         self._require_ownership_or_admin(article, user, "update")
 
@@ -200,6 +269,22 @@ class ArticleService:
         return updated_article
 
     def delete_article(self, article_id: str, user: UserIdentity) -> None:
+        """
+        Deletes an article and dispatches cleanup signals.
+
+        Logic:
+        1. Verifies article existence and ownership/admin permission.
+        2. Deletes the document from the 'posts' collection.
+        3. Dispatches 'article_deleted' signal to trigger comment and media cleanup.
+
+        Args:
+            article_id (str): The ID of the article to delete.
+            user (UserIdentity): Identity of the user performing the deletion.
+
+        Raises:
+            NotFoundException: If the article does not exist.
+            ForbiddenException: If the user lacks permission.
+        """
         article = self.get_article_or_404(article_id)
         self._require_ownership_or_admin(article, user, "delete")
 

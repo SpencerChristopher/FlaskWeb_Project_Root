@@ -35,6 +35,10 @@ def create_flask_app(import_name: str) -> Flask:
 
 def configure_proxy_fix(app: Flask) -> None:
     """Apply ProxyFix based on trusted proxy hop configuration."""
+    # Skip ProxyFix in local testing unless explicitly requested
+    if app.config.get("TESTING") and os.environ.get("FORCE_PROXY_FIX") != "true":
+        return
+
     proxy_x_for = int(os.environ.get("PROXY_FIX_X_FOR", "1"))
     proxy_x_proto = int(os.environ.get("PROXY_FIX_X_PROTO", "1"))
     proxy_x_host = int(os.environ.get("PROXY_FIX_X_HOST", "1"))

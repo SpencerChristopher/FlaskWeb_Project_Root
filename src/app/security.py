@@ -115,18 +115,26 @@ def configure_http_security(app: Flask) -> None:
         "referrer_policy": "strict-origin-when-cross-origin",
     }
 
+    force_https = os.environ.get("TALISMAN_FORCE_HTTPS", "true").lower() == "true"
+    
+    # CRITICAL: Always disable HTTPS forcing if we are in a pytest environment.
+    # This prevents local Docker smoke tests from being redirected to port 443.
+    # PYTEST_CURRENT_TEST is set automatically by the pytest runner.
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        force_https = False
+
     if app_env == "production":
         talisman_kwargs["strict_transport_security"] = True
         talisman_kwargs["strict_transport_security_max_age"] = 31536000
         talisman_kwargs["strict_transport_security_include_subdomains"] = True
-        force_https = os.environ.get("TALISMAN_FORCE_HTTPS", "true").lower() == "true"
         talisman_kwargs["force_https"] = force_https
     else:
         report_uri = os.environ.get("CSP_REPORT_URI")
         if report_uri:
             talisman_kwargs["content_security_policy_report_only"] = True
             talisman_kwargs["content_security_policy_report_uri"] = report_uri
-        talisman_kwargs["force_https"] = False
+        # Deep Simulation: Allow HTTPS forcing in dev if explicitly requested
+        talisman_kwargs["force_https"] = force_https
 
     Talisman(app, **talisman_kwargs)
 

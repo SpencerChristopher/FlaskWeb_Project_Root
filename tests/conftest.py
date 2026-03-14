@@ -1,21 +1,22 @@
+import os
+# CRITICAL: These must be set BEFORE any other project imports to ensure
+# Talisman and other extensions initialize with test-safe defaults.
+os.environ.setdefault("FLASK_ENV", "development")
+os.environ["TALISMAN_FORCE_HTTPS"] = "false"
+
 import re
 import pytest
-import os
 from flask import Flask
 from dotenv import load_dotenv
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 load_dotenv()
-# Ensure test env disables HTTPS redirects before app creation
-os.environ.setdefault("FLASK_ENV", "development")
-os.environ["TALISMAN_FORCE_HTTPS"] = "false"
 from src.server import create_app
 from mongoengine import disconnect, connect, get_db
 from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
 from src.models.article import Article
 from src.extensions import limiter
-
 
 def _clear_test_collections() -> None:
     db = get_db()
@@ -59,33 +60,27 @@ def _build_test_mongo_uri(in_container: bool) -> str:
 
 def _add_markers_by_path(item):
     path = str(item.fspath)
-    if "tests\\risk_tests\\" in path or "tests/risk_tests/" in path:
-        item.add_marker(pytest.mark.risk)
+    if "tests\\unit\\" in path or "tests/unit/" in path:
+        item.add_marker(pytest.mark.unit)
+        return
+    if "tests\\integration\\" in path or "tests/integration/" in path:
         item.add_marker(pytest.mark.integration)
         return
-    if "tests\\api_tests\\" in path or "tests/api_tests/" in path:
-        item.add_marker(pytest.mark.integration)
-        return
-    if "tests\\security_tests\\" in path or "tests/security_tests/" in path:
+    if "tests\\security\\" in path or "tests/security/" in path:
         item.add_marker(pytest.mark.security)
         item.add_marker(pytest.mark.integration)
         return
-    if "tests\\service_tests\\" in path or "tests/service_tests/" in path:
+    if "tests\\infra\\" in path or "tests/infra/" in path:
         item.add_marker(pytest.mark.integration)
+        # Inherit specific sub-markers based on filename if needed
+        if "smoke" in path:
+            item.add_marker(pytest.mark.smoke)
+        if "risk" in path or "chaos" in path:
+            item.add_marker(pytest.mark.risk)
         return
-    if "tests\\routing_tests\\" in path or "tests/routing_tests/" in path:
-        item.add_marker(pytest.mark.integration)
+    if "tests\\e2e\\" in path or "tests/e2e/" in path:
+        item.add_marker(pytest.mark.e2e)
         return
-    if "tests\\page_content_test\\" in path or "tests/page_content_test/" in path:
-        item.add_marker(pytest.mark.integration)
-        return
-    if (
-        "tests\\test_database_connection.py" in path
-        or "tests/test_database_connection.py" in path
-    ):
-        item.add_marker(pytest.mark.integration)
-        return
-    item.add_marker(pytest.mark.unit)
 
 
 def pytest_collection_modifyitems(config, items):
@@ -137,8 +132,12 @@ def app():
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
     os.environ["SECRET_KEY"] = "test-secret-key"
-    os.environ.setdefault("FLASK_ENV", "production")
-    os.environ.setdefault("TALISMAN_FORCE_HTTPS", "false")
+    
+    # In local development/test containers, we must disable HTTPS forcing 
+    # because nginx is usually only listening on port 80 (HTTP).
+    # Staging/Production will override this via their own env vars.
+    os.environ["FLASK_ENV"] = "development"
+    os.environ["TALISMAN_FORCE_HTTPS"] = "false"
 
     app = create_app()
     app.config.update(

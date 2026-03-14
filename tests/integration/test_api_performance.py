@@ -40,8 +40,14 @@ class TestAPIPerformance:
     """
 
     def _get_base_url(self, prod_base_url):
-        if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
-            return "http://localhost:5000"
+        """Dynamically determine base URL for performance tests."""
+        if "spencerscooking.uk" in prod_base_url:
+            return prod_base_url
+            
+        if os.getenv("DOCKER_CONTAINER") == "true":
+            # If no certs, hit nginx on port 80 instead of 443
+            if not VERIFY:
+                return prod_base_url.replace("https://", "http://")
         return prod_base_url
 
     def test_bootstrap_latency(self, prod_base_url):
@@ -56,7 +62,8 @@ class TestAPIPerformance:
         latencies = []
         for _ in range(5):
             start = time.perf_counter()
-            resp = session.get(url, verify=VERIFY)
+            # Allow redirects locally
+            resp = session.get(url, verify=VERIFY, allow_redirects=True)
             end = time.perf_counter()
             assert resp.status_code == 200
             latencies.append((end - start) * 1000)  # Convert to ms
@@ -75,7 +82,8 @@ class TestAPIPerformance:
         url = f"{base}/api/blog?page=1&per_page=6"
 
         start = time.perf_counter()
-        resp = session.get(url, verify=VERIFY)
+        # Disable redirects locally
+        resp = session.get(url, verify=VERIFY, allow_redirects=False)
         end = time.perf_counter()
 
         latency = (end - start) * 1000
