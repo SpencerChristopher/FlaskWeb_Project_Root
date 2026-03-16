@@ -83,7 +83,7 @@ if ($SkipAudit) {
     Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
     Write-Host "Running pip-audit and bandit..."
-    docker run --rm -v "${PWD}:/app" -w /app python:3.11-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
+    docker run --rm -v "${PWD}:/app" -w /app python:3.12-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
     # Resolve file paths explicitly so they are passed to the container correctly
@@ -174,7 +174,7 @@ if ($LASTEXITCODE -ne 0) {
 
 if ($CheckArm) {
     Write-Host "Verifying ARM64 Build compatibility..."
-    docker buildx build --platform linux/arm64 --build-arg PYTHON_VERSION=3.11 . --tag arm64-preflight --load=false
+    docker buildx build --platform linux/arm64 --build-arg PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e . --tag arm64-preflight --load=false
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: ARM64 Build failed." -ForegroundColor Red
         exit 1
@@ -183,7 +183,11 @@ if ($CheckArm) {
 
 # [8/8] Infrastructure CVE Baseline Audit
 Write-Host "[8/8] Auditing Infrastructure CVE Baseline (Docker Scout)..."
-$images = @("nginx:stable-alpine-slim", "mongo:8.0.19-noble", "redis:7.4-alpine")
+$images = @(
+    "nginx:stable-alpine-slim@sha256:c9d648d0547ebfe3cbd197c73f5a8b5a8bdf4e215c76d290f93952e1a7154891",
+    "mongo:8.0.19-noble@sha256:1773d7826e340cd966f439a4e71abea42fd9ca70ddce1ab6b96eb76013c3ca8e",
+    "redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065"
+)
 if (Require-Command "docker" -and (docker scout version 2>&1 | Out-String -ErrorAction SilentlyContinue)) {
     foreach ($img in $images) {
         if ($StrictSecurity) {

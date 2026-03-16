@@ -129,4 +129,5 @@ class TestProdReadiness:
         url = f"{base}/static/app.js"
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
         assert resp.status_code == 200
-        assert "application/javascript" in resp.headers.get("Content-Type", "")
+        content_type = resp.headers.get("Content-Type", "").lower()
+        assert any(sub in content_type for sub in ("application/javascript", "text/javascript"))

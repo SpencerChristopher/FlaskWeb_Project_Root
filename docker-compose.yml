@@ -3,7 +3,8 @@ services:
     build:
       context: .
       args:
-        PYTHON_VERSION: ${PYTHON_VERSION:-3.11}
+        PYTHON_IMAGE: ${PYTHON_IMAGE:-python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e}
+        NODE_IMAGE: ${NODE_IMAGE:-node:20-slim@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92}
     container_name: flask_web_app
     restart: unless-stopped
     mem_limit: 2g # Added to prevent OOM errors during testing, pending SECRET_KEY fix
@@ -47,7 +48,7 @@ services:
       - "8000"
 
   nginx:
-    image: nginx:stable-alpine-slim
+    image: nginx:stable-alpine-slim@sha256:c9d648d0547ebfe3cbd197c73f5a8b5a8bdf4e215c76d290f93952e1a7154891
     container_name: nginx_proxy
     restart: unless-stopped
     ports:
@@ -59,7 +60,7 @@ services:
       - web
 
   mongo:
-    image: mongo:8.0.19-noble
+    image: mongo:8.0.19-noble@sha256:1773d7826e340cd966f439a4e71abea42fd9ca70ddce1ab6b96eb76013c3ca8e
     container_name: mongodb
     restart: unless-stopped
     stop_grace_period: 60s
@@ -85,7 +86,7 @@ services:
       start_period: 40s
 
   redis:
-    image: "redis:7.4-alpine"
+    image: "redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065"
     container_name: redis
     restart: always
     command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 50mb --maxmemory-policy allkeys-lru

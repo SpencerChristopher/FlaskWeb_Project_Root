@@ -1,7 +1,8 @@
 # --- Builder Stage ---
 # This stage installs dependencies using Poetry
-ARG PYTHON_VERSION=3.11
-FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e
+ARG NODE_IMAGE=node:20-slim@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92
+FROM ${PYTHON_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -20,7 +21,7 @@ RUN poetry install --no-root
 
 # --- Static Assets Obfuscation Stage ---
 # This stage minifies and obfuscates Vanilla JS using Terser
-FROM node:20-slim AS static-builder
+FROM ${NODE_IMAGE} AS static-builder
 WORKDIR /app
 COPY ./static ./static
 # Install Terser globally and minify in a single layer
@@ -33,8 +34,7 @@ RUN npm config set fetch-retries 5 && \
 
 # --- Final Stage ---
 # This stage creates the lean, high-integrity production/staging image
-ARG PYTHON_VERSION=3.11
-FROM python:${PYTHON_VERSION}-slim-bookworm AS final
+FROM ${PYTHON_IMAGE} AS final
 
 WORKDIR /app
 
