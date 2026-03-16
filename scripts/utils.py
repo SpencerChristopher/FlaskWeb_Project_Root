@@ -48,7 +48,7 @@ def get_flask_app_context():
         'host': mongo_uri,
         'uuidRepresentation': 'standard' # Aligned with Stage 2 compliance
     }
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key')
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dummy-secret-key-0123456789abcdef')
 
     db.init_app(app)
 

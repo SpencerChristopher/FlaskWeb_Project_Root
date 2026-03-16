@@ -33,6 +33,7 @@ The project is fully containerized for consistent development and deployment. Ng
 For local development, secrets and overrides are managed via a `.env` file.
 1. Create your local `.env`: `cp .env.template .env`
 2. Update `.env` with your secrets (`SECRET_KEY`, `ADMIN_PASSWORD`, etc.).
+   - Make sure `SECRET_KEY` is at least 32 characters long so JWT signing uses a strong HMAC secret.
 3. Configure your local dev overrides: `cp docker-compose.override.yml.template docker-compose.override.yml`
 
 For a detailed explanation of the environment variable hierarchy, see [Deployment Guide](docs/DEPLOYMENT.md).
