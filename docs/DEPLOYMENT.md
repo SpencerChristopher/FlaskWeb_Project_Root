@@ -68,6 +68,15 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 5.  **Verify Staging Health:** Runs `curl -f` check against `http://localhost:5000/` to ensure the application stack is responsive.
 6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data (articles + profile) in the staging environment.
 
+### Runner data refresh (for local E2E)
+Before each local E2E run, ensure the runner’s database reflects the baseline data by clearing and reseeding it with the latest fixtures:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/drop_db.py
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/seed_db.py --heavy
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/create_admin.py
+```
+This keeps the runner standing by with predictable data while you run the Playwright suite from your local machine (see the Testing guide for the host-side invocation).
+
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
 *   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` provides a safe default (e.g., `3`) via `GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}`.

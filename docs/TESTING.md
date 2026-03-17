@@ -76,6 +76,18 @@ Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while 
     2. Export the same env vars every run (including `E2E_BASE_URL`/`PROD_BASE_URL`).
     3. Use a dedicated service token for staging only.
     4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
+    5. Boot the stack with `FLASK_ENV=staging` before triggering the verify steps.
+    6. Ensure the staging runner is seeded and healthy (drop the DB and rerun `scripts/seed_db.py --heavy`) before invoking your Playwright suite.
+
+You can refresh the staging dataset with the runner commands below before launching the host-side tests:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/drop_db.py
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/seed_db.py --heavy
+# Optional: recreate admin user from the secrets file
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web \
+  /app/.venv/bin/python scripts/create_admin.py
+```
+These commands keep the runner’s data fresh while you continue to execute the E2E suite from your local terminal with the exported secrets.
 
 ---
 
