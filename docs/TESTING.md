@@ -55,7 +55,6 @@ Run from inside the `web` container.
 
 ### C. Staging with Cloudflare Access (Service Token)
 Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while bypassing Zero Trust via a service token.
-Ensure the staging runner exports the required secrets (`SECRET_KEY`, `ADMIN_*`, `MONGO_*`, `STAGING_TOKEN`, `CF_ACCESS_*`) before running this stack; they are never stored in `config.env`. Once the secrets are in place, `scripts/run_staging_e2e.sh` can be used to start the compose stack, install Playwright, and run the `pytest -m e2e` suite against staging in one go.
 *   **Env (required):**
     * `E2E_BASE_URL=https://staging.spencerscooking.uk`
     * `PROD_BASE_URL=https://staging.spencerscooking.uk`
