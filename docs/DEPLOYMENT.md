@@ -18,7 +18,7 @@ Configuration values are sourced in a hierarchical manner:
 3.  **`docker-compose.ci.yml`:** This is an override file used *only* in CI/CD. It overrides the `web` service definition from `docker-compose.yml` to specify `image: ${IMAGE_TAG}` and `build: null`, ensuring that CI/Staging pulls a pre-built image from the registry.
 4.  **`docker-compose.override.yml`:** This is an override file (generated from `docker-compose.override.yml.template`) used *only* for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
 5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, and any optional overrides. **It is NOT used in the CI/CD pipeline.**
-6.  **`config.env` file (Local Development Reference):** Defines shared non-secret defaults and is included via `env_file` so containers inherit consistent values. It does **not** include secrets or overrides for `FLASK_ENV`; that variable is derived from the Compose environment entry (defaulting to `staging` unless overridden locally via `.env`).
+6.  **`config.env` file (Local Development Reference):** Defines shared non-secret defaults. It is used as a reference for local `.env` files but is **not used by the CI/CD pipeline.**
     *Secrets are never stored in `config.env`; they are exported into the runner's environment (via GitHub Secrets or your secret manager) before `docker compose` runs so the containers inherit them without writing them to disk.*
 7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used by `docker-compose.ci.yml` and `scripts/deploy.sh` to pull the exact image built for that commit.
 
@@ -73,7 +73,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
 *   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` provides a safe default (e.g., `3`) via `GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}`.
 *   **Gunicorn Hardening:** Gunicorn is configured with `--limit-request-line 4094`, `--limit-request-fields 100`, and `--max-requests 1000`. `--preload` is enabled to force atomic app factory loading, ensuring the container fails immediately if the application cannot bootstrap. `FORWARDED_ALLOW_IPS` is used to restrict which IPs the WSGI server trusts for proxy headers.
-*   **Flask App Env:** `FLASK_ENV` defaults to `staging` when the CI/staging compose stack boots (the helper scripts export this explicitly) so the security middleware mirrors production; deployment uses `production`.
+*   **Flask App Env:** `FLASK_ENV` is set to `development` for CI/test and `production` for staging/deployment.
 *   **Talisman/HTTPS:** `TALISMAN_FORCE_HTTPS` is configured (default `true` for deployment).
 *   **ProxyFix:** `PROXY_FIX_X_FOR`, `PROXY_FIX_X_PROTO`, etc., are configured to handle reverse proxy headers.
 *   **Service Health Checks:** `mongo`, `redis`, and the `web` (Flask) services all have `healthcheck` definitions in `docker-compose.yml`. MongoDB healthcheck uses authenticated root credentials.
@@ -88,10 +88,6 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 - `MONGO_ROOT_PASSWORD`
 - `MONGO_APP_USER`
 - `MONGO_APP_PASSWORD`
-- `REDIS_PASSWORD`
-- `CF_ACCESS_CLIENT_ID`
-- `CF_ACCESS_CLIENT_SECRET`
-- `CF_ACCESS_JWT`
 
 ## Production Deployment (Raspberry Pi & Cloudflare)
 
@@ -135,15 +131,13 @@ Nginx is configured to trust Cloudflare headers:
 *   Production certificates (e.g., from Cloudflare) can replace these by placing them in the `./certs` folder.
 
 ## Running staging E2E (Turn-key runner)
-1.  Export the required secrets (same ones listed above plus `REDIS_PASSWORD`) into the shell that executes Compose, and ensure `FLASK_ENV=staging`. This mirrors the workflow's use of GitHub Secrets while keeping them out of the repository.
+1.  Export the required secrets (same ones listed above) into the shell that executes Compose. This mirrors the workflow's use of GitHub Secrets without writing them to disk.
 2.  Run `scripts/run_staging_e2e.sh` from the repository root. It:
     * Verifies every secret is present.
     * Starts the staging stack with `config.env`.
     * Installs Playwright dependencies + Chromium as root.
-    * Copies the local `tests/` directory into `/app/tests` so the suite can run inside the container.
     * Executes `pytest -m e2e` against `https://staging.spencerscooking.uk`.
-3.  For machines that need a more automated flow, create a secrets file (example path `/etc/staging-secrets.env`) containing the required exports (including `REDIS_PASSWORD`), restrict it to root, and run `scripts/run_staging_e2e_with_secrets.sh /etc/staging-secrets.env`. That script loads the file, exports the secrets, and delegates to `run_staging_e2e.sh`, so no manual exporting is required during each run.
-4.  Because the `web` container now inherits `CF_ACCESS_*` when the secrets are exported before `docker compose up`, you can `docker exec flask_web_app env` and see the same values the E2E suite uses (they still disappear once the stack stops). This keeps the test credentials available to the helper scripts while respecting the “secrets only in memory” rule.
+3.  The script returns `0` only if the browsers are installed, the tests run, and the stack stays healthy—for repeatable, turn-key staging verification.
 
 ## Runners & Permissions
 *   **WSL Staging Runner:** Must have Docker access and be registered with the label `wsl-staging`.

@@ -55,7 +55,7 @@ Run from inside the `web` container.
 
 ### C. Staging with Cloudflare Access (Service Token)
 Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while bypassing Zero Trust via a service token.
-Ensure the staging runner exports the required secrets (`SECRET_KEY`, `ADMIN_*`, `MONGO_*`, `REDIS_PASSWORD`, `STAGING_TOKEN`, `CF_ACCESS_*`) before running this stack; they are never stored in `config.env`. Once exported, the `web` container inherits the `CF_ACCESS_*` values so both the host helper and any `docker exec` inspection see the same credentials. If you'd rather fetch those values from a protected file, create a read-only `/etc/staging-secrets.env` with the exports and run `scripts/run_staging_e2e_with_secrets.sh /etc/staging-secrets.env`; the helper will source the file, export the values (including `REDIS_PASSWORD`), and then run the standard staging E2E flow.
+Ensure the staging runner exports the required secrets (`SECRET_KEY`, `ADMIN_*`, `MONGO_*`, `STAGING_TOKEN`, `CF_ACCESS_*`) before running this stack; they are never stored in `config.env`. Once the secrets are in place, `scripts/run_staging_e2e.sh` can be used to start the compose stack, install Playwright, and run the `pytest -m e2e` suite against staging in one go.
 *   **Env (required):**
     * `E2E_BASE_URL=https://staging.spencerscooking.uk`
     * `PROD_BASE_URL=https://staging.spencerscooking.uk`
@@ -77,8 +77,6 @@ Ensure the staging runner exports the required secrets (`SECRET_KEY`, `ADMIN_*`,
     2. Export the same env vars every run (including `E2E_BASE_URL`/`PROD_BASE_URL`).
     3. Use a dedicated service token for staging only.
     4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
-    5. Boot the stack with `FLASK_ENV=staging` so the security stack mirrors production (the staging script exports this automatically).
-    6. The staging helper copies the local `tests/` directory into `/app/tests` before invoking `pytest`, keeping the core container image unchanged.
 
 ---
 

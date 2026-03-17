@@ -11,7 +11,6 @@ REQUIRED_SECRETS=(
   MONGO_APP_PASSWORD
   STAGING_TOKEN
   CF_ACCESS_JWT
-  REDIS_PASSWORD
 )
 
 for secret in "${REQUIRED_SECRETS[@]}"; do
@@ -20,13 +19,8 @@ done
 
 COMPOSE_FILES="-f docker-compose.yml -f docker-compose.staging.yml"
 E2E_BASE_URL=${E2E_BASE_URL:-https://staging.spencerscooking.uk}
-export FLASK_ENV=${FLASK_ENV:-staging}
 
 docker compose ${COMPOSE_FILES} --env-file config.env up -d
-
-# Copy the current tests into the running container so pytest has content to execute.
-docker exec flask_web_app mkdir -p /app/tests
-docker cp tests/. flask_web_app:/app/tests
 
 # Install system dependencies (chromium requires root to install packages)
 docker compose ${COMPOSE_FILES} --env-file config.env exec --user root web /app/.venv/bin/python -m playwright install-deps chromium
