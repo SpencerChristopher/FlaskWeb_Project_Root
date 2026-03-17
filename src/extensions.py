@@ -18,10 +18,10 @@ bcrypt = Bcrypt()
 jwt = JWTManager()
 limiter = Limiter(key_func=get_remote_address, strategy="fixed-window")
 
-# Redis client for session and token management
-# Sourced from the same URI as limiter for infrastructure consolidation
-redis_pass = os.environ.get("REDIS_PASSWORD", "changeme")
 redis_host = os.environ.get("REDIS_HOST", "redis")
+redis_pass = os.environ.get("REDIS_PASSWORD")
+if not redis_pass:
+    raise RuntimeError("REDIS_PASSWORD must be provided when initializing Redis clients")
 redis_client = redis.from_url(
     os.environ.get(
         "RATELIMIT_STORAGE_URI", f"redis://:{redis_pass}@{redis_host}:6379/0"

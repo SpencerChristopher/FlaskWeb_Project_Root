@@ -80,7 +80,9 @@ def configure_core_runtime(app: Flask) -> None:
 
     # Configure Redis URL
     redis_host = os.environ.get("REDIS_HOST", "redis")
-    redis_pass = os.environ.get("REDIS_PASSWORD", "changeme")
+    redis_pass = os.environ.get("REDIS_PASSWORD")
+    if not redis_pass:
+        raise ValueError("REDIS_PASSWORD must be set in the environment")
     redis_uri = f"redis://:{redis_pass}@{redis_host}:6379/0"
     app.config["RATELIMIT_STORAGE_URI"] = redis_uri
     os.environ["RATELIMIT_STORAGE_URI"] = redis_uri

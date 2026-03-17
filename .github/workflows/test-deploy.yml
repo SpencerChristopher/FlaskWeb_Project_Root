@@ -78,8 +78,9 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       LOG_LEVEL: INFO
-      FLASK_ENV: development
+      FLASK_ENV: staging
       PYTHON_VERSION: "3.11"
 
     steps:
@@ -107,7 +108,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
@@ -205,6 +206,7 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       LOG_LEVEL: INFO
       FLASK_ENV: production
       STAGING_TOKEN: ${{ secrets.STAGING_TOKEN }}
@@ -229,7 +231,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD STAGING_TOKEN; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD STAGING_TOKEN; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
