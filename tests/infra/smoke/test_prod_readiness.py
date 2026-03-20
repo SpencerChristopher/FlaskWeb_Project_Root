@@ -79,24 +79,24 @@ if not VERIFY:
 class TestProdReadiness:
     """Smoke tests for production environments."""
 
-    def _get_base_url(self, prod_base_url):
+    def _get_base_url(self, base_url):
         """
         Dynamically determine the base URL.
         - If in Docker and no certs, use HTTP on Port 80 (internal nginx).
         - If Staging (URL contains spencerscooking.uk), use HTTPS.
         """
-        if "spencerscooking.uk" in prod_base_url:
-            return prod_base_url # Already includes https://
+        if "spencerscooking.uk" in base_url:
+            return base_url # Already includes https://
             
         if os.getenv("DOCKER_CONTAINER") == "true":
             # If no certs, hit nginx on port 80 instead of 443
             if not VERIFY:
-                return prod_base_url.replace("https://", "http://")
-        return prod_base_url
+                return base_url.replace("https://", "http://")
+        return base_url
 
-    def test_api_bootstrap_public(self, prod_base_url):
+    def test_api_bootstrap_public(self, base_url):
         """Verify that bootstrap endpoint is reachable and returns public data."""
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/api/bootstrap"
         # Allow redirects here as bootstrap should be public, but might redirect if no data exists
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
@@ -105,9 +105,9 @@ class TestProdReadiness:
         assert "profile" in data
         assert "auth" in data
 
-    def test_db_connectivity_via_blog_api(self, prod_base_url):
+    def test_db_connectivity_via_blog_api(self, base_url):
         """Verify that the blog API can fetch posts (DB Check)."""
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/api/blog"
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
         assert resp.status_code == 200
@@ -115,17 +115,17 @@ class TestProdReadiness:
         assert "posts" in data
         assert isinstance(data["posts"], list)
 
-    def test_unauthorized_content_access_blocked(self, prod_base_url):
+    def test_unauthorized_content_access_blocked(self, base_url):
         """Verify that administrative endpoints are correctly gated."""
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/api/content/articles"
         # We expect a redirect to login (302) or a 401 if it's strictly API
         resp = session.get(url, verify=VERIFY, allow_redirects=False)
         assert resp.status_code in [302, 401]
 
-    def test_static_assets_available(self, prod_base_url):
+    def test_static_assets_available(self, base_url):
         """Verify that Nginx is correctly serving static files."""
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/static/app.js"
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
         assert resp.status_code == 200

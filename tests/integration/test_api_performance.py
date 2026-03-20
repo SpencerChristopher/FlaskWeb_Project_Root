@@ -51,23 +51,23 @@ class TestAPIPerformance:
     Targets under 200ms for core endpoints to ensure 'snappy' feel.
     """
 
-    def _get_base_url(self, prod_base_url):
+    def _get_base_url(self, base_url):
         """Dynamically determine base URL for performance tests."""
-        if "spencerscooking.uk" in prod_base_url:
-            return prod_base_url
+        if "spencerscooking.uk" in base_url:
+            return base_url
             
         if os.getenv("DOCKER_CONTAINER") == "true":
             # If no certs, hit nginx on port 80 instead of 443
             if not VERIFY:
-                return prod_base_url.replace("https://", "http://")
-        return prod_base_url
+                return base_url.replace("https://", "http://")
+        return base_url
 
-    def test_bootstrap_latency(self, prod_base_url):
+    def test_bootstrap_latency(self, base_url):
         """
         Verify that the bootstrap endpoint (combined Auth + Profile)
         responds within the performance budget.
         """
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/api/bootstrap"
 
         # Measure 5 samples to get an average
@@ -86,11 +86,11 @@ class TestAPIPerformance:
         # Threshold: 250ms for initial combined load (Account for local jitter)
         assert avg_latency < 250, f"Bootstrap API too slow: {avg_latency:.2f}ms"
 
-    def test_blog_list_latency(self, prod_base_url):
+    def test_blog_list_latency(self, base_url):
         """
         Verify that the blog listing (paginated) responds efficiently.
         """
-        base = self._get_base_url(prod_base_url)
+        base = self._get_base_url(base_url)
         url = f"{base}/api/blog?page=1&per_page=6"
 
         start = time.perf_counter()

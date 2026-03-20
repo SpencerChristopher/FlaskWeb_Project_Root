@@ -47,7 +47,7 @@ docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
-The application will be available at `http://localhost:5000`.
+The application will be available at `http://localhost:5001`.
 
 ---
 

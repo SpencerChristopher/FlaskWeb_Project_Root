@@ -1,4 +1,3 @@
-import os
 import pytest
 import re
 from playwright.sync_api import Page, expect
@@ -10,16 +9,16 @@ def is_horizontally_scrollable(page: Page):
     return page.evaluate("document.documentElement.scrollWidth > document.documentElement.clientWidth")
 
 @pytest.mark.e2e
-def test_mobile_hamburger_menu(page: Page):
+def test_mobile_hamburger_menu(page: Page, base_url: str):
     """
     Verifies that the hamburger menu appears and functions on mobile devices.
     """
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     
     # Set viewport to iPhone 12 size
     page.set_viewport_size({"width": 390, "height": 844})
     
     page.goto(f"{base_url}/home")
+
     
     # Handle Cookie Consent if visible
     accept_btn = page.locator("[data-test='cookie-accept']")
@@ -48,11 +47,10 @@ def test_mobile_hamburger_menu(page: Page):
     expect(page.locator("[data-test='view-articles']")).to_be_visible()
 
 @pytest.mark.e2e
-def test_mobile_overflow_and_layout(page: Page):
+def test_mobile_overflow_and_layout(page: Page, base_url: str):
     """
     Checks for horizontal overflow and element clipping on various mobile sizes.
     """
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     
     viewports = [
         {"width": 320, "height": 568},  # iPhone 5/SE
@@ -63,6 +61,7 @@ def test_mobile_overflow_and_layout(page: Page):
     for vp in viewports:
         page.set_viewport_size(vp)
         page.goto(f"{base_url}/home")
+
         
         # Handle Cookie Consent if visible
         accept_btn = page.locator("[data-test='cookie-accept']")
@@ -82,15 +81,15 @@ def test_mobile_overflow_and_layout(page: Page):
         expect(page.locator("[data-test='profile-statement']")).to_be_visible()
 
 @pytest.mark.e2e
-def test_mobile_scroll_resilience(page: Page):
+def test_mobile_scroll_resilience(page: Page, base_url: str):
     """
     Verifies that the page remains scrollable and doesn't exhibit "bad scroll"
     (e.g., sticking, jumping, or locking) on mobile.
     """
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     page.set_viewport_size({"width": 375, "height": 667})
     
     page.goto(f"{base_url}/home")
+
     
     # Handle Cookie Consent if visible
     accept_btn = page.locator("[data-test='cookie-accept']")

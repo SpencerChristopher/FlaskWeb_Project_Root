@@ -1,4 +1,3 @@
-import os
 import pathlib
 import pytest
 from playwright.sync_api import Page, expect
@@ -6,8 +5,7 @@ from playwright.sync_api import Page, expect
 
 @pytest.mark.e2e
 @pytest.mark.a11y
-def test_homepage_accessibility(page: Page):
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
+def test_homepage_accessibility(page: Page, base_url: str):
     axe_path = pathlib.Path("tests/axe/axe.min.js")
 
     if not axe_path.exists():

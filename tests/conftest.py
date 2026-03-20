@@ -93,21 +93,17 @@ def pytest_collection_modifyitems(config, items):
         _add_markers_by_path(item)
 
 
-@pytest.fixture
-def prod_base_url():
-    """Returns the live URL for smoke and performance testing."""
-    if os.environ.get("DOCKER_CONTAINER") in ["1", "true"]:
-        return os.environ.get("PROD_BASE_URL", "http://nginx")
-    return os.environ.get("PROD_BASE_URL", "http://localhost:5000")
-
-
 @pytest.fixture(scope="session")
 def base_url(request):
     """
     Provide a stable base URL for e2e tests.
     Prefers explicit env vars, then pytest-base-url option, then sensible defaults.
     """
-    env_url = os.environ.get("PYTEST_BASE_URL") or os.environ.get("E2E_BASE_URL")
+    env_url = (
+        os.environ.get("PYTEST_BASE_URL")
+        or os.environ.get("E2E_BASE_URL")
+        or os.environ.get("PROD_BASE_URL")
+    )
     if env_url:
         return env_url
 
@@ -117,7 +113,9 @@ def base_url(request):
 
     if os.environ.get("DOCKER_CONTAINER") in {"1", "true"}:
         return "http://nginx"
-    return "http://localhost:5005"
+
+    # Default to 5001 to match docker-compose.yml (5000 is often occupied)
+    return "http://localhost:5001"
 
 
 @pytest.fixture(scope="session", autouse=True)

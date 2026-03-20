@@ -5,12 +5,11 @@ from playwright.sync_api import Page, expect
 
 
 @pytest.mark.e2e
-def test_admin_profile_workflow(page: Page):
+def test_admin_profile_workflow(page: Page, base_url: str):
     """
     Test the logged-in admin experience for editing the profile.
     Verifies the new work history list/modal UI on a desktop viewport.
     """
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 

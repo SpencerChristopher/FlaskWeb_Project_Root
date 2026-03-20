@@ -4,12 +4,11 @@ from playwright.sync_api import Page, expect
 
 
 @pytest.mark.e2e
-def test_silent_refresh_interceptor(page: Page):
+def test_silent_refresh_interceptor(page: Page, base_url: str):
     """
     Verifies that the frontend can recover from an expired access token
     silently without redirecting the user to login or home.
     """
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 

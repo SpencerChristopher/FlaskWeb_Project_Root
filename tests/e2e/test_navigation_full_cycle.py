@@ -4,12 +4,12 @@ from playwright.sync_api import Page, expect
 
 
 @pytest.mark.e2e
-def test_guest_navigation_from_login(page: Page):
+def test_guest_navigation_from_login(page: Page, base_url: str):
     """Verifies a guest can navigate away from the login page."""
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
 
     # Go to Login
     page.goto(f"{base_url}/login")
+
 
     # Accept cookies
     accept_btn = page.locator("[data-test='cookie-accept']")
@@ -34,9 +34,8 @@ def test_guest_navigation_from_login(page: Page):
 
 
 @pytest.mark.e2e
-def test_admin_navigation_after_login(page: Page):
+def test_admin_navigation_after_login(page: Page, base_url: str):
     """Verifies an admin can navigate after logging in."""
-    base_url = os.getenv("E2E_BASE_URL", "http://localhost:5000")
     admin_user = os.getenv("ADMIN_USERNAME", "admin")
     admin_pass = os.getenv("ADMIN_PASSWORD", "NewAdmin2020!")
 
