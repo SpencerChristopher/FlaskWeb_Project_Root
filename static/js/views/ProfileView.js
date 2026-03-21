@@ -1,24 +1,26 @@
 /**
  * ProfileView.js
- * Manages the developer profile edit view with structured fields for social links and work history.
+ * Revamped profile management with tabbed interface and user settings.
  */
 
-const socialLabelMap = {
-    github: "GH",
-    linkedin: "IN",
-    twitter: "TW",
-    tiktok: "TT",
-    leetcode: "LC",
-    kaggle: "KG",
-    hackthebox: "HTB",
+const socialIconMap = {
+    github: "bi-github",
+    linkedin: "bi-linkedin",
+    twitter: "bi-twitter-x",
+    tiktok: "bi-tiktok",
+    leetcode: "bi-code-slash",
+    kaggle: "bi-graph-up",
+    hackthebox: "bi-shield-lock",
 };
 
-function renderSocialLinks(links = {}) {
-    return Object.keys(socialLabelMap)
+function renderSocialLinkInputs(links = {}) {
+    return Object.keys(socialIconMap)
         .map(
             (key) => `
             <div class="col-md-6 mb-3">
-                <label class="form-label small fw-bold text-uppercase">${key}</label>
+                <label class="form-label small fw-bold text-uppercase d-flex align-items-center gap-2">
+                    <i class="bi ${socialIconMap[key]}"></i> ${key}
+                </label>
                 <input type="url" id="social-${key}" class="form-control" 
                        placeholder="https://${key}.com/..." value="${links[key] || ""}">
             </div>`
@@ -33,128 +35,197 @@ export const ProfileView = {
 
         return `
             <section id="view-admin-profile" class="py-5" data-test="view-admin-profile">
-                <div class="container px-5">
-                    <header class="mb-5">
-                        <h1 class="fw-bolder">Edit Profile</h1>
-                        <p class="lead text-muted">Manage your identity and professional history.</p>
+                <div class="container px-3 px-lg-5">
+                    <header class="mb-5 d-flex justify-content-between align-items-end">
+                        <div>
+                            <h1 class="fw-bolder mb-1">Account Settings</h1>
+                            <p class="lead text-muted mb-0">Manage your professional identity and security.</p>
+                        </div>
+                        <div class="d-none d-md-block">
+                             <span class="badge bg-light text-dark border p-2">Role: ${auth.user?.role || 'Guest'}</span>
+                        </div>
                     </header>
 
-                    <form id="profileForm" class="row g-4">
-                        <!-- Identity Section -->
-                        <div class="col-12">
-                            <div class="card border-0 shadow-sm rounded-4 bg-white">
-                                <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">Identity</h5></div>
-                                <div class="card-body p-4">
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small fw-bold">Full Name</label>
-                                            <input type="text" id="p-name" class="form-control" value="${profile.name || ""}" required>
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label class="form-label small fw-bold">Location</label>
-                                            <input type="text" id="p-location" class="form-control" value="${profile.location || ""}" required>
-                                        </div>
-                                        <div class="col-12 mb-3">
-                                            <label class="form-label small fw-bold">Headline Role (Optional Override)</label>
-                                            <input type="text" id="p-headline" class="form-control" value="${profile.headline_role || ""}" placeholder="e.g. Senior Software Architect">
-                                            <div class="form-text">If left blank, your most recent 'Present' job title will be used.</div>
-                                        </div>
-                                        <div class="col-12 mb-3">
-                                            <label class="form-label small fw-bold">Statement / Bio</label>
-                                            <textarea id="p-statement" class="form-control" rows="4" required>${profile.statement || ""}</textarea>
-                                        </div>
-                                        <div class="col-12">
-                                            <label class="form-label small fw-bold">Profile Image</label>
-                                            <div class="d-flex align-items-center gap-3">
-                                                <div class="position-relative">
-                                                    <img id="p-image-preview" src="${profile.image_url || "/static/uploads/placeholder-profile.png"}" 
-                                                         class="rounded-circle shadow-sm border" style="width: 80px; height: 80px; object-fit: cover;"
-                                                         onerror="this.src='/static/uploads/placeholder-profile.png'">
+                    <!-- Settings Tabs -->
+                    <ul class="nav nav-pills mb-4 gap-2" id="profileTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="btn btn-primary active rounded-pill px-4" id="identity-tab" data-bs-toggle="pill" data-bs-target="#tab-identity" type="button">
+                                <i class="bi bi-person-badge mr-2"></i> Identity
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="btn btn-outline-dark rounded-pill px-4" id="experience-tab" data-bs-toggle="pill" data-bs-target="#tab-experience" type="button">
+                                <i class="bi bi-briefcase mr-2"></i> Experience
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="btn btn-outline-dark rounded-pill px-4" id="security-tab" data-bs-toggle="pill" data-bs-target="#tab-security" type="button">
+                                <i class="bi bi-shield-lock mr-2"></i> Security
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Identity Tab -->
+                        <div class="tab-pane fade show active" id="tab-identity">
+                            <form id="profileForm" class="row g-4">
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                                        <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">General Information</h5></div>
+                                        <div class="card-body p-4">
+                                            <div class="row">
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label small fw-bold">Full Display Name</label>
+                                                    <input type="text" id="p-name" class="form-control" value="${profile.name || ""}" required>
                                                 </div>
-                                                <div class="flex-grow-1">
-                                                    <div class="input-group">
-                                                        <input type="text" id="p-image" class="form-control" value="${profile.image_url || ""}" placeholder="/static/uploads/...">
-                                                        <input type="file" id="p-image-file" class="d-none" accept="image/*">
-                                                        <button type="button" class="btn btn-outline-primary" id="p-image-upload-btn">
-                                                            <i class="bi bi-upload mr-1"></i> Upload New
-                                                        </button>
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label small fw-bold">Location</label>
+                                                    <input type="text" id="p-location" class="form-control" value="${profile.location || ""}" required>
+                                                </div>
+                                                <div class="col-12 mb-3">
+                                                    <label class="form-label small fw-bold">Headline Role (Hero Title)</label>
+                                                    <input type="text" id="p-headline" class="form-control" value="${profile.headline_role || ""}" placeholder="e.g. Senior Software Architect">
+                                                    <div class="form-text">Used as the main title on the homepage.</div>
+                                                </div>
+                                                <div class="col-12 mb-3">
+                                                    <label class="form-label small fw-bold">Statement / Professional Bio</label>
+                                                    <textarea id="p-statement" class="form-control" rows="4" required>${profile.statement || ""}</textarea>
+                                                </div>
+                                                <div class="col-12">
+                                                    <label class="form-label small fw-bold">Profile Image</label>
+                                                    <div class="d-flex align-items-center gap-3 p-3 border rounded-3 bg-light">
+                                                        <img id="p-image-preview" src="${profile.image_url || "/static/uploads/placeholder-profile.png"}" 
+                                                             class="rounded-circle shadow-sm border bg-white" style="width: 80px; height: 80px; object-fit: cover;"
+                                                             onerror="this.src='/static/uploads/placeholder-profile.png'">
+                                                        <div class="flex-grow-1">
+                                                            <div class="input-group">
+                                                                <input type="text" id="p-image" class="form-control" value="${profile.image_url || ""}" placeholder="/static/uploads/..." readonly>
+                                                                <input type="file" id="p-image-file" class="d-none" accept="image/*">
+                                                                <button type="button" class="btn btn-dark" id="p-image-upload-btn">
+                                                                    <i class="bi bi-cloud-upload mr-2"></i> Upload
+                                                                </button>
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                    <div class="form-text small">Upload a new photo or provide a local URL.</div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
+
+                                    <div class="row g-4">
+                                        <div class="col-lg-7">
+                                            <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
+                                                <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">Social & Professional Links</h5></div>
+                                                <div class="card-body p-4">
+                                                    <div class="row">${renderSocialLinkInputs(profile.social_links)}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-5">
+                                            <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
+                                                <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">Core Skills</h5></div>
+                                                <div class="card-body p-4 text-center">
+                                                    <p class="small text-muted mb-3">Enter skills separated by commas.</p>
+                                                    <textarea id="p-skills" class="form-control mb-3" rows="8" placeholder="Python, Flask, Docker...">${(profile.skills || []).join(", ")}</textarea>
+                                                    <div id="skills-preview" class="d-flex flex-wrap gap-2 justify-content-center">
+                                                        ${(profile.skills || []).map(s => `<span class="badge bg-primary">${s}</span>`).join('')}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="text-end mt-5">
+                                        <div id="profile-error" class="alert alert-danger mb-3" style="display:none;"></div>
+                                        <button type="submit" class="btn btn-success btn-lg px-5 rounded-pill shadow">Save All Identity Changes</button>
+                                    </div>
                                 </div>
-                            </div>
+                            </form>
                         </div>
 
-                        <!-- Social Links -->
-                        <div class="col-md-6">
-                            <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
-                                <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">Social Links</h5></div>
-                                <div class="card-body p-4">
-                                    <div class="row">${renderSocialLinks(profile.social_links)}</div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Skills -->
-                        <div class="col-md-6">
-                            <div class="card border-0 shadow-sm rounded-4 bg-white h-100">
-                                <div class="card-header bg-white border-bottom p-4"><h5 class="mb-0 fw-bold">Skills</h5></div>
-                                <div class="card-body p-4">
-                                    <label class="form-label small fw-bold">Core Skills (Comma separated)</label>
-                                    <textarea id="p-skills" class="form-control" rows="6">${(profile.skills || []).join(", ")}</textarea>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Work History -->
-                        <div class="col-12">
+                        <!-- Experience Tab -->
+                        <div class="tab-pane fade" id="tab-experience">
                             <div class="card border-0 shadow-sm rounded-4 bg-white">
                                 <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
-                                    <h5 class="mb-0 fw-bold">Work History</h5>
-                                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3" id="open-add-work-modal">+ Add Experience</button>
+                                    <h5 class="mb-0 fw-bold">Professional History</h5>
+                                    <button type="button" class="btn btn-primary btn-sm rounded-pill px-4" id="open-add-work-modal">
+                                        <i class="bi bi-plus-lg mr-2"></i> Add Entry
+                                    </button>
                                 </div>
                                 <div class="card-body p-0">
                                     <div id="work-history-list" class="list-group list-group-flush p-4">
                                         ${workHistory.map((w, idx) => `
-                                            <div class="list-group-item p-4 work-list-item bg-white shadow-sm mb-3 rounded-3" data-idx="${idx}" data-history="${btoa(JSON.stringify(w))}">
+                                            <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx}" data-history="${btoa(JSON.stringify(w))}">
                                                 <div class="d-flex justify-content-between align-items-start">
-                                                    <div>
-                                                        <h5 class="fw-bold mb-1">${w.role}</h5>
-                                                        <div class="text-primary fw-bold mb-2">${w.company}</div>
-                                                        <div class="text-muted small mb-2">
-                                                            <span>${w.start_date}</span> &ndash; <span>${w.end_date || "Present"}</span>
-                                                            <span class="ms-2">&bull; ${w.location}</span>
+                                                    <div class="flex-grow-1">
+                                                        <div class="d-flex align-items-center gap-2 mb-1">
+                                                            <h5 class="fw-bold mb-0">${w.role}</h5>
+                                                            <span class="badge bg-light text-dark border small">${w.end_date === 'Present' ? 'Current' : 'Past'}</span>
                                                         </div>
-                                                        <p class="mb-0 small text-muted">${w.description || ""}</p>
+                                                        <div class="text-primary fw-bold mb-2"><i class="bi bi-building mr-1"></i> ${w.company}</div>
+                                                        <div class="text-muted small mb-3">
+                                                            <i class="bi bi-calendar3 mr-1"></i> <span>${w.start_date}</span> &ndash; <span>${w.end_date || "Present"}</span>
+                                                            <span class="ms-3"><i class="bi bi-geo-alt mr-1"></i> ${w.location}</span>
+                                                        </div>
+                                                        <p class="mb-0 small text-muted text-justify" style="max-width: 800px;">${w.description || ""}</p>
                                                     </div>
-                                                    <div class="btn-group">
-                                                        <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn">Edit</button>
-                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-work-btn">Remove</button>
+                                                    <div class="btn-group ms-3">
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger remove-work-btn" title="Delete"><i class="bi bi-trash"></i></button>
                                                     </div>
                                                 </div>
                                             </div>
                                         `).join("")}
-                                        ${workHistory.length === 0 ? '<div class="p-5 text-center text-muted">No experience added yet.</div>' : ""}
+                                        ${workHistory.length === 0 ? '<div class="p-5 text-center text-muted"><i class="bi bi-inbox display-4 d-block mb-3"></i>No history records found.</div>' : ""}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center mt-5">
+                                <button type="button" class="btn btn-success btn-lg px-5 rounded-pill shadow" id="final-save-experience">Commit Experience Updates</button>
+                            </div>
+                        </div>
+
+                        <!-- Security Tab -->
+                        <div class="tab-pane fade" id="tab-security">
+                            <div class="row justify-content-center">
+                                <div class="col-lg-6">
+                                    <div class="card border-0 shadow-sm rounded-4 bg-white">
+                                        <div class="card-header bg-white border-bottom p-4">
+                                            <h5 class="mb-0 fw-bold"><i class="bi bi-key mr-2"></i> Change Password</h5>
+                                        </div>
+                                        <div class="card-body p-4">
+                                            <form id="changePasswordForm">
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Current Password</label>
+                                                    <input type="password" id="current-password" class="form-control" required>
+                                                </div>
+                                                <hr>
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">New Password</label>
+                                                    <input type="password" id="new-password" class="form-control" required>
+                                                    <div class="form-text small">Must be at least 8 characters with 1 number and 1 special character.</div>
+                                                </div>
+                                                <div class="mb-4">
+                                                    <label class="form-label small fw-bold">Confirm New Password</label>
+                                                    <input type="password" id="confirm-password" class="form-control" required>
+                                                </div>
+                                                <div id="password-error" class="alert alert-danger mb-3" style="display:none;"></div>
+                                                <div id="password-success" class="alert alert-success mb-3" style="display:none;">Password changed successfully!</div>
+                                                <button type="submit" class="btn btn-dark w-100 rounded-pill py-3">Update Security Credentials</button>
+                                            </form>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="col-12 text-center mt-5">
-                            <div id="profile-error" class="alert alert-danger" style="display:none;"></div>
-                            <button type="submit" class="btn btn-primary btn-lg px-5 rounded-pill shadow">Save Profile Changes</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
 
                 <!-- Work Entry Modal -->
                 <div id="work-modal" class="modal-overlay" style="display:none;">
                     <div class="modal-content card shadow-lg border-0 rounded-4">
                         <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
-                            <h5 class="fw-bolder mb-0" id="work-modal-title">Add Experience</h5>
+                            <h5 class="fw-bolder mb-0" id="work-modal-title">Experience Details</h5>
                             <button type="button" class="btn-close" id="close-work-modal"></button>
                         </div>
                         <div class="card-body p-4">
@@ -162,11 +233,11 @@ export const ProfileView = {
                                 <input type="hidden" id="w-idx" value="">
                                 <div class="row g-3">
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">Company</label>
+                                        <label class="form-label small fw-bold">Company / Organization</label>
                                         <input type="text" id="w-company" class="form-control" required>
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label small fw-bold">Role</label>
+                                        <label class="form-label small fw-bold">Role Title</label>
                                         <input type="text" id="w-role" class="form-control" required>
                                     </div>
                                     <div class="col-md-6">
@@ -182,16 +253,16 @@ export const ProfileView = {
                                         <input type="text" id="w-location" class="form-control" required>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Description</label>
-                                        <textarea id="w-desc" class="form-control" rows="3"></textarea>
+                                        <label class="form-label small fw-bold">Job Description</label>
+                                        <textarea id="w-desc" class="form-control" rows="4"></textarea>
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label small fw-bold">Skills (comma separated)</label>
+                                        <label class="form-label small fw-bold">Technologies Used (Comma separated)</label>
                                         <input type="text" id="w-skills" class="form-control" placeholder="e.g. React, Python, AWS">
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 mt-4">
-                                    <button type="submit" class="btn btn-primary flex-grow-1" id="save-work-entry">Save Experience</button>
+                                    <button type="submit" class="btn btn-primary flex-grow-1" id="save-work-entry">Apply Entry</button>
                                     <button type="button" class="btn btn-light" id="cancel-work-modal">Cancel</button>
                                 </div>
                             </form>
@@ -206,23 +277,52 @@ export const ProfileView = {
                     align-items: center; justify-content: center; z-index: 1000;
                     backdrop-filter: blur(4px);
                 }
-                .modal-content { width: 95%; max-width: 600px; }
+                .modal-content { width: 95%; max-width: 650px; }
+                .nav-pills .btn.active { background-color: var(--accent-sage) !important; color: #1a1918 !important; border-color: var(--accent-sage) !important; }
+                .nav-pills .btn { transition: all 0.2s ease; }
+                .text-justify { text-align: justify; }
             </style>`;
     },
 
     mount: (context) => {
         const fetchAPI = context.api;
-        const form = document.getElementById('profileForm');
-        if (!form) return;
+        
+        // --- Tab Switching Logic (since we don't use Bootstrap JS) ---
+        const tabButtons = document.querySelectorAll('[data-bs-toggle="pill"]');
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Deactivate all
+                tabButtons.forEach(b => {
+                    b.classList.remove('active', 'btn-primary');
+                    b.classList.add('btn-outline-dark');
+                    const targetId = b.getAttribute('data-bs-target');
+                    document.querySelector(targetId).classList.remove('show', 'active');
+                });
+                // Activate clicked
+                btn.classList.add('active', 'btn-primary');
+                btn.classList.remove('btn-outline-dark');
+                const targetId = btn.getAttribute('data-bs-target');
+                document.querySelector(targetId).classList.add('show', 'active');
+            });
+        });
 
+        const form = document.getElementById('profileForm');
         const workList = document.getElementById('work-history-list');
         const workModal = document.getElementById('work-modal');
         const workForm = document.getElementById('workEntryForm');
+        const skillsInput = document.getElementById('p-skills');
+        const skillsPreview = document.getElementById('skills-preview');
+
+        // Skills Preview Real-time update
+        skillsInput.addEventListener('input', () => {
+            const skills = skillsInput.value.split(',').map(s => s.trim()).filter(s => s);
+            skillsPreview.innerHTML = skills.map(s => `<span class="badge bg-primary">${s}</span>`).join('');
+        });
 
         const openWorkModal = (idx = null) => {
             const titleEl = document.getElementById('work-modal-title');
             if (idx !== null) {
-                titleEl.textContent = 'Edit Experience';
+                titleEl.textContent = 'Edit Professional Experience';
                 const item = workList.querySelector(`[data-idx="${idx}"]`);
                 const data = JSON.parse(atob(item.getAttribute('data-history')));
                 document.getElementById('w-idx').value = idx;
@@ -234,7 +334,7 @@ export const ProfileView = {
                 document.getElementById('w-desc').value = data.description || '';
                 document.getElementById('w-skills').value = (data.skills || []).join(', ');
             } else {
-                titleEl.textContent = 'Add Experience';
+                titleEl.textContent = 'Add Professional Experience';
                 workForm.reset();
                 document.getElementById('w-idx').value = '';
             }
@@ -256,9 +356,14 @@ export const ProfileView = {
             if (!item) return;
             const idx = item.getAttribute('data-idx');
 
-            if (e.target.classList.contains('remove-work-btn')) {
-                if (confirm('Remove this experience entry?')) item.remove();
-            } else if (e.target.classList.contains('edit-work-btn')) {
+            if (e.target.closest('.remove-work-btn')) {
+                if (confirm('Permanently remove this entry from your history?')) {
+                    item.remove();
+                    if (workList.querySelectorAll('.work-list-item').length === 0) {
+                        workList.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-inbox display-4 d-block mb-3"></i>No history records found.</div>';
+                    }
+                }
+            } else if (e.target.closest('.edit-work-btn')) {
                 openWorkModal(idx);
             }
         };
@@ -277,20 +382,23 @@ export const ProfileView = {
             };
 
             const html = `
-                <div class="list-group-item p-4 work-list-item bg-white shadow-sm mb-3 rounded-3" data-idx="${idx || Date.now()}" data-history="${btoa(JSON.stringify(entry))}">
+                <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx || Date.now()}" data-history="${btoa(JSON.stringify(entry))}">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h5 class="fw-bold mb-1">${entry.role}</h5>
-                            <div class="text-primary fw-bold mb-2">${entry.company}</div>
-                            <div class="text-muted small mb-2">
-                                <span>${entry.start_date}</span> &ndash; <span>${entry.end_date || "Present"}</span>
-                                <span class="ms-2">&bull; ${entry.location}</span>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <h5 class="fw-bold mb-0">${entry.role}</h5>
+                                <span class="badge bg-light text-dark border small">${entry.end_date === 'Present' ? 'Current' : 'Past'}</span>
                             </div>
-                            <p class="mb-0 small text-muted">${entry.description || ""}</p>
+                            <div class="text-primary fw-bold mb-2"><i class="bi bi-building mr-1"></i> ${entry.company}</div>
+                            <div class="text-muted small mb-3">
+                                <i class="bi bi-calendar3 mr-1"></i> <span>${entry.start_date}</span> &ndash; <span>${entry.end_date || "Present"}</span>
+                                <span class="ms-3"><i class="bi bi-geo-alt mr-1"></i> ${entry.location}</span>
+                            </div>
+                            <p class="mb-0 small text-muted text-justify" style="max-width: 800px;">${entry.description || ""}</p>
                         </div>
-                        <div class="btn-group">
-                            <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn">Edit</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-work-btn">Remove</button>
+                        <div class="btn-group ms-3">
+                            <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn" title="Edit"><i class="bi bi-pencil"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-work-btn" title="Delete"><i class="bi bi-trash"></i></button>
                         </div>
                     </div>
                 </div>`;
@@ -300,8 +408,8 @@ export const ProfileView = {
                 oldItem.outerHTML = html;
             } else {
                 const emptyMsg = workList.querySelector('.text-muted.p-5');
-                if (emptyMsg) emptyMsg.remove();
-                workList.insertAdjacentHTML('beforeend', html);
+                if (emptyMsg) workList.innerHTML = '';
+                workList.insertAdjacentHTML('afterbegin', html); // Add newest to top
             }
             closeWorkModal();
         };
@@ -324,7 +432,6 @@ export const ProfileView = {
                 uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
 
                 try {
-                    // Use the centralized fetchAPI from context to ensure CSRF and Auth are handled
                     const result = await fetchAPI('/api/content/profile/photo', {
                         method: 'POST',
                         body: formData
@@ -332,20 +439,19 @@ export const ProfileView = {
 
                     urlInput.value = result.url;
                     previewImg.src = result.url;
-                    alert('Photo uploaded and updated successfully!');
+                    alert('Profile photo updated successfully!');
                 } catch (err) {
                     alert('Upload failed: ' + err.message);
                 } finally {
                     uploadBtn.disabled = false;
-                    uploadBtn.innerHTML = '<i class="bi bi-upload mr-1"></i> Upload New';
+                    uploadBtn.innerHTML = '<i class="bi bi-cloud-upload mr-2"></i> Upload';
                 }
             };
         }
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        const gatherProfileData = () => {
             const social_links = {};
-            Object.keys(socialLabelMap).forEach(key => {
+            Object.keys(socialIconMap).forEach(key => {
                 const val = document.getElementById(`social-${key}`).value;
                 if (val) social_links[key] = val;
             });
@@ -354,7 +460,7 @@ export const ProfileView = {
                 return JSON.parse(atob(item.getAttribute('data-history')));
             });
 
-            const profileData = {
+            return {
                 name: document.getElementById('p-name').value,
                 location: document.getElementById('p-location').value,
                 headline_role: document.getElementById('p-headline').value,
@@ -364,12 +470,15 @@ export const ProfileView = {
                 social_links,
                 work_history
             };
+        };
 
+        const submitProfile = async (data) => {
             try {
                 await fetchAPI('/api/content/profile', {
                     method: 'PUT',
-                    body: JSON.stringify(profileData)
+                    body: JSON.stringify(data)
                 });
+                alert('Profile updated successfully!');
                 context.navigate('/home');
             } catch (err) {
                 const errEl = document.getElementById('profile-error');
@@ -377,6 +486,47 @@ export const ProfileView = {
                 errEl.style.display = 'block';
                 window.scrollTo(0, 0);
             }
-        });
+        };
+
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            submitProfile(gatherProfileData());
+        };
+
+        document.getElementById('final-save-experience').onclick = () => {
+             submitProfile(gatherProfileData());
+        };
+
+        // --- Security / Password Change ---
+        const passwordForm = document.getElementById('changePasswordForm');
+        passwordForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const current_password = document.getElementById('current-password').value;
+            const new_password = document.getElementById('new-password').value;
+            const confirm_password = document.getElementById('confirm-password').value;
+            const errorEl = document.getElementById('password-error');
+            const successEl = document.getElementById('password-success');
+
+            errorEl.style.display = 'none';
+            successEl.style.display = 'none';
+
+            if (new_password !== confirm_password) {
+                errorEl.textContent = "New passwords do not match.";
+                errorEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                await fetchAPI('/api/auth/change-password', {
+                    method: 'POST',
+                    body: JSON.stringify({ current_password, new_password })
+                });
+                successEl.style.display = 'block';
+                passwordForm.reset();
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+            }
+        };
     }
 };
