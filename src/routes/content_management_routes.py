@@ -140,7 +140,7 @@ def upload_media() -> Response:
         raise BadRequestException("No selected file.")
 
     try:
-        url = media_service.save_image(file.stream, file.filename)
+        url, _file_hash = media_service.save_image(file.stream, file.filename)
         return jsonify({"url": url, "message": "Media uploaded successfully"}), 201
     except ValueError as e:
         raise BadRequestException(str(e))

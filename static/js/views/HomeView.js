@@ -77,7 +77,7 @@ export const HomeView = {
                                             <div class="d-flex flex-wrap align-items-center gap-3">
                                                 ${data.location ? `
                                                     <span class="badge location-badge">
-                                                        📍 ${escapeHTML(data.location)}
+                                                        \u{1F4CD} ${escapeHTML(data.location)}
                                                     </span>
                                                 ` : ""}
                                                 
@@ -91,6 +91,7 @@ export const HomeView = {
 
                                         ${roleTitle ? `<p class="role-title mb-4">${escapeHTML(roleTitle)}</p>` : ""}
                                         
+                                                                                
                                         <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement" style="line-height: 1.6; max-width: 800px; text-align: justify;">
                                             ${escapeHTML(data.statement || "")}
                                         </div>
@@ -133,7 +134,7 @@ export const HomeView = {
                                 ${workItems.map((w, idx) => ComponentFactory.createCard({
                                     title: escapeHTML(w.role || ""),
                                     subtitle: escapeHTML(w.company || ""),
-                                    meta: `📅 ${escapeHTML(w.start_date || "")} — ${escapeHTML(w.end_date || "")} &nbsp;&bull;&nbsp; 📍 ${escapeHTML(w.location || "")}`,
+                                    meta: `\u{1F4C5} ${escapeHTML(w.start_date || "")} &mdash; ${escapeHTML(w.end_date || "")} &nbsp;&bull;&nbsp; \u{1F4CD} ${escapeHTML(w.location || "")}`,
                                     body: w.description ? `<p class="mb-0">${escapeHTML(w.description)}</p>` : "",
                                     tags: Array.isArray(w.skills) ? w.skills : [],
                                     dataTest: `work-card-${idx}`
