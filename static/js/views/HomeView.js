@@ -1,14 +1,14 @@
 import { ComponentFactory } from '../components/ComponentFactory.js';
-import { escapeHTML, validateURL } from '../utils/SecurityUtils.js';
+import { escapeHTML, renderMarkdown, validateURL } from '../utils/SecurityUtils.js';
 
-const socialLabelMap = {
-    github: "GH",
-    linkedin: "IN",
-    twitter: "TW",
-    tiktok: "TT",
-    leetcode: "LC",
-    kaggle: "KG",
-    hackthebox: "HTB",
+const socialIconMap = {
+    github: "bi-github",
+    linkedin: "bi-linkedin",
+    twitter: "bi-twitter-x",
+    tiktok: "bi-tiktok",
+    leetcode: "bi-code-slash",
+    kaggle: "bi-graph-up",
+    hackthebox: "bi-shield-lock",
 };
 
 function renderSocialLinks(links = {}) {
@@ -16,12 +16,13 @@ function renderSocialLinks(links = {}) {
         .filter(([, url]) => typeof url === "string" && url.trim())
         .map(([key, url]) => {
             const label = key.replace(/[-_]+/g, " ").trim();
-            const short = socialLabelMap[key] || (label ? label[0].toUpperCase() : "?");
+            const icon = socialIconMap[key] || "bi-link-45deg";
             const safeUrl = validateURL(url);
+            const safeLabel = escapeHTML(label || key);
             return `
-                <a class="social-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer" data-test="social-link-${key}">
-                    <span class="social-pill" aria-hidden="true">${escapeHTML(short)}</span>
-                    <span class="visually-hidden">${escapeHTML(label)}</span>
+                <a class="social-link" href="${safeUrl}" target="_blank" rel="noopener noreferrer" data-test="social-link-${key}" aria-label="${safeLabel}">
+                    <span class="social-pill" aria-hidden="true"><i class="bi ${icon}"></i></span>
+                    <span class="visually-hidden">${safeLabel}</span>
                 </a>`;
         })
         .join("");
@@ -132,12 +133,13 @@ export const HomeView = {
                         <div class="row justify-content-center">
                             <div class="col-12">
                                 ${workItems.map((w, idx) => ComponentFactory.createCard({
-                                    title: escapeHTML(w.role || ""),
-                                    subtitle: escapeHTML(w.company || ""),
-                                    meta: `\u{1F4C5} ${escapeHTML(w.start_date || "")} &mdash; ${escapeHTML(w.end_date || "")} &nbsp;&bull;&nbsp; \u{1F4CD} ${escapeHTML(w.location || "")}`,
-                                    body: w.description ? `<p class="mb-0">${escapeHTML(w.description)}</p>` : "",
+                                    title: w.role || "",
+                                    subtitle: w.company || "",
+                                    meta: `\u{1F4C5} ${w.start_date || ""} \u{2013} ${w.end_date || ""} \u{2022} \u{1F4CD} ${w.location || ""}`,
+                                    body: w.description ? `<div class="mb-0 markdown">${renderMarkdown(w.description)}</div>` : "",
                                     tags: Array.isArray(w.skills) ? w.skills : [],
-                                    dataTest: `work-card-${idx}`
+                                    dataTest: `work-card-${idx}`,
+                                    className: "card-depth"
                                 })).join("")}
                             </div>
                         </div>

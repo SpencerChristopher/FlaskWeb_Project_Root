@@ -66,3 +66,55 @@ export function sanitizeHTML(html) {
     
     return doc.body.innerHTML;
 }
+
+function formatInlineMarkdown(text) {
+    let output = text;
+    output = output.replace(/`([^`]+)`/g, "<code>$1</code>");
+    output = output.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    output = output.replace(/\*(.+?)\*/g, "<em>$1</em>");
+    return output;
+}
+
+/**
+ * Renders a small, safe subset of Markdown (lists, bold, italic, inline code).
+ * HTML is always escaped before formatting is applied.
+ */
+export function renderMarkdown(text) {
+    if (!text) return "";
+    const escaped = escapeHTML(text);
+    const lines = escaped.split(/\r?\n/);
+    const html = [];
+    let inList = false;
+
+    const closeList = () => {
+        if (inList) {
+            html.push("</ul>");
+            inList = false;
+        }
+    };
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (/^[-*+]\s+/.test(trimmed)) {
+            if (!inList) {
+                html.push("<ul>");
+                inList = true;
+            }
+            const item = trimmed.replace(/^[-*+]\s+/, "");
+            html.push(`<li>${formatInlineMarkdown(item)}</li>`);
+            continue;
+        }
+
+        if (!trimmed) {
+            closeList();
+            html.push("<br>");
+            continue;
+        }
+
+        closeList();
+        html.push(`<p>${formatInlineMarkdown(trimmed)}</p>`);
+    }
+
+    closeList();
+    return html.join("");
+}

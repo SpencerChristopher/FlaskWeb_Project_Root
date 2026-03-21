@@ -3,6 +3,8 @@
  * Revamped profile management with tabbed interface and user settings.
  */
 
+import { renderMarkdown } from '../utils/SecurityUtils.js';
+
 const socialIconMap = {
     github: "bi-github",
     linkedin: "bi-linkedin",
@@ -11,6 +13,17 @@ const socialIconMap = {
     leetcode: "bi-code-slash",
     kaggle: "bi-graph-up",
     hackthebox: "bi-shield-lock",
+};
+
+const encodeHistory = (entry) => encodeURIComponent(JSON.stringify(entry));
+
+const decodeHistory = (value) => {
+    try {
+        return JSON.parse(decodeURIComponent(value));
+    } catch (err) {
+        console.error("Failed to decode work history entry.", err);
+        return null;
+    }
 };
 
 function renderSocialLinkInputs(links = {}) {
@@ -145,6 +158,8 @@ export const ProfileView = {
 
                         <!-- Experience Tab -->
                         <div class="tab-pane fade" id="tab-experience">
+                            <div id="experience-error" class="alert alert-danger mb-3" style="display:none;"></div>
+                            <div id="experience-success" class="alert alert-success mb-3" style="display:none;"></div>
                             <div class="card border-0 shadow-sm rounded-4 bg-white">
                                 <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
                                     <h5 class="mb-0 fw-bold">Professional History</h5>
@@ -155,7 +170,7 @@ export const ProfileView = {
                                 <div class="card-body p-0">
                                     <div id="work-history-list" class="list-group list-group-flush p-4">
                                         ${workHistory.map((w, idx) => `
-                                            <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx}" data-history="${btoa(JSON.stringify(w))}">
+                                            <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx}" data-history="${encodeHistory(w)}">
                                                 <div class="d-flex justify-content-between align-items-start">
                                                     <div class="flex-grow-1">
                                                         <div class="d-flex align-items-center gap-2 mb-1">
@@ -167,7 +182,7 @@ export const ProfileView = {
                                                             <i class="bi bi-calendar3 mr-1"></i> <span>${w.start_date}</span> &ndash; <span>${w.end_date || "Present"}</span>
                                                             <span class="ms-3"><i class="bi bi-geo-alt mr-1"></i> ${w.location}</span>
                                                         </div>
-                                                        <p class="mb-0 small text-muted text-justify" style="max-width: 800px;">${w.description || ""}</p>
+                                                        <div class="mb-0 small text-muted text-justify markdown" style="max-width: 800px;">${renderMarkdown(w.description || "")}</div>
                                                     </div>
                                                     <div class="btn-group ms-3">
                                                         <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn" title="Edit"><i class="bi bi-pencil"></i></button>
@@ -179,9 +194,6 @@ export const ProfileView = {
                                         ${workHistory.length === 0 ? '<div class="p-5 text-center text-muted"><i class="bi bi-inbox display-4 d-block mb-3"></i>No history records found.</div>' : ""}
                                     </div>
                                 </div>
-                            </div>
-                            <div class="text-center mt-5">
-                                <button type="button" class="btn btn-success btn-lg px-5 rounded-pill shadow" id="final-save-experience">Commit Experience Updates</button>
                             </div>
                         </div>
 
@@ -254,7 +266,7 @@ export const ProfileView = {
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">Job Description</label>
-                                        <textarea id="w-desc" class="form-control" rows="4"></textarea>
+                                        <textarea id="w-desc" class="form-control work-desc" rows="8"></textarea>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">Technologies Used (Comma separated)</label>
@@ -277,10 +289,14 @@ export const ProfileView = {
                     align-items: center; justify-content: center; z-index: 1000;
                     backdrop-filter: blur(4px);
                 }
-                .modal-content { width: 95%; max-width: 650px; }
+                .modal-content { width: 95%; max-width: 820px; }
                 .nav-pills .btn.active { background-color: var(--accent-sage) !important; color: #1a1918 !important; border-color: var(--accent-sage) !important; }
                 .nav-pills .btn { transition: all 0.2s ease; }
                 .text-justify { text-align: justify; }
+                .work-desc { min-height: 180px; resize: vertical; }
+                .markdown p { margin-bottom: 0.5rem; }
+                .markdown ul { margin: 0; padding-left: 1.1rem; }
+                .markdown ul li { margin-bottom: 0.25rem; }
             </style>`;
     },
 
@@ -312,6 +328,8 @@ export const ProfileView = {
         const workForm = document.getElementById('workEntryForm');
         const skillsInput = document.getElementById('p-skills');
         const skillsPreview = document.getElementById('skills-preview');
+        const expError = document.getElementById('experience-error');
+        const expSuccess = document.getElementById('experience-success');
 
         // Skills Preview Real-time update
         skillsInput.addEventListener('input', () => {
@@ -319,12 +337,35 @@ export const ProfileView = {
             skillsPreview.innerHTML = skills.map(s => `<span class="badge bg-primary">${s}</span>`).join('');
         });
 
+        const showExperienceError = (message) => {
+            if (!expError) return;
+            expError.textContent = message;
+            expError.style.display = 'block';
+            if (expSuccess) expSuccess.style.display = 'none';
+        };
+
+        const showExperienceSuccess = (message) => {
+            if (!expSuccess) return;
+            expSuccess.textContent = message;
+            expSuccess.style.display = 'block';
+            if (expError) expError.style.display = 'none';
+        };
+
+        const clearExperienceStatus = () => {
+            if (expError) expError.style.display = 'none';
+            if (expSuccess) expSuccess.style.display = 'none';
+        };
+
         const openWorkModal = (idx = null) => {
             const titleEl = document.getElementById('work-modal-title');
             if (idx !== null) {
                 titleEl.textContent = 'Edit Professional Experience';
                 const item = workList.querySelector(`[data-idx="${idx}"]`);
-                const data = JSON.parse(atob(item.getAttribute('data-history')));
+                const data = decodeHistory(item.getAttribute('data-history'));
+                if (!data) {
+                    showExperienceError("Unable to load this entry. Please try again.");
+                    return;
+                }
                 document.getElementById('w-idx').value = idx;
                 document.getElementById('w-company').value = data.company;
                 document.getElementById('w-role').value = data.role;
@@ -351,7 +392,7 @@ export const ProfileView = {
         document.getElementById('close-work-modal').onclick = closeWorkModal;
         document.getElementById('cancel-work-modal').onclick = closeWorkModal;
 
-        workList.onclick = (e) => {
+        workList.onclick = async (e) => {
             const item = e.target.closest('.work-list-item');
             if (!item) return;
             const idx = item.getAttribute('data-idx');
@@ -362,13 +403,15 @@ export const ProfileView = {
                     if (workList.querySelectorAll('.work-list-item').length === 0) {
                         workList.innerHTML = '<div class="p-5 text-center text-muted"><i class="bi bi-inbox display-4 d-block mb-3"></i>No history records found.</div>';
                     }
+                    clearExperienceStatus();
+                    await submitExperience();
                 }
             } else if (e.target.closest('.edit-work-btn')) {
                 openWorkModal(idx);
             }
         };
 
-        workForm.onsubmit = (e) => {
+        workForm.onsubmit = async (e) => {
             e.preventDefault();
             const idx = document.getElementById('w-idx').value;
             const entry = {
@@ -382,7 +425,7 @@ export const ProfileView = {
             };
 
             const html = `
-                <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx || Date.now()}" data-history="${btoa(JSON.stringify(entry))}">
+                <div class="list-group-item p-4 work-list-item border rounded-3 bg-white shadow-sm mb-3" data-idx="${idx || Date.now()}" data-history="${encodeHistory(entry)}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div class="flex-grow-1">
                             <div class="d-flex align-items-center gap-2 mb-1">
@@ -394,7 +437,7 @@ export const ProfileView = {
                                 <i class="bi bi-calendar3 mr-1"></i> <span>${entry.start_date}</span> &ndash; <span>${entry.end_date || "Present"}</span>
                                 <span class="ms-3"><i class="bi bi-geo-alt mr-1"></i> ${entry.location}</span>
                             </div>
-                            <p class="mb-0 small text-muted text-justify" style="max-width: 800px;">${entry.description || ""}</p>
+                            <div class="mb-0 small text-muted text-justify markdown" style="max-width: 800px;">${renderMarkdown(entry.description || "")}</div>
                         </div>
                         <div class="btn-group ms-3">
                             <button type="button" class="btn btn-sm btn-outline-secondary edit-work-btn" title="Edit"><i class="bi bi-pencil"></i></button>
@@ -412,6 +455,8 @@ export const ProfileView = {
                 workList.insertAdjacentHTML('afterbegin', html); // Add newest to top
             }
             closeWorkModal();
+            clearExperienceStatus();
+            await submitExperience();
         };
 
         const uploadBtn = document.getElementById('p-image-upload-btn');
@@ -457,8 +502,9 @@ export const ProfileView = {
             });
 
             const work_history = Array.from(workList.querySelectorAll('.work-list-item')).map(item => {
-                return JSON.parse(atob(item.getAttribute('data-history')));
-            });
+                const decoded = decodeHistory(item.getAttribute('data-history'));
+                return decoded;
+            }).filter(item => item);
 
             return {
                 name: document.getElementById('p-name').value,
@@ -488,13 +534,21 @@ export const ProfileView = {
             }
         };
 
+        const submitExperience = async () => {
+            try {
+                await fetchAPI('/api/content/profile', {
+                    method: 'PUT',
+                    body: JSON.stringify(gatherProfileData())
+                });
+                showExperienceSuccess('Experience updated successfully.');
+            } catch (err) {
+                showExperienceError("Save failed: " + err.message);
+            }
+        };
+
         form.onsubmit = (e) => {
             e.preventDefault();
             submitProfile(gatherProfileData());
-        };
-
-        document.getElementById('final-save-experience').onclick = () => {
-             submitProfile(gatherProfileData());
         };
 
         // --- Security / Password Change ---

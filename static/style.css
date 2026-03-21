@@ -409,8 +409,9 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 999px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  background: #111;
+  border: 1px solid #111;
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -420,8 +421,14 @@ body {
 }
 
 .social-link:hover {
-  color: var(--accent-sage);
+  color: var(--text);
   transform: translateY(-2px);
+}
+
+.social-link:hover .social-pill {
+  background: #fff;
+  color: #111;
+  border-color: #111;
 }
 
 .visually-hidden {
@@ -439,6 +446,36 @@ body {
   border-radius: 20px;
   padding: 30px;
   margin-bottom: 24px;
+}
+
+.card-depth {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 1px rgba(0, 0, 0, 0.05),
+    0 8px 18px rgba(0, 0, 0, 0.08),
+    0 24px 40px rgba(0, 0, 0, 0.08);
+  position: relative;
+}
+
+.card-depth::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  pointer-events: none;
+}
+
+.card-depth::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.55), transparent 60%);
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .exp-meta {
@@ -471,12 +508,17 @@ body {
   border-radius: 6px;
   font-size: 0.75rem;
   font-weight: 600;
-  background: var(--accent-sage);
+  background: linear-gradient(180deg, #e9f5f3 0%, var(--accent-sage) 100%);
   color: #1a1918;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .tag.secondary {
-  background: var(--accent-lavender);
+  background: linear-gradient(180deg, #f2effa 0%, var(--accent-lavender) 100%);
+  border-color: rgba(0, 0, 0, 0.06);
 }
 
 @media (max-width: 768px) {

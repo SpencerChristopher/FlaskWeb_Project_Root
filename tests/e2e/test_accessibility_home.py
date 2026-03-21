@@ -20,6 +20,9 @@ def test_homepage_accessibility(page: Page, base_url: str):
     if accept_btn.is_visible():
         accept_btn.click()
 
+    # Wait for SPA to render the home view before running axe
+    page.wait_for_selector("[data-test='view-home']")
+
     # Load Axe from CDN (already allowed by CSP)
     page.add_script_tag(
         url="https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js"

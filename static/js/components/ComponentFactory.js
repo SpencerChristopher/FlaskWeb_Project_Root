@@ -10,16 +10,17 @@ export const ComponentFactory = {
     /**
      * Creates a standard content card (used for Experience and Blog).
      */
-    createCard: ({ id, title, subtitle, meta, body, tags = [], link = null, dataTest = "", badge = "" }) => {
+    createCard: ({ id, title, subtitle, meta, body, tags = [], link = null, dataTest = "", badge = "", className = "" }) => {
         const safeTitle = escapeHTML(title);
         const safeSubtitle = escapeHTML(subtitle);
         const safeMeta = escapeHTML(meta);
         const safeLink = validateURL(link);
         const safeBadge = escapeHTML(badge);
         const safeDataTest = escapeHTML(dataTest);
+        const safeClass = escapeHTML(className);
 
         return `
-            <article class="card mb-4 border-0 shadow-sm bg-white" 
+            <article class="card mb-4 border-0 shadow-sm bg-white ${safeClass}" 
                      data-test="${safeDataTest}" 
                      style="max-width: 1100px; margin-left: auto; margin-right: auto; border-radius: 32px; overflow: hidden;">
                 <div class="card-body p-4 p-md-5">
