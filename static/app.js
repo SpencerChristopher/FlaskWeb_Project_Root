@@ -115,6 +115,7 @@ async function fetchAPI(url, options = {}) {
 function renderLoading() {
     return `
         <section class="py-5" data-test="view-loading">
+            <h1 class="visually-hidden">Loading page</h1>
             <div class="container px-5 text-center">
                 <div class="spinner-border text-primary" role="status" aria-label="Loading"></div>
             </div>
