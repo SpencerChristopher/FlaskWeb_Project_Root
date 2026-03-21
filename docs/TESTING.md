@@ -43,6 +43,16 @@ Run from inside the `web` container.
 *   **Target:** `http://nginx` (Internal Docker network)
 *   **Scope:** Best for verifying integration, infrastructure risks (chaos), and performance benchmarks.
 *   **Requirement:** The container detects it is inside Docker and automatically switches routing.
+*   **Playwright install (container, for E2E):**
+    ```bash
+    docker compose exec -T web /app/.venv/bin/python -m pip install -U playwright
+    docker compose exec -T web /app/.venv/bin/python -m playwright install chromium
+    ```
+*   **E2E (container):**
+    ```bash
+    docker compose exec -e E2E_BASE_URL=http://nginx -e PYTEST_BASE_URL=http://nginx \
+      web /app/.venv/bin/pytest /app/tests/e2e -m e2e
+    ```
 *   **Command:** 
     ```bash
     docker compose exec -T web /app/.venv/bin/pytest tests/ -m "not e2e"

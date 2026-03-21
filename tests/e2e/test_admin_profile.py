@@ -33,7 +33,7 @@ def test_admin_profile_workflow(page: Page, base_url: str):
     # Use the link from the nav to ensure it works
     page.click("text=Edit Profile")
     page.wait_for_selector("[data-test='view-admin-profile']")
-    expect(page.locator("h1:has-text('Edit Profile')")).to_be_visible()
+    expect(page.locator("h1:has-text('Account Settings')")).to_be_visible()
 
     # Clear existing work history to ensure clean test state
     delete_btns = page.locator(".remove-work-btn")
@@ -85,7 +85,7 @@ def test_admin_profile_workflow(page: Page, base_url: str):
 
     add_btn = page.locator("#open-add-work-modal")
     expect(add_btn).to_be_visible()
-    expect(add_btn).to_have_text("+ Add Experience")
+    expect(add_btn).to_have_text("Add Entry")
 
     # 4. Open Modal and add a new entry
     add_btn.click()
