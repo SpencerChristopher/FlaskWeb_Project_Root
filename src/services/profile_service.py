@@ -112,8 +112,6 @@ class ProfileService:
             social_links=profile.social_links or {},
             work_history=self._map_work_history_to_dto(profile.work_history),
             image_url=profile.image_url,
-            image_hash=profile.image_hash,
-            image_filename=profile.image_filename,
             last_updated=(
                 profile.last_updated.isoformat() if profile.last_updated else None
             ),
@@ -146,8 +144,9 @@ class ProfileService:
                 social_links=normalized_social_links,
                 work_history=work_history_models,
                 image_url=desired_image_url,
-                image_hash=profile_data.image_hash,
-                image_filename=profile_data.image_filename,
+                image_hash=None,
+                image_filename=None,
+                image_uploaded_at=None,
                 last_updated=datetime.datetime.now(datetime.timezone.utc),
             )
         else:
@@ -159,27 +158,21 @@ class ProfileService:
             profile.skills = profile_data.skills
             profile.social_links = normalized_social_links
             profile.work_history = work_history_models
-            
-            # Update image metadata if provided via schema
-            if profile_data.image_hash:
-                profile.image_hash = profile_data.image_hash
-            if profile_data.image_filename:
-                profile.image_filename = profile_data.image_filename
 
             if profile_data.image_url and profile_data.image_url != profile.image_url:
                 if profile.image_url:
                     self._media_service.delete_image(profile.image_url)
                 profile.image_url = self._validate_image_url(profile_data.image_url)
-                if not profile_data.image_hash:
-                    profile.image_hash = None
-                if not profile_data.image_filename:
-                    profile.image_filename = None
+                profile.image_hash = None
+                profile.image_filename = None
+                profile.image_uploaded_at = None
             elif not profile_data.image_url and profile.image_url:
                 # If image_url is explicitly cleared, delete the old file
                 self._media_service.delete_image(profile.image_url)
                 profile.image_url = None
                 profile.image_hash = None
                 profile.image_filename = None
+                profile.image_uploaded_at = None
             profile.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         saved_profile = self._profile_repository.save(profile)
@@ -203,7 +196,9 @@ class ProfileService:
             self._media_service.delete_image(profile_doc.image_url)
 
         # 2. Save new photo (returns URL and SHA-256 hash)
-        new_url, file_hash = self._media_service.save_image(file_stream, original_filename)
+        new_url, file_hash = self._media_service.save_image(
+            file_stream, original_filename
+        )
 
         # 3. Update Profile reference (or create if missing)
         if not profile_doc:
@@ -214,11 +209,13 @@ class ProfileService:
                 image_url=new_url,
                 image_hash=file_hash,
                 image_filename=original_filename,
+                image_uploaded_at=datetime.datetime.now(datetime.timezone.utc),
             )
         else:
             profile_doc.image_url = new_url
             profile_doc.image_hash = file_hash
             profile_doc.image_filename = original_filename
+            profile_doc.image_uploaded_at = datetime.datetime.now(datetime.timezone.utc)
             profile_doc.last_updated = datetime.datetime.now(datetime.timezone.utc)
 
         self._profile_repository.save(profile_doc)

@@ -42,6 +42,9 @@ class Profile(db.Document):
     social_links = mongoengine.DictField()
     work_history = mongoengine.EmbeddedDocumentListField(WorkHistoryItem)
     image_url = mongoengine.StringField()
+    image_hash = mongoengine.StringField()  # Integrity verification
+    image_filename = mongoengine.StringField()  # Original filename tracking
+    image_uploaded_at = mongoengine.DateTimeField()  # Server-side upload timestamp
     last_updated = mongoengine.DateTimeField(default=datetime.datetime.utcnow)
 
     def to_dict(self) -> dict:
@@ -55,6 +58,11 @@ class Profile(db.Document):
             "social_links": self.social_links or {},
             "work_history": [item.to_mongo().to_dict() for item in self.work_history],
             "image_url": self.image_url,
+            "image_hash": self.image_hash,
+            "image_filename": self.image_filename,
+            "image_uploaded_at": (
+                self.image_uploaded_at.isoformat() if self.image_uploaded_at else None
+            ),
             "last_updated": (
                 self.last_updated.isoformat() if self.last_updated else None
             ),

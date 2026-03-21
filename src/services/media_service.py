@@ -34,10 +34,12 @@ class MediaService:
             and filename.rsplit(".", 1)[1].lower() in self._allowed_extensions
         )
 
-    def save_image(self, file_stream: BinaryIO, original_filename: str) -> str:
+    def save_image(self, file_stream: BinaryIO, original_filename: str) -> tuple[str, str]:
         """
-        Saves an image to the local filesystem and returns the relative URL path.
+        Saves an image to the local filesystem.
+        Returns a tuple of (relative_url, sha256_hash).
         """
+        import hashlib
         if not self._is_allowed_file(original_filename):
             raise ValueError("Unsupported file extension.")
 
@@ -73,8 +75,12 @@ class MediaService:
             image.save(output, format="WEBP", quality=82, method=6)
 
         output.seek(0)
-        if output.getbuffer().nbytes > self._max_size_bytes:
+        final_bytes = output.read()
+        if len(final_bytes) > self._max_size_bytes:
             raise ValueError("Processed image exceeds size limit.")
+
+        # Calculate SHA-256 of the FINAL processed bytes
+        file_hash = hashlib.sha256(final_bytes).hexdigest()
 
         # Generate UUID filename to prevent collisions and path injection
         new_filename = f"{uuid.uuid4().hex}.webp"
@@ -82,10 +88,10 @@ class MediaService:
 
         # Save the processed file
         with open(file_path, "wb") as f:
-            f.write(output.read())
+            f.write(final_bytes)
 
-        # Return the path relative to static
-        return f"/static/uploads/{new_filename}"
+        # Return the path relative to static and the hash
+        return f"/static/uploads/{new_filename}", file_hash
 
     def delete_image(self, image_url: str) -> bool:
         """
