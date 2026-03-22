@@ -1,6 +1,8 @@
 """
-This module contains routes for managing content.
-These routes are resource-centric and enforced by granular permissions.
+Routes for managing content and profile resources.
+
+These endpoints are resource-centric and protected by granular permissions.
+They are intended for authenticated administrative or authoring workflows.
 """
 
 from functools import wraps
@@ -33,7 +35,11 @@ media_service = get_media_service()
 @bp.route("/articles", methods=["GET"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def get_articles() -> Response:
-    """Retrieves articles for management."""
+    """List articles for administrative management.
+
+    Returns:
+        Response: JSON array of managed article summaries.
+    """
     articles = article_service.list_admin_articles(g.current_user)
     return jsonify([article_service.to_public_dict(a) for a in articles]), 200
 
@@ -41,7 +47,14 @@ def get_articles() -> Response:
 @bp.route("/articles", methods=["POST"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def create_article() -> Response:
-    """Creates a new article."""
+    """Create a new article from a validated payload.
+
+    Returns:
+        Response: JSON representation of the created article.
+
+    Raises:
+        BadRequestException: If the JSON payload is missing or invalid.
+    """
     data = request.get_json()
     if not data:
         raise BadRequestException("Invalid JSON payload")
@@ -54,7 +67,14 @@ def create_article() -> Response:
 @bp.route("/articles/<string:article_id>", methods=["GET"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def get_article(article_id: str) -> Response:
-    """Retrieves a specific article."""
+    """Retrieve a managed article by its ID.
+
+    Args:
+        article_id: The article identifier.
+
+    Returns:
+        Response: JSON representation of the article.
+    """
     article = article_service.get_article_managed(article_id, g.current_user)
     return jsonify(article_service.to_public_dict(article)), 200
 
@@ -62,7 +82,17 @@ def get_article(article_id: str) -> Response:
 @bp.route("/articles/<string:article_id>", methods=["PUT"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def update_article(article_id: str) -> Response:
-    """Updates an existing article."""
+    """Update an existing article by ID.
+
+    Args:
+        article_id: The article identifier.
+
+    Returns:
+        Response: JSON representation of the updated article.
+
+    Raises:
+        BadRequestException: If the JSON payload is missing or invalid.
+    """
     data = request.get_json()
     if not data:
         raise BadRequestException("Invalid JSON payload")
@@ -75,14 +105,25 @@ def update_article(article_id: str) -> Response:
 @bp.route("/articles/<string:article_id>", methods=["DELETE"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def delete_article(article_id: str) -> Response:
-    """Deletes an article."""
+    """Delete an article by ID.
+
+    Args:
+        article_id: The article identifier.
+
+    Returns:
+        Response: Confirmation message.
+    """
     article_service.delete_article(article_id, g.current_user)
     return jsonify({"message": "Article deleted successfully"}), 200
 
 
 @bp.route("/profile", methods=["GET"])
 def get_profile() -> Response:
-    """Retrieves the developer profile singleton."""
+    """Retrieve the public developer profile singleton.
+
+    Returns:
+        Response: JSON representation of the profile.
+    """
     profile = profile_service.get_profile()
     return jsonify(profile.model_dump()), 200
 
@@ -90,7 +131,14 @@ def get_profile() -> Response:
 @bp.route("/profile", methods=["PUT"])
 @permission_required([Permissions.PROFILE_MANAGE])
 def update_profile() -> Response:
-    """Updates the developer profile singleton."""
+    """Update the developer profile singleton.
+
+    Returns:
+        Response: JSON representation of the updated profile.
+
+    Raises:
+        BadRequestException: If the JSON payload is missing or invalid.
+    """
     data = request.get_json()
     if not data:
         raise BadRequestException("Invalid JSON payload")
@@ -103,7 +151,14 @@ def update_profile() -> Response:
 @bp.route("/profile/photo", methods=["POST"])
 @permission_required([Permissions.PROFILE_MANAGE])
 def upload_profile_photo() -> Response:
-    """Replaces the profile photo."""
+    """Replace the profile photo with a newly uploaded image.
+
+    Returns:
+        Response: JSON payload containing the new image URL.
+
+    Raises:
+        BadRequestException: If the upload is missing or invalid.
+    """
     if "file" not in request.files:
         raise BadRequestException("No file part in the request.")
 
@@ -131,7 +186,14 @@ def upload_profile_photo() -> Response:
 @bp.route("/media", methods=["POST"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def upload_media() -> Response:
-    """Uploads generic media for blog articles."""
+    """Upload generic media for blog articles.
+
+    Returns:
+        Response: JSON payload containing the media URL.
+
+    Raises:
+        BadRequestException: If the upload is missing or invalid.
+    """
     if "file" not in request.files:
         raise BadRequestException("No file part in the request.")
 
@@ -149,7 +211,14 @@ def upload_media() -> Response:
 @bp.route("/media", methods=["DELETE"])
 @permission_required([Permissions.CONTENT_MANAGE, Permissions.CONTENT_AUTHOR])
 def delete_media() -> Response:
-    """Deletes generic media."""
+    """Delete a generic media asset by URL.
+
+    Returns:
+        Response: Confirmation message.
+
+    Raises:
+        BadRequestException: If the URL is missing or deletion fails.
+    """
     url = request.args.get("url")
     if not url:
         raise BadRequestException("Missing 'url' parameter.")

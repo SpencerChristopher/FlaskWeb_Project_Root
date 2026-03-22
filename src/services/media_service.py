@@ -1,6 +1,11 @@
 """
 Service for managing media uploads (images) for profile and blog posts.
-Optimized for Raspberry Pi: stores files on the local filesystem.
+
+Responsibilities:
+- Validate file extension and size constraints.
+- Normalize and re-encode images to a safe, consistent format.
+- Persist files to a local upload directory for lightweight deployments.
+- Provide deterministic hashes for observability and deduplication.
 """
 
 from __future__ import annotations
@@ -14,9 +19,20 @@ from PIL import Image, ImageOps
 
 
 class MediaService:
-    """Application service for binary asset management."""
+    """Application service for binary asset management.
+
+    This service is optimized for local filesystem storage and low-resource
+    environments (e.g., Raspberry Pi). It enforces size/dimension limits,
+    strips metadata, and emits stable filenames to reduce collision risk.
+    """
 
     def __init__(self, upload_dir: str, allowed_extensions: set[str] | None = None):
+        """Initialize the media service with storage and validation settings.
+
+        Args:
+            upload_dir: Filesystem directory where uploads are persisted.
+            allowed_extensions: Optional set of allowed file extensions.
+        """
         self._upload_dir = Path(upload_dir)
         self._allowed_extensions = allowed_extensions or {
             "png",
@@ -29,15 +45,34 @@ class MediaService:
         self._max_dimension_px = 1600
 
     def _is_allowed_file(self, filename: str) -> bool:
+        """Check if a filename has an allowed extension.
+
+        Args:
+            filename: The original filename from the client.
+
+        Returns:
+            bool: True if extension is allowed, False otherwise.
+        """
         return (
             "." in filename
             and filename.rsplit(".", 1)[1].lower() in self._allowed_extensions
         )
 
     def save_image(self, file_stream: BinaryIO, original_filename: str) -> tuple[str, str]:
-        """
-        Saves an image to the local filesystem.
-        Returns a tuple of (relative_url, sha256_hash).
+        """Save an image to the local filesystem after normalization.
+
+        Performs size validation, strips metadata, re-encodes to WebP, and
+        returns both the stored URL and the SHA-256 hash of the final bytes.
+
+        Args:
+            file_stream: Binary stream of the uploaded image.
+            original_filename: Original client-provided filename.
+
+        Returns:
+            tuple[str, str]: (relative_url, sha256_hash).
+
+        Raises:
+            ValueError: If the file type, size, or contents are invalid.
         """
         import hashlib
         if not self._is_allowed_file(original_filename):
@@ -94,9 +129,13 @@ class MediaService:
         return f"/static/uploads/{new_filename}", file_hash
 
     def delete_image(self, image_url: str) -> bool:
-        """
-        Deletes an image file from the filesystem based on its relative URL path.
-        Returns True if successful, False otherwise.
+        """Delete an image file from the filesystem by its relative URL.
+
+        Args:
+            image_url: URL expected to point to a local static upload.
+
+        Returns:
+            bool: True if deletion succeeded, False otherwise.
         """
         if not image_url or not image_url.startswith("/static/uploads/"):
             return False

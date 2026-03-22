@@ -1,4 +1,4 @@
-"""Public API routes for content and contact."""
+"""Public API routes for content, bootstrap data, and contact forms."""
 
 import re
 from flask import Blueprint, jsonify, current_app, request, Response
@@ -23,9 +23,12 @@ auth_service = get_auth_service()
 @bp.route("/bootstrap", methods=["GET"])
 @jwt_required(optional=True)
 def bootstrap_api() -> Response:
-    """
-    Combined endpoint for initial app load.
-    Returns the public profile AND current auth status.
+    """Return bootstrap data for the SPA initial load.
+
+    Returns the public profile and (if authenticated) user capabilities.
+
+    Returns:
+        Response: JSON payload with profile and auth status.
     """
     profile = profile_service.get_profile()
 
@@ -47,7 +50,11 @@ def bootstrap_api() -> Response:
 
 @bp.route("/home", methods=["GET"])
 def home_api() -> Response:
-    """Legacy/Simple home data endpoint, now backed by ProfileService."""
+    """Return legacy home payload backed by ProfileService.
+
+    Returns:
+        Response: Minimal JSON payload for legacy clients.
+    """
     profile = profile_service.get_profile()
     return jsonify(
         {
@@ -61,7 +68,11 @@ def home_api() -> Response:
 
 @bp.route("/about", methods=["GET"])
 def about_api() -> Response:
-    """Return 'about' section data."""
+    """Return the static 'about' section payload.
+
+    Returns:
+        Response: JSON content for the about page.
+    """
     return jsonify(
         {
             "title": "We've got what you need!",
@@ -78,7 +89,14 @@ def about_api() -> Response:
 
 @bp.route("/blog", methods=["GET"])
 def blog_list_api() -> Response:
-    """Public blog listing (still uses /blog for SEO/URLs)."""
+    """Return the public blog listing with pagination.
+
+    Returns:
+        Response: JSON payload of articles and pagination metadata.
+
+    Raises:
+        BadRequestException: If page parameters are invalid.
+    """
     try:
         page = int(request.args.get("page", 1))
         per_page = int(request.args.get("per_page", 6))
@@ -115,7 +133,17 @@ def blog_list_api() -> Response:
 
 @bp.route("/blog/<string:slug>", methods=["GET"])
 def blog_article_api(slug: str) -> Response:
-    """Public article view."""
+    """Return a public article by slug.
+
+    Args:
+        slug: URL-safe article slug.
+
+    Returns:
+        Response: JSON representation of the article.
+
+    Raises:
+        BadRequestException: If the slug format is invalid.
+    """
     # Validate slug format using regex
     if not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", slug):
         raise BadRequestException("Invalid slug format.")
@@ -126,7 +154,11 @@ def blog_article_api(slug: str) -> Response:
 
 @bp.route("/license", methods=["GET"])
 def license_api() -> Response:
-    """Return 'license' information."""
+    """Return license information.
+
+    Returns:
+        Response: JSON payload with license details.
+    """
     return jsonify(
         {
             "title": "License Information",
@@ -145,7 +177,14 @@ def license_api() -> Response:
 @bp.route("/contact", methods=["POST"])
 @limiter.limit("5 per minute")
 def contact_api() -> Response:
-    """Handle contact form submissions."""
+    """Handle contact form submissions with rate limiting.
+
+    Returns:
+        Response: Confirmation message.
+
+    Raises:
+        BadRequestException: If required fields are missing.
+    """
     data = request.get_json()
     if not data:
         raise BadRequestException("Invalid JSON payload")

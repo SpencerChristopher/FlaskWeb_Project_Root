@@ -1,6 +1,11 @@
 """
 Profile service for managing the site owner's developer identity.
-Follows the 'Pydemic' style: accepting and returning Pydantic DTOs.
+
+Responsibilities:
+- Orchestrate profile reads/updates as a singleton document.
+- Validate and normalize inbound data (including social links and image URL rules).
+- Coordinate image lifecycle via MediaService to avoid orphaned uploads.
+- Return Pydantic DTOs for consistent API responses.
 """
 
 import datetime
@@ -25,7 +30,12 @@ logger = logging.getLogger(__name__)
 
 
 class ProfileService:
-    """Application service for developer profile orchestration."""
+    """Application service for developer profile orchestration.
+
+    This service mediates profile persistence, validation, and media lifecycle
+    coordination. It keeps the profile consistent as a singleton and ensures
+    image metadata is managed server-side to avoid leakage and orphaned files.
+    """
 
     def __init__(
         self, profile_repository: ProfileRepository, media_service: "MediaService"
@@ -34,6 +44,14 @@ class ProfileService:
         self._media_service = media_service
 
     def _map_work_history_to_dto(self, history: list) -> list[WorkHistorySchema]:
+        """Convert profile work history models into DTOs.
+
+        Args:
+            history: List of WorkHistoryModel instances from persistence.
+
+        Returns:
+            list[WorkHistorySchema]: DTOs suitable for API responses.
+        """
         return [
             WorkHistorySchema(
                 company=item.company,
@@ -50,6 +68,14 @@ class ProfileService:
     def _map_dto_to_work_history_model(
         self, history: list[WorkHistorySchema]
     ) -> list[WorkHistoryModel]:
+        """Convert inbound work history DTOs into persistence models.
+
+        Args:
+            history: List of validated WorkHistorySchema DTOs.
+
+        Returns:
+            list[WorkHistoryModel]: Embedded document models for persistence.
+        """
         return [
             WorkHistoryModel(
                 company=item.company,
@@ -64,6 +90,14 @@ class ProfileService:
         ]
 
     def _normalize_social_links(self, links: dict[str, str]) -> dict[str, str]:
+        """Normalize social link keys into a consistent slug format.
+
+        Args:
+            links: Mapping of social platform keys to URLs.
+
+        Returns:
+            dict[str, str]: Normalized key/value mapping with cleaned URLs.
+        """
         normalized: dict[str, str] = {}
         for key, url in links.items():
             norm_key = re.sub(r"[\\s_]+", "-", key.strip().lower())
@@ -74,6 +108,17 @@ class ProfileService:
         return normalized
 
     def _validate_image_url(self, image_url: str | None) -> str | None:
+        """Validate a profile image URL is a local upload.
+
+        Args:
+            image_url: Candidate image URL from a client request.
+
+        Returns:
+            str | None: Validated URL or None if empty.
+
+        Raises:
+            BadRequestException: If the URL does not reference local uploads.
+        """
         if not image_url:
             return None
         if not image_url.startswith("/static/uploads/"):
@@ -83,8 +128,10 @@ class ProfileService:
         return image_url
 
     def get_profile(self) -> ProfilePublic:
-        """
-        Retrieves the profile. If none exists, returns a default one.
+        """Retrieve the profile singleton or return a default profile.
+
+        Returns:
+            ProfilePublic: The profile DTO for public use.
         """
         profile = self._profile_repository.get_profile()
         if not profile:
@@ -120,8 +167,20 @@ class ProfileService:
     def update_profile(
         self, profile_data: ProfileSchema, user: "UserIdentity"
     ) -> ProfilePublic:
-        """
-        Updates the singleton profile. Creates it if it doesn't exist.
+        """Update the singleton profile, creating it if missing.
+
+        Handles image URL changes and ensures any replaced image is deleted to
+        prevent orphaned media.
+
+        Args:
+            profile_data: Validated profile payload.
+            user: The authenticated user performing the update.
+
+        Returns:
+            ProfilePublic: Updated profile DTO.
+
+        Raises:
+            BadRequestException: If an image URL is invalid.
         """
         profile = self._profile_repository.get_profile()
 
@@ -185,9 +244,21 @@ class ProfileService:
     def update_profile_photo(
         self, file_stream: BinaryIO, original_filename: str, user: "UserIdentity"
     ) -> str:
-        """
-        Specialized method to replace the existing profile photo with a new one.
-        Ensures only one photo exists by deleting the previous file.
+        """Replace the profile photo with a newly uploaded image.
+
+        Deletes any existing image to prevent orphaned files. Stores hash,
+        original filename, and upload timestamp for traceability.
+
+        Args:
+            file_stream: Binary stream of the image upload.
+            original_filename: Original filename provided by the client.
+            user: The authenticated user performing the upload.
+
+        Returns:
+            str: URL of the stored image.
+
+        Raises:
+            ValueError: If the image is invalid or violates size/format rules.
         """
         profile_doc = self._profile_repository.get_profile()
 

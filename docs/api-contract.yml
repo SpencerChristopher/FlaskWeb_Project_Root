@@ -20,7 +20,7 @@ endpoints:
     description: Initial app load endpoint. Returns both public profile and current auth status.
     body:
       required_keys: [profile, auth]
-      profile_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
+      profile_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
       auth_keys: [logged_in, user]
 
   - method: GET
@@ -133,15 +133,18 @@ endpoints:
     status: 200
     description: Publicly accessible developer profile. Dates are ISO-8601 strings.
     body:
-      required_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
 
   - method: PUT
     path: /api/content/profile
     status: 200
     security: [jwt_required, "permission: profile:manage"]
     description: Update the developer profile.
+    request_body:
+      required_keys: [name, location, statement]
+      optional_keys: [headline_role, image_url, interests, skills, social_links, work_history]
     body:
-      required_keys: [name, headline_role, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
 
   - method: POST
     path: /api/content/profile/photo

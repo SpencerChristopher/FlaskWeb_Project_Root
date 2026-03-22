@@ -16,6 +16,14 @@ class MongoProfileRepository(ProfileRepository):
     """MongoEngine implementation of profile singleton operations."""
 
     def get_profile(self) -> Optional[Profile]:
+        """Fetch the profile singleton, repairing singleton key if missing.
+
+        Returns:
+            Optional[Profile]: The profile document if present, else None.
+
+        Raises:
+            DatabaseConnectionException: If the database lookup fails.
+        """
         try:
             profile = Profile.objects(singleton_key=PROFILE_SINGLETON_KEY).first()
             if profile:
@@ -31,6 +39,17 @@ class MongoProfileRepository(ProfileRepository):
             ) from e
 
     def save(self, profile: Profile) -> Profile:
+        """Persist the profile singleton.
+
+        Args:
+            profile: The profile document to save.
+
+        Returns:
+            Profile: The saved profile document.
+
+        Raises:
+            DatabaseConnectionException: If the database write fails.
+        """
         try:
             profile.singleton_key = PROFILE_SINGLETON_KEY
             return profile.save()
