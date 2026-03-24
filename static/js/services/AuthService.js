@@ -62,8 +62,10 @@ export class AuthService {
         }
     }
 
-    async login(username, password) {
-        const body = JSON.stringify({ username, password });
+    async login(username, password, turnstileToken = null) {
+        const payload = { username, password };
+        if (turnstileToken) payload.turnstile_token = turnstileToken;
+        const body = JSON.stringify(payload);
         await this.api('/api/auth/login', { method: 'POST', body });
         return await this.checkStatus(); // checkStatus triggers notify()
     }

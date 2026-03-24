@@ -60,6 +60,12 @@
                 </div>
             </div>
         </footer>
+        <script>
+            window.APP_CONFIG = {{ {
+                "turnstileSiteKey": turnstile_site_key,
+                "turnstileEnabled": turnstile_enabled
+            } | tojson }};
+        </script>
         <!-- Custom App JS-->
         <script src="{{ url_for('static', filename='app.js') }}?v=20260307" type="module"></script>
     </body>

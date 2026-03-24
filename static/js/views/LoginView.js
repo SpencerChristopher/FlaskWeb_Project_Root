@@ -1,3 +1,5 @@
+import { renderTurnstile, isTurnstileEnabled } from '../utils/Turnstile.js';
+
 export const LoginView = {
     template() {
         return `
@@ -19,9 +21,12 @@ export const LoginView = {
                                             <label class="form-label" for="password">Password</label>
                                             <input class="form-control" id="password" type="password" placeholder="Password" required />
                                         </div>
+                                        <div class="mb-3" id="login-turnstile-wrapper">
+                                            <div id="login-turnstile-container"></div>
+                                        </div>
                                         <div class="d-flex justify-content-between align-items-center">
                                             <button class="btn btn-primary btn-lg" type="submit" data-test="login-submit">Sign In</button>
-                                            <div class="small text-muted" data-test="login-message"></div>
+                                            <div class="small text-muted" data-test="login-message" aria-live="polite"></div>
                                         </div>
                                     </form>
                                 </div>
@@ -34,6 +39,31 @@ export const LoginView = {
     mount(context, onLogin) {
         const form = document.getElementById('loginForm');
         if (!form) return;
+        let turnstileToken = null;
+
+        const container = document.getElementById('login-turnstile-container');
+        const wrapper = document.getElementById('login-turnstile-wrapper');
+        if (!isTurnstileEnabled()) {
+            wrapper?.classList.add('d-none');
+        } else if (container) {
+            renderTurnstile(container, {
+                callback: (token) => {
+                    turnstileToken = token;
+                    form.dataset.turnstileToken = token;
+                },
+                'expired-callback': () => {
+                    turnstileToken = null;
+                    delete form.dataset.turnstileToken;
+                },
+                'error-callback': () => {
+                    turnstileToken = null;
+                    delete form.dataset.turnstileToken;
+                }
+            }).catch(() => {
+                const msg = form.querySelector('[data-test="login-message"]');
+                if (msg) msg.textContent = 'Bot protection failed to load.';
+            });
+        }
         form.addEventListener('submit', onLogin, { signal: context.signal });
     },
 };

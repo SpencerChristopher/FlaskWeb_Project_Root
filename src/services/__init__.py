@@ -3,6 +3,7 @@ Service wiring for application-layer orchestration.
 """
 
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -12,6 +13,9 @@ if TYPE_CHECKING:
     from src.services.session_service import SessionService
     from src.services.profile_service import ProfileService
     from src.services.media_service import MediaService
+    from src.services.turnstile_service import TurnstileService
+    from src.services.email_service import EmailService
+    from src.services.contact_guard import ContactGuard
 
 _auth_service = None
 _authz_service = None
@@ -19,6 +23,14 @@ _article_service = None
 _session_service = None
 _profile_service = None
 _media_service = None
+_turnstile_service = None
+_email_service = None
+_contact_guard = None
+
+
+def _env_flag(name: str, default: str = "false") -> bool:
+    value = os.environ.get(name, default)
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_session_service() -> "SessionService":
@@ -103,3 +115,54 @@ def get_media_service() -> "MediaService":
         upload_dir = os.path.join(os.getcwd(), "static", "uploads")
         _media_service = MediaService(upload_dir)
     return _media_service
+
+
+def get_turnstile_service() -> "TurnstileService":
+    """Return the singleton Turnstile verification service."""
+    global _turnstile_service
+    if _turnstile_service is None:
+        import os
+        from src.services.turnstile_service import TurnstileService
+
+        _turnstile_service = TurnstileService(
+            secret_key=os.environ.get("TURNSTILE_SECRET_KEY"),
+            enabled=_env_flag("TURNSTILE_ENABLED", "true"),
+        )
+    return _turnstile_service
+
+
+def get_email_service() -> "EmailService":
+    """Return the singleton SMTP email service."""
+    global _email_service
+    if _email_service is None:
+        import os
+        from src.services.email_service import EmailService
+
+        _email_service = EmailService(
+            host=os.environ.get("SMTP_HOST"),
+            port=int(os.environ.get("SMTP_PORT", "587")),
+            username=os.environ.get("SMTP_USER"),
+            password=os.environ.get("SMTP_PASSWORD"),
+            use_tls=_env_flag("SMTP_USE_TLS", "true"),
+            use_ssl=_env_flag("SMTP_USE_SSL", "false"),
+            from_email=os.environ.get("CONTACT_FROM_EMAIL"),
+            to_email=os.environ.get("CONTACT_TO_EMAIL"),
+        )
+    return _email_service
+
+
+def get_contact_guard() -> "ContactGuard":
+    """Return the singleton contact guard for bot defense."""
+    global _contact_guard
+    if _contact_guard is None:
+        import os
+        from src.services.contact_guard import ContactGuard
+
+        raw_fields = os.environ.get("CONTACT_HONEYPOT_FIELDS", "website,company")
+        honeypot_fields = [field.strip() for field in raw_fields.split(",") if field.strip()]
+
+        _contact_guard = ContactGuard(
+            min_time_ms=int(os.environ.get("CONTACT_MIN_TIME_MS", "1500")),
+            honeypot_fields=honeypot_fields,
+        )
+    return _contact_guard

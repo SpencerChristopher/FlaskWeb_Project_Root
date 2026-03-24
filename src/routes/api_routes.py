@@ -11,6 +11,9 @@ from src.services import (
     get_profile_service,
     get_authz_service,
     get_auth_service,
+    get_turnstile_service,
+    get_email_service,
+    get_contact_guard,
 )
 
 bp = Blueprint("api_routes", __name__, url_prefix="/api")
@@ -18,6 +21,9 @@ article_service = get_article_service()
 profile_service = get_profile_service()
 authz_service = get_authz_service()
 auth_service = get_auth_service()
+turnstile_service = get_turnstile_service()
+email_service = get_email_service()
+contact_guard = get_contact_guard()
 
 
 @bp.route("/bootstrap", methods=["GET"])
@@ -196,6 +202,31 @@ def contact_api() -> Response:
     if not all([name, email, message]):
         raise BadRequestException("Name, email, and message are required fields")
 
-    current_app.logger.info(f"Contact form submission from {name} ({email}): {message}")
+    contact_guard.validate(data)
+
+    token = data.get("turnstile_token") or data.get("cf-turnstile-response")
+    if turnstile_service.enabled:
+        if not token:
+            raise BadRequestException("Turnstile token is required.")
+        remote_ip = request.headers.get("CF-Connecting-IP") or request.remote_addr
+        if not turnstile_service.verify_token(token, remote_ip=remote_ip):
+            raise BadRequestException("Turnstile verification failed.")
+    else:
+        remote_ip = request.headers.get("CF-Connecting-IP") or request.remote_addr
+
+    current_app.logger.info(
+        "Contact form submission received from %s (%s), length=%s",
+        name,
+        email,
+        len(message),
+    )
+
+    email_service.send_contact_email(
+        name=name,
+        email=email,
+        message=message,
+        remote_ip=remote_ip,
+        user_agent=request.headers.get("User-Agent"),
+    )
 
     return jsonify({"message": "Message sent successfully!"}), 200

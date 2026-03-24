@@ -168,10 +168,18 @@ document.addEventListener('click', (e) => {
 
 async function handleLogin(e) {
     e.preventDefault();
+    const form = document.getElementById('loginForm');
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
+    const turnstileToken = form?.dataset.turnstileToken || null;
+    const loginMessage = form?.querySelector('[data-test="login-message"]');
+    const turnstileRequired = window.APP_CONFIG?.turnstileEnabled && window.APP_CONFIG?.turnstileSiteKey;
+    if (turnstileRequired && !turnstileToken) {
+        if (loginMessage) loginMessage.textContent = 'Please complete verification.';
+        return;
+    }
     try {
-        await auth.login(username, password); // Observer triggers re-render/nav-update
+        await auth.login(username, password, turnstileToken); // Observer triggers re-render/nav-update
         navigate('/home');
     } catch (err) { alert(err.message); }
 }

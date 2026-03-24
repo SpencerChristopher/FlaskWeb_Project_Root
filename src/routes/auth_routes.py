@@ -6,6 +6,7 @@ current authentication status.
 """
 
 import datetime
+import os
 from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import (
     create_access_token,
@@ -26,10 +27,12 @@ from src.app.security import permission_required
 from src.services.roles import Permissions
 from src.schemas import UserRegistration, ChangePasswordRequest
 from src.services import get_auth_service
+from src.services import get_turnstile_service
 
 
 bp = Blueprint("auth_routes", __name__, url_prefix="/api/auth")
 auth_service = get_auth_service()
+turnstile_service = get_turnstile_service()
 
 
 @bp.route("/login", methods=["POST"])
@@ -41,6 +44,19 @@ def login() -> Response:
     data: Dict[str, Any] = request.get_json()
     if not data or not data.get("username") or not data.get("password"):
         raise BadRequestException("Username and password are required")
+
+    if os.environ.get("TURNSTILE_LOGIN_ENABLED", "false").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    } and turnstile_service.enabled:
+        token = data.get("turnstile_token") or data.get("cf-turnstile-response")
+        if not token:
+            raise BadRequestException("Turnstile token is required.")
+        remote_ip = request.headers.get("CF-Connecting-IP") or request.remote_addr
+        if not turnstile_service.verify_token(token, remote_ip=remote_ip):
+            raise BadRequestException("Turnstile verification failed.")
 
     username = data["username"]
     password = data["password"]

@@ -4,6 +4,7 @@ This module defines the main route for the Flask application.
 It serves the primary HTML shell for the Single Page Application (SPA).
 """
 
+import os
 from flask import Blueprint, render_template, Response, request, abort
 
 bp = Blueprint("main_routes", __name__)
@@ -22,4 +23,14 @@ def index(path: str) -> Response:
     if request.path.startswith("/api/"):
         abort(404)
 
-    return render_template("base.html")
+    turnstile_site_key = os.environ.get("TURNSTILE_SITE_KEY", "")
+    turnstile_enabled = (
+        os.environ.get("TURNSTILE_ENABLED", "true").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
+
+    return render_template(
+        "base.html",
+        turnstile_site_key=turnstile_site_key,
+        turnstile_enabled=turnstile_enabled,
+    )

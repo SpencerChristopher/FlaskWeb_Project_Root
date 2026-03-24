@@ -36,3 +36,21 @@ def test_change_password_with_missing_data(client, test_user, login_user_fixture
     headers = {"Authorization": f"Bearer {access_token}"}
     response = client.post("/api/auth/change-password", json={}, headers=headers)
     assert response.status_code == 400
+
+
+def test_login_requires_turnstile_when_enabled(client, test_user, monkeypatch):
+    from src.routes import auth_routes
+
+    class _DummyTurnstile:
+        enabled = True
+
+        def verify_token(self, token, remote_ip=None):
+            return False
+
+    monkeypatch.setenv("TURNSTILE_LOGIN_ENABLED", "true")
+    monkeypatch.setattr(auth_routes, "turnstile_service", _DummyTurnstile())
+
+    response = client.post(
+        "/api/auth/login", json={"username": "testuser", "password": "testpassword"}
+    )
+    assert response.status_code == 400
