@@ -153,7 +153,7 @@ def app():
     # Determine MONGO_URI based on environment
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
-    os.environ["SECRET_KEY"] = "test-secret-key"
+    os.environ["SECRET_KEY"] = "test-secret-key-32-bytes-min-length-012345"
     
     # In local development/test containers, we must disable HTTPS forcing 
     # because nginx is usually only listening on port 80 (HTTP).
