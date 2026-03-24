@@ -90,6 +90,7 @@ def configure_http_security(app: Flask) -> None:
             "'self'",
             "https://cdn.jsdelivr.net",
             "https://cdnjs.cloudflare.com",
+            "https://challenges.cloudflare.com",
         ],
         "style-src": [
             "'self'",
@@ -105,6 +106,11 @@ def configure_http_security(app: Flask) -> None:
         "connect-src": [
             "'self'",
             "https://cdn.jsdelivr.net",
+            "https://challenges.cloudflare.com",
+        ],
+        "frame-src": [
+            "'self'",
+            "https://challenges.cloudflare.com",
         ],
         "img-src": "*",
     }

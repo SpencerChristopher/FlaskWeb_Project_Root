@@ -60,7 +60,7 @@
                 </div>
             </div>
         </footer>
-        <script>
+        <script nonce="{{ csp_nonce() }}">
             window.APP_CONFIG = {{ {
                 "turnstileSiteKey": turnstile_site_key,
                 "turnstileEnabled": turnstile_enabled
