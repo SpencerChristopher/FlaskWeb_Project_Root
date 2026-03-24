@@ -13,11 +13,11 @@ This document covers the current deployment flow, CI/CD, runner expectations, an
 **Source of Configuration Values**
 Configuration values are sourced in a hierarchical manner:
 
-1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`). These are injected directly into the CI/CD environment and passed to containers.
+1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, SMTP credentials, contact routing, Turnstile keys). These are injected directly into the CI/CD environment and passed to containers.
 2.  **`docker-compose.yml`:** This is the primary source for all non-secret default environment variables (e.g., `LOG_LEVEL`, `GUNICORN_WORKERS`). It defines the base services and contains the `build: .` context for the `web` service for local development.
 3.  **`docker-compose.ci.yml`:** This is an override file used *only* in CI/CD. It overrides the `web` service definition from `docker-compose.yml` to specify `image: ${IMAGE_TAG}` and `build: null`, ensuring that CI/Staging pulls a pre-built image from the registry.
 4.  **`docker-compose.override.yml`:** This is an override file (generated from `docker-compose.override.yml.template`) used *only* for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
-5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, and any optional overrides. **It is NOT used in the CI/CD pipeline.**
+5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, and any optional overrides (SMTP/contact/Turnstile). **It is NOT used in the CI/CD pipeline.**
 6.  **`config.env` file (Local Development Reference):** Defines shared non-secret defaults. It is used as a reference for local `.env` files but is **not used by the CI/CD pipeline.**
 7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used by `docker-compose.ci.yml` and `scripts/deploy.sh` to pull the exact image built for that commit.
 
@@ -96,6 +96,15 @@ This keeps the runner standing by with predictable data while you run the Playwr
 - `MONGO_ROOT_PASSWORD`
 - `MONGO_APP_USER`
 - `MONGO_APP_PASSWORD`
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `CONTACT_TO_EMAIL`
+- `CONTACT_FROM_EMAIL`
+- `PASSWORD_SERVICE_FROM_EMAIL`
+- `TURNSTILE_SITE_KEY`
+- `TURNSTILE_SECRET_KEY`
 
 ## Production Deployment (Raspberry Pi & Cloudflare)
 

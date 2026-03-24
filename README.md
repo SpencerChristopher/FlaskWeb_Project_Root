@@ -30,9 +30,9 @@ The project is fully containerized for consistent development and deployment. Ng
 *   Python 3.11+ (if running host-side tests)
 
 ### 2. Configuration & Secrets
-For local development, secrets and overrides are managed via a `.env` file.
+For local development, secrets and overrides are managed via a `.env` file (never committed).
 1. Create your local `.env`: `cp .env.template .env`
-2. Update `.env` with your secrets (`SECRET_KEY`, `ADMIN_PASSWORD`, etc.).
+2. Update `.env` with your secrets (`SECRET_KEY`, `ADMIN_PASSWORD`, SMTP/contact routing, Turnstile keys, etc.).
 3. Configure your local dev overrides: `cp docker-compose.override.yml.template docker-compose.override.yml`
 
 For a detailed explanation of the environment variable hierarchy, see [Deployment Guide](docs/DEPLOYMENT.md).

@@ -64,7 +64,24 @@ if (-not $SkipCloud -and -not $Offline) {
     # Check Secret Existence
     try {
         $remoteSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
-        $requiredSecrets = @("SECRET_KEY", "ADMIN_USERNAME", "ADMIN_PASSWORD", "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_USER", "MONGO_APP_PASSWORD")
+        $requiredSecrets = @(
+            "SECRET_KEY",
+            "ADMIN_USERNAME",
+            "ADMIN_PASSWORD",
+            "MONGO_ROOT_USER",
+            "MONGO_ROOT_PASSWORD",
+            "MONGO_APP_USER",
+            "MONGO_APP_PASSWORD",
+            "SMTP_HOST",
+            "SMTP_PORT",
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "CONTACT_TO_EMAIL",
+            "CONTACT_FROM_EMAIL",
+            "PASSWORD_SERVICE_FROM_EMAIL",
+            "TURNSTILE_SITE_KEY",
+            "TURNSTILE_SECRET_KEY"
+        )
         foreach ($s in $requiredSecrets) {
             if ($s -notin $remoteSecrets) {
                 Write-Host "MISSING SECRET: '$s' is required by CI but not found in GitHub." -ForegroundColor Red

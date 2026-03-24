@@ -27,6 +27,22 @@ services:
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
 
+      # Email (SMTP) and contact routing
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+      CONTACT_TO_EMAIL: ${CONTACT_TO_EMAIL}
+      CONTACT_FROM_EMAIL: ${CONTACT_FROM_EMAIL}
+      PASSWORD_SERVICE_FROM_EMAIL: ${PASSWORD_SERVICE_FROM_EMAIL}
+
+      # Cloudflare Turnstile
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
+      TURNSTILE_ENABLED: ${TURNSTILE_ENABLED:-true}
+
       FLASK_APP: main.py
       DOCKER_CONTAINER: "true"
     depends_on:
