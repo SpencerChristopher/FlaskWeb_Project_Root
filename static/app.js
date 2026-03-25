@@ -173,7 +173,7 @@ async function handleLogin(e) {
     const password = document.getElementById('password').value;
     const turnstileToken = form?.dataset.turnstileToken || null;
     const loginMessage = form?.querySelector('[data-test="login-message"]');
-    const turnstileRequired = window.APP_CONFIG?.turnstileEnabled && window.APP_CONFIG?.turnstileSiteKey;
+    const turnstileRequired = window.APP_CONFIG?.turnstileLoginEnabled === true;
     if (turnstileRequired && !turnstileToken) {
         if (loginMessage) loginMessage.textContent = 'Please complete verification.';
         return;

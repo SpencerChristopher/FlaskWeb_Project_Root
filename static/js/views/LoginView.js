@@ -1,4 +1,4 @@
-import { renderTurnstile, isTurnstileEnabled } from '../utils/Turnstile.js';
+import { renderTurnstile, isTurnstileLoginEnabled } from '../utils/Turnstile.js';
 
 export const LoginView = {
     template() {
@@ -43,7 +43,7 @@ export const LoginView = {
 
         const container = document.getElementById('login-turnstile-container');
         const wrapper = document.getElementById('login-turnstile-wrapper');
-        if (!isTurnstileEnabled()) {
+        if (!isTurnstileLoginEnabled()) {
             wrapper?.classList.add('d-none');
         } else if (container) {
             renderTurnstile(container, {

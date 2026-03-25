@@ -28,9 +28,14 @@ def index(path: str) -> Response:
         os.environ.get("TURNSTILE_ENABLED", "true").strip().lower()
         in {"1", "true", "yes", "on"}
     )
+    turnstile_login_enabled = (
+        os.environ.get("TURNSTILE_LOGIN_ENABLED", "false").strip().lower()
+        in {"1", "true", "yes", "on"}
+    )
 
     return render_template(
         "base.html",
         turnstile_site_key=turnstile_site_key,
         turnstile_enabled=turnstile_enabled,
+        turnstile_login_enabled=turnstile_login_enabled,
     )

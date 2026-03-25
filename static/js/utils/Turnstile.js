@@ -12,6 +12,10 @@ export function isTurnstileEnabled() {
     return !!getTurnstileSiteKey() && getConfig().turnstileEnabled !== false;
 }
 
+export function isTurnstileLoginEnabled() {
+    return isTurnstileEnabled() && getConfig().turnstileLoginEnabled === true;
+}
+
 export function loadTurnstile() {
     if (window.turnstile) return Promise.resolve(window.turnstile);
     if (turnstileLoadPromise) return turnstileLoadPromise;

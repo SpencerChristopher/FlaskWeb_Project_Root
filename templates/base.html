@@ -63,7 +63,8 @@
         <script nonce="{{ csp_nonce() }}">
             window.APP_CONFIG = {{ {
                 "turnstileSiteKey": turnstile_site_key,
-                "turnstileEnabled": turnstile_enabled
+                "turnstileEnabled": turnstile_enabled,
+                "turnstileLoginEnabled": turnstile_login_enabled
             } | tojson }};
         </script>
         <!-- Custom App JS-->
