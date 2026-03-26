@@ -113,7 +113,13 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 *   `.\scripts\preflight_ci.ps1 -CheckArm`: Performs a local dry-run build for `linux/arm64` to verify dependency compatibility.
 *   `.\scripts\preflight_ci.ps1 -SmokeTest`: Triggers a targeted functional check that verifies the `web -> nginx` network bridge, catching the "NameResolutionError" locally.
 *   `.\scripts\preflight_ci.ps1 -RunAct`: (Optional) Runs the entire GitHub Actions workflow locally using `act`.
-*   **Note:** The GitHub Actions workflow intentionally skips `smoke`, `performance/heavy`, and `e2e` markers; run those manually (see Staging section).
+    *   **Note:** The GitHub Actions workflow intentionally skips `smoke`, `performance/heavy`, and `e2e` markers; run those manually (see Staging section).
+
+### D. `pip-audit` allowlist
+
+`pip-audit-allowlist.txt` lives at the repository root and is automatically fed into every `pip-audit` execution inside the preflight scripts (`bash` or PowerShell). Each non-comment line is appended as `--ignore-vuln <id>`, so you can document reviewed vulnerabilities that upstream has not yet patched. The current entries cover `CVE-2026-27614`/`GHSA-vp6q-7m36-pq3w` and `CVE-2026-4539` (local `AdlLexer` regex DoS); update the file and rerun preflight whenever a fix appears.
+
+`pip-audit-allowlist.txt` is also consumed by the `static-analysis` job in `.github/workflows/test-deploy.yml`, so CI's `pip-audit` command aligns with your local preflight runs (the workflow builds the arg string via the same allowlist file).
 
 ---
 

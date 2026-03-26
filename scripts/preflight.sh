@@ -4,6 +4,13 @@ set -eo pipefail
 ROOT_DIR=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
+trim() {
+    local var="$1"
+    var="${var#"${var%%[![:space:]]*}"}"
+    var="${var%"${var##*[![:space:]]}"}"
+    printf '%s' "$var"
+}
+
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
         echo "Error: Required tool '$1' is not installed."
@@ -19,10 +26,20 @@ require_cmd docker
 require_cmd curl
 
 echo "[2/7] Security Audit (pip-audit)"
+allowlist_file="$ROOT_DIR/pip-audit-allowlist.txt"
+pip_audit_ignore_args=()
+if [[ -f "$allowlist_file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="$(trim "$line")"
+        [[ -z "$line" ]] && continue
+        pip_audit_ignore_args+=("--ignore-vuln" "$line")
+    done < "$allowlist_file"
+fi
 if command -v pip-audit >/dev/null 2>&1; then
     # Audit the local project dependencies
     poetry export --format=constraints.txt --output=constraints.txt --without-hashes
-    pip-audit -r constraints.txt
+    pip-audit -r constraints.txt "${pip_audit_ignore_args[@]}"
     rm constraints.txt
 else
     echo "Warning: pip-audit not found on host. Skipping local dependency scan."

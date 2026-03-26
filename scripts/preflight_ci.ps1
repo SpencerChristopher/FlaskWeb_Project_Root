@@ -23,6 +23,19 @@ function Require-Command($name, [switch]$Optional) {
     return $true
 }
 
+function Get-PipAuditAllowlistArgs {
+    $allowlistPath = Join-Path $PSScriptRoot "..\pip-audit-allowlist.txt"
+    if (-not (Test-Path $allowlistPath)) { return "" }
+    $entries = Get-Content $allowlistPath | ForEach-Object {
+        $line = $_.Split('#')[0].Trim()
+        if (-not [string]::IsNullOrWhiteSpace($line)) { $line }
+    }
+    if (-not $entries) { return "" }
+    return " " + ($entries | ForEach-Object { "--ignore-vuln $_" } -join " ")
+}
+
+$PipAuditAllowlistArgs = Get-PipAuditAllowlistArgs
+
 Write-Host "`n--- Preflight Security & Integrity Checks (PowerShell) ---" -ForegroundColor Cyan
 
 # [1/8] Tool Check
@@ -100,7 +113,7 @@ if ($SkipAudit) {
     Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
     Write-Host "Running pip-audit and bandit..."
-    docker run --rm -v "${PWD}:/app" -w /app python:3.12-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt && bandit -r src/ -ll && rm constraints.txt"
+    docker run --rm -v "${PWD}:/app" -w /app python:3.12-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt$PipAuditAllowlistArgs && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
     # Resolve file paths explicitly so they are passed to the container correctly
