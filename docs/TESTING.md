@@ -121,6 +121,10 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 
 `pip-audit-allowlist.txt` is also consumed by the `static-analysis` job in `.github/workflows/test-deploy.yml`, so CI's `pip-audit` command aligns with your local preflight runs (the workflow builds the arg string via the same allowlist file).
 
+### E. CI seeding guard
+
+`CI_SEED_ENABLED` controls whether the `deploy-to-wsl` job runs `scripts/seed_db.py`. The workflow now defaults this env var to `false`, so seeded data (including the profile singleton) is left untouched during most runs. When you deliberately need to reseed, set `CI_SEED_ENABLED=true` for that run and flip it back afterward; the seed detection logic stays in place so only targeted changes trigger the seeding commands.
+
 ---
 
 ## 3. Special Test Requirements
