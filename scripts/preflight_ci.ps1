@@ -31,7 +31,7 @@ function Get-PipAuditAllowlistArgs {
         if (-not [string]::IsNullOrWhiteSpace($line)) { $line }
     }
     if (-not $entries) { return "" }
-    return " " + ($entries | ForEach-Object { "--ignore-vuln $_" } -join " ")
+    return " " + (($entries | ForEach-Object { "--ignore-vuln $_" }) -join " ")
 }
 
 $PipAuditAllowlistArgs = Get-PipAuditAllowlistArgs
