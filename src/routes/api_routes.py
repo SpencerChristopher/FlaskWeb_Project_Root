@@ -82,13 +82,28 @@ def about_api() -> Response:
     return jsonify(
         {
             "title": "We've got what you need!",
-            "content": (
-                "Start Bootstrap has everything you need to get your new website "
-                "up and running in no time! Choose one of our open source, free "
-                "to download, and easy to use themes! No strings attached!"
+            "heading": "Spencer's Cooking",
+            "description": (
+                "Spencer's Cooking is a personal project by me. The goal is to grow "
+                "from a professional profile into a searchable recipe hub that helps "
+                "you cook more thoughtfully."
             ),
-            "button_text": "Get Started!",
-            "button_link": "/services",
+            "mission": (
+                "The experience centers on building a recommendation engine that "
+                "weighs common ingredients so every weekly meal plan makes shopping "
+                "simpler and smarter."
+            ),
+            "promise": (
+                "Every plan is designed so those same ingredients appear in multiple "
+                "meals, preventing unfinished jars or produce from lingering in the fridge."
+            ),
+            "highlights": [
+                "Evolve the profile into a recipe knowledge base curated for real life.",
+                "Searchable recipes mapped to ingredients you already use.",
+                "Personalized weekly plans that reuse every item, cutting waste."
+            ],
+            "cta_label": "Explore the Blog",
+            "cta_link": "/blog",
         }
     )
 
