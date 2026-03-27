@@ -74,6 +74,7 @@ jobs:
     name: Verify Functional (amd64)
     needs: static-analysis
     runs-on: wsl-staging
+    environment: staging
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}

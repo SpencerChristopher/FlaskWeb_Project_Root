@@ -76,32 +76,39 @@ if (-not $SkipCloud -and -not $Offline) {
 
     # Check Secret Existence
     try {
-        $remoteSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
-        $requiredSecrets = @(
-            "SECRET_KEY",
-            "ADMIN_USERNAME",
-            "ADMIN_PASSWORD",
-            "MONGO_ROOT_USER",
-            "MONGO_ROOT_PASSWORD",
-            "MONGO_APP_USER",
-            "MONGO_APP_PASSWORD",
-            "SMTP_HOST",
-            "SMTP_PORT",
-            "SMTP_USER",
-            "SMTP_PASSWORD",
-            "CONTACT_TO_EMAIL",
-            "CONTACT_FROM_EMAIL",
-            "PASSWORD_SERVICE_FROM_EMAIL",
-            "TURNSTILE_SITE_KEY",
-            "TURNSTILE_SECRET_KEY"
+        $remoteRepoSecrets = gh secret list | ForEach-Object { $_.Split("`t")[0] }
+        $remoteStagingSecrets = gh secret list --env staging | ForEach-Object { $_.Split("`t")[0] }
+        $remoteProdSecrets = gh secret list --env production | ForEach-Object { $_.Split("`t")[0] }
+
+        $requiredRepoSecrets = @(
+            "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD",
+            "CONTACT_TO_EMAIL", "CONTACT_FROM_EMAIL", "PASSWORD_SERVICE_FROM_EMAIL",
+            "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"
         )
-        foreach ($s in $requiredSecrets) {
-            if ($s -notin $remoteSecrets) {
-                Write-Host "MISSING SECRET: '$s' is required by CI but not found in GitHub." -ForegroundColor Red
+        
+        $requiredEnvSecrets = @(
+            "SECRET_KEY", "ADMIN_USERNAME", "ADMIN_PASSWORD",
+            "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_USER", "MONGO_APP_PASSWORD",
+            "CLOUDFLARE_TUNNEL_TOKEN", "DOMAIN_NAME"
+        )
+
+        foreach ($s in $requiredRepoSecrets) {
+            if ($s -notin $remoteRepoSecrets) {
+                Write-Host "MISSING REPO SECRET: '$s' not found in GitHub." -ForegroundColor Red
                 exit 1
             }
         }
-        Write-Host "GitHub Secrets: VERIFIED" -ForegroundColor Green
+
+        foreach ($s in $requiredEnvSecrets) {
+            if ($s -notin $remoteStagingSecrets) {
+                Write-Host "MISSING STAGING SECRET: '$s' not found in GitHub 'staging' environment." -ForegroundColor Red
+                exit 1
+            }
+            if ($s -notin $remoteProdSecrets) {
+                Write-Host "WARNING: Prod secret '$s' not found in GitHub 'production' environment." -ForegroundColor Yellow
+            }
+        }
+        Write-Host "GitHub Secrets: VERIFIED (Repo + Environments)" -ForegroundColor Green
     } catch {
         Write-Host "Warning: Could not fetch secret list." -ForegroundColor Yellow
     }
