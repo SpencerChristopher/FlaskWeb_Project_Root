@@ -8,12 +8,17 @@ on:
   workflow_dispatch:
     inputs:
       hard_rebuild:
-        description: "Use down -v on staging deploy (includes pre-reset Mongo backup)"
+        description: "STAGING ONLY: Use down -v to purge volumes (fixes credential drift)"
         type: boolean
         required: false
         default: false
       reseed_db:
         description: "Force database reseed (even if no relevant files changed)"
+        type: boolean
+        required: false
+        default: false
+      heavy_seed:
+        description: "STAGING ONLY: Use heavy seed (150+ articles) for stress testing"
         type: boolean
         required: false
         default: false
@@ -256,7 +261,7 @@ jobs:
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
       # Flip to 'true' only when you intend to reset or reseed profiles/articles.
-      CI_SEED_ENABLED: ${{ github.event.inputs.reseed_db == 'true' && 'true' || 'false' }}
+      CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -331,6 +336,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Force seeding if heavy_seed input is checked
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
           before="${{ github.event.before }}"
           after="${{ github.sha }}"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
@@ -356,10 +367,15 @@ jobs:
       - name: Seed Database
         if: ${{ env.CI_SEED_ENABLED == 'true' && steps.seed_changes.outputs.should_seed == 'true' }}
         run: |
+          seed_args=""
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            echo "Heavy seed requested for staging stress test."
+            seed_args="--heavy"
+          fi
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py $seed_args
 
       - name: Verify API after seed
         if: ${{ steps.seed_changes.outputs.should_seed == 'true' }}
