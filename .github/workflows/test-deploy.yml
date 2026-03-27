@@ -12,6 +12,11 @@ on:
         type: boolean
         required: false
         default: false
+      reseed_db:
+        description: "Force database reseed (even if no relevant files changed)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -245,7 +250,7 @@ jobs:
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
       # Flip to 'true' only when you intend to reset or reseed profiles/articles.
-      CI_SEED_ENABLED: "false"
+      CI_SEED_ENABLED: ${{ github.event.inputs.reseed_db == 'true' && 'true' || 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
