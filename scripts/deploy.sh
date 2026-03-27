@@ -86,6 +86,16 @@ fi
 
 if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
   if [ "${DEPLOY_RESET_VOLUMES:-false}" = "true" ]; then
+    # --- Production Safety Guard ---
+    if [ "${DEPLOY_ENV}" = "production" ]; then
+      if [ "${FORCE_PRODUCTION_WIPE:-false}" != "true" ]; then
+        echo "ERROR: Destructive volume reset (DEPLOY_RESET_VOLUMES=true) is BLOCKED in production."
+        echo "If you really intended to wipe production data, set FORCE_PRODUCTION_WIPE=true."
+        exit 1
+      fi
+      echo "WARNING: FORCE_PRODUCTION_WIPE is active. Wiping production volumes..."
+    fi
+    
     echo "Performing hard reset with volume removal..."
     if [ "${DEPLOY_BACKUP_BEFORE_RESET:-true}" = "true" ]; then
       backup_before_reset
