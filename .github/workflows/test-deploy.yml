@@ -116,9 +116,12 @@ jobs:
 
       - name: Reset compose stack
         run: |
-          echo "Performing forced hard reset for credential migration..."
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml pull || true
+          if [ "${{ github.event.inputs.hard_rebuild }}" = "true" ]; then
+            echo "Performing hard reset with volume removal for functional verify..."
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
+          else
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
