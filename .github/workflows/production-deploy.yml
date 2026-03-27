@@ -110,8 +110,10 @@ jobs:
     name: Deploy to Pi
     needs: build-and-test
     runs-on: [self-hosted, pi-prod]
+    environment: production
     timeout-minutes: 30
     env:
+      DEPLOY_ENV: production
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -120,6 +122,8 @@ jobs:
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
       LOG_LEVEL: INFO
       FLASK_ENV: production
       TALISMAN_FORCE_HTTPS: "true"
@@ -136,6 +140,20 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD CLOUDFLARE_TUNNEL_TOKEN DOMAIN_NAME; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Error: One or more required production secrets are missing."
+            exit 1
+          fi
 
       - name: Deploy to Raspberry Pi
         env:

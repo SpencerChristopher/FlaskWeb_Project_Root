@@ -4,7 +4,9 @@ services:
     image: cloudflare/cloudflared:latest@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
     container_name: cloudflared_tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    # --no-tls-verify is required because CI generates self-signed certificates for Nginx.
+    # The tunnel still provides full Edge encryption for users at spencerscooking.uk.
+    command: tunnel --no-autoupdate --no-tls-verify run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
@@ -12,14 +14,41 @@ services:
         condition: service_started
     networks:
       - default
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Production-specific overrides for Nginx
   nginx:
-    # In production, we ensure Nginx is only reachable via the tunnel and local network
+    # Bind to 443; reachable internally by the tunnel. 
+    # External access only via the tunnel.
     ports:
       - "443:443"
     environment:
       - NGINX_HOST=${DOMAIN_NAME:-localhost}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Production-specific overrides for the Web App
+  web:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Production-specific overrides for MongoDB
+  mongo:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   default:

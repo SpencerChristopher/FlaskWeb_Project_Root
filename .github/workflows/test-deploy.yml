@@ -213,8 +213,10 @@ jobs:
     name: Deploy to WSL
     needs: [amd64-verify, arm64-compatibility-check]
     runs-on: wsl-staging
+    environment: staging
     timeout-minutes: 30
     env:
+      DEPLOY_ENV: staging
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -237,7 +239,7 @@ jobs:
       TURNSTILE_LOGIN_ENABLED: "false"
       LOG_LEVEL: INFO
       FLASK_ENV: production
-      STAGING_TOKEN: ${{ secrets.STAGING_TOKEN }}
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
@@ -261,7 +263,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD STAGING_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD CLOUDFLARE_TUNNEL_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1

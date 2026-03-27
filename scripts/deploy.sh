@@ -1,7 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml)
+# Determine deployment environment and compose files
+DEPLOY_ENV="${DEPLOY_ENV:-staging}"
+echo "Deploying to environment: ${DEPLOY_ENV}"
+
+if [ "${DEPLOY_ENV}" = "production" ]; then
+  COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.prod.yml)
+else
+  COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml)
+fi
 
 backup_before_reset() {
   if ! docker ps --format '{{.Names}}' | grep -q '^mongodb$'; then
