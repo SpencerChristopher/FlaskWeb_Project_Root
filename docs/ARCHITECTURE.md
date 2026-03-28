@@ -100,6 +100,13 @@ Side effects (logging article deletions, cleaning up media, auditing logins) are
 8.  **Repository** executes optimized projected query to MongoDB.
 9.  **Pydantic** validates the final output before it leaves the API.
 
+### D. Repository-as-Source-of-Truth (Configuration)
+To enable fast, deployment-free adjustments to application behavior, non-secret configuration is decoupled from the codebase:
+1.  **GitHub Repository Variables:** Store non-secret values (e.g., `LOG_LEVEL`, `CORS_ORIGINS`).
+2.  **GitHub Environments:** Provide environment-specific overrides (e.g., `FLASK_ENV: production` for Staging/Prod).
+3.  **Local Sync (`sync_vars.ps1`):** Developers pull the latest staging configuration into a local `.env.vars` file, ensuring perfect parity between development and the live runners.
+4.  **Runtime Injection:** Docker Compose maps these variables directly into the container's environment, eliminating the need for a static `config.env`.
+
 ---
 
 ## 5. Architectural Verification

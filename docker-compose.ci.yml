@@ -7,3 +7,22 @@ services:
     environment:
       TALISMAN_FORCE_HTTPS: "false"
       JWT_COOKIE_SECURE: "false"
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 1
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  mongo:
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 128M

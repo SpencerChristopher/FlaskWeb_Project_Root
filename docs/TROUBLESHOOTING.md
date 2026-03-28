@@ -84,6 +84,25 @@ export REQUIRE_HTTPS=1
 
 ---
 
+## Infrastructure & Credentials
+
+### 1. MongoDB "Authentication Failed" during startup
+**Symptom:** Mongo container starts but the web app logs `Authentication failed` or health checks fail indefinitely.  
+**Root cause:** Credential Drift. MongoDB only uses the `MONGO_ROOT_PASSWORD` secret on **first-time volume creation**. If you changed the secret in GitHub but the runner still has an old volume, the passwords won't match.  
+**Fix:** Perform a Hard Reset to purge the incompatible volume:
+- **GitHub UI:** Trigger the workflow manually and check the **"STAGING ONLY: Use down -v..."** box.
+- **CLI (Local/WSL):** `docker compose down -v`.
+
+### 2. Missing configuration in local dev
+**Symptom:** Web app fails to boot with `KeyError` for non-secret variables like `LOG_LEVEL`.  
+**Root cause:** Configuration has moved to GitHub Repository Variables and is missing from your local `.env`.  
+**Fix:** Run the sync script to generate `.env.vars`:
+```powershell
+powershell.exe -File scripts/sync_vars.ps1
+```
+
+---
+
 ## Quick Diagnostics
 
 ### Check nginx reachability from container

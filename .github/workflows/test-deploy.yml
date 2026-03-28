@@ -106,9 +106,24 @@ jobs:
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: "false"
       TURNSTILE_LOGIN_ENABLED: "false"
-      LOG_LEVEL: INFO
-      FLASK_ENV: development
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
+      FLASK_ENV: ${{ vars.FLASK_ENV || 'development' }}
       PYTHON_VERSION: "3.11"
+      # Repository Variables (Config migration)
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
 
     steps:
       - name: Checkout code
@@ -254,12 +269,27 @@ jobs:
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
       TURNSTILE_LOGIN_ENABLED: "false"
-      LOG_LEVEL: INFO
+      LOG_LEVEL: ${{ vars.LOG_LEVEL || 'INFO' }}
       FLASK_ENV: production
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
       CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
+      # Repository Variables (Config migration)
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
       # Flip to 'true' only when you intend to reset or reseed profiles/articles.
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
     steps:

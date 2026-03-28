@@ -13,13 +13,20 @@ This document covers the current deployment flow, CI/CD, runner expectations, an
 **Source of Configuration Values**
 Configuration values are sourced in a hierarchical manner:
 
-1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, SMTP credentials, contact routing, Turnstile keys). These are injected directly into the CI/CD environment and passed to containers.
-2.  **`docker-compose.yml`:** This is the primary source for all non-secret default environment variables (e.g., `LOG_LEVEL`, `GUNICORN_WORKERS`). It defines the base services and contains the `build: .` context for the `web` service for local development.
-3.  **`docker-compose.ci.yml`:** This is an override file used *only* in CI/CD. It overrides the `web` service definition from `docker-compose.yml` to specify `image: ${IMAGE_TAG}` and `build: null`, ensuring that CI/Staging pulls a pre-built image from the registry.
-4.  **`docker-compose.override.yml`:** This is an override file (generated from `docker-compose.override.yml.template`) used *only* for local development. It sets up volume mounts for live reloading, development-specific environment variables (e.g., `FLASK_ENV=development`), and exposes additional ports.
-5.  **`.env` file (Local Development Only):** Used for local overrides and sensitive secrets that are not committed to Git. It should define `SECRET_KEY`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `MONGO_ROOT_USER`, `MONGO_ROOT_PASSWORD`, `MONGO_APP_USER`, `MONGO_APP_PASSWORD`, and any optional overrides (SMTP/contact/Turnstile). **It is NOT used in the CI/CD pipeline.**
-6.  **`config.env` file (Local Development Reference):** Defines shared non-secret defaults. It is used as a reference for local `.env` files but is **not used by the CI/CD pipeline.**
-7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used by `docker-compose.ci.yml` and `scripts/deploy.sh` to pull the exact image built for that commit.
+1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `MONGO_ROOT_PASSWORD`). These are injected directly into the CI/CD environment.
+2.  **GitHub Repository Variables:** The "Single Source of Truth" for all non-secret configuration (e.g., `LOG_LEVEL`, `CORS_ORIGINS`, `GUNICORN_TIMEOUT`).
+3.  **GitHub Environment Variables:** Provide environment-specific overrides (e.g., `FLASK_ENV: production` for Staging/Prod).
+4.  **Local Sync (`scripts/sync_vars.ps1`):** A PowerShell script that developers use to pull the latest GitHub configuration into a local `.env.vars` file for Docker Compose parity.
+5.  **`docker-compose.yml`:** The primary source for service definitions. It maps secrets and repository variables into the container and enforces **Resource Limits** (e.g., 512MB for Mongo).
+6.  **`docker-compose.prod.yml` & `docker-compose.staging.yml`:** Provide environment-specific tuning (e.g., capping MongoDB's WiredTiger cache to 256MB for the Raspberry Pi).
+7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used to pull the exact commit image.
+
+## Manual Overrides (Workflow Dispatch)
+When manually triggering the workflow from GitHub, the following levers are available:
+
+-   **`hard_rebuild` (Staging Only):** Executes `down -v` to purge persistent volumes. Invaluable for fixing credential drift or volume corruption. **Blocked in Production** without a break-glass variable.
+-   **`reseed_db`:** Forces the database seeder to run even if no relevant files changed.
+-   **`heavy_seed` (Staging Only):** Triggers a heavy seed (150+ articles) for stress testing infinite scroll and pagination.
 
 ## CI Pipeline (dev branch)
 **Workflow:** `.github/workflows/test-deploy.yml`
@@ -108,9 +115,16 @@ This keeps the runner standing by with predictable data while you run the Playwr
 
 ## Production Deployment (Raspberry Pi & Cloudflare)
 
-The production environment leverages **Cloudflare Tunnels (Zero Trust)** for secure edge routing and identity-aware access.
+The production environment is tuned specifically for a **2GB Raspberry Pi (ARM64)** and leverages **Cloudflare Tunnels (Zero Trust)** for secure edge routing.
 
-### **1. Cloudflare Tunnels (The "Outbound-Only" Bridge)**
+### **1. Hardware Optimization (Low-Memory Tuning)**
+To prevent OOM kills and protect the SD card from excessive wear:
+-   **MongoDB:** WiredTiger cache is capped at **256MB**. Total container memory is limited to **512MB**.
+-   **Gunicorn:** Reduced to **2 workers** and **1 thread** to minimize memory footprint while maintaining concurrency on the Pi's 4-core CPU.
+-   **Resource Caps:** Strict memory limits are applied to Nginx (64MB), Redis (128MB), and Tunnel (64MB) containers.
+-   **Log Rotation:** Docker logs are capped at 10MB per file with a 3-file rotation to prevent disk exhaustion.
+
+### **2. Cloudflare Tunnels (The "Outbound-Only" Bridge)**
 Instead of opening inbound ports (80/443) on your home router or server, the `cloudflared` container creates an **outbound-only** persistent connection to the Cloudflare Edge.
 - **Security Benefit:** Your server's public IP remains hidden. There is no "attack surface" for port-scanners or traditional DDoS attacks because the server is not listening for connections from the internet.
 - **Connectivity:** The tunnel acts as a virtual bridge, allowing Cloudflare to route traffic from your domain name directly to the Nginx container inside the Docker network.

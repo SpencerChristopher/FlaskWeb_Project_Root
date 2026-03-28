@@ -19,6 +19,12 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
 
   # Production-specific overrides for Nginx
   nginx:
@@ -33,22 +39,58 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
 
   # Production-specific overrides for the Web App
   web:
+    environment:
+      FLASK_ENV: production
+      TALISMAN_FORCE_HTTPS: "true"
+      JWT_COOKIE_SECURE: "true"
+      CORS_ORIGINS: https://spencerscooking.uk,https://prod.spencerscooking.uk
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 1
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 128M
 
   # Production-specific overrides for MongoDB
   mongo:
+    # Cap WiredTiger cache to protect Pi RAM
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Production-specific overrides for Redis
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
 
 networks:
   default:

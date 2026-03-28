@@ -38,6 +38,13 @@ Run from your local terminal/IDE.
     python -m playwright install chromium
     ```
 
+*   **Local Configuration Sync:**
+    To ensure your local dev environment matches GitHub Repository Variables (CORS, timeouts, etc.), run:
+    ```powershell
+    powershell.exe -File scripts/sync_vars.ps1
+    ```
+    This generates `.env.vars`, which is automatically loaded by the `docker-compose.override.yml`.
+
 ### B. Container-Side Testing (CI Parity)
 Run from inside the `web` container.
 *   **Target:** `http://nginx` (Internal Docker network)

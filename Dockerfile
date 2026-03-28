@@ -59,12 +59,26 @@ USER appuser
 # Environment configuration
 ARG LOG_LEVEL=INFO
 ENV LOG_LEVEL=$LOG_LEVEL \
+    FLASK_ENV=development \
     GUNICORN_TIMEOUT=30 \
     GUNICORN_WORKERS=3 \
     GUNICORN_THREADS=2 \
     FORWARDED_ALLOW_IPS=* \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    JWT_COOKIE_SECURE=false \
+    JWT_COOKIE_CSRF_PROTECT=true \
+    JWT_COOKIE_SAMESITE=Lax \
+    PROXY_FIX_X_FOR=1 \
+    PROXY_FIX_X_PROTO=1 \
+    PROXY_FIX_X_HOST=1 \
+    PROXY_FIX_X_PREFIX=1 \
+    CORS_ORIGINS=http://localhost:5001,http://127.0.0.1:5001 \
+    MONGO_SERVER_SELECTION_TIMEOUT_MS=10000 \
+    MONGO_CONNECT_TIMEOUT_MS=10000 \
+    MONGO_SOCKET_TIMEOUT_MS=10000 \
+    TALISMAN_FORCE_HTTPS=false \
+    CSP_REPORT_URI=""
 
 # Copy the virtual environment and application source
 # We use --chown to ensure the non-root user has immediate ownership

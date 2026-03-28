@@ -7,27 +7,42 @@ services:
         NODE_IMAGE: ${NODE_IMAGE:-node:20-slim@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92}
     container_name: flask_web_app
     restart: unless-stopped
-    mem_limit: 2g # Added to prevent OOM errors during testing, pending SECRET_KEY fix
-    env_file:
-      - config.env
     environment: # Explicitly define environment variables
-      # Secrets (injected by CI)
+      # Secrets (injected by CI or local .env)
       SECRET_KEY: ${SECRET_KEY}
       ADMIN_USERNAME: ${ADMIN_USERNAME}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
 
-      # Gunicorn
+      # Gunicorn & Performance
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-30}
       
-      # Infrastructure Components
-      MONGO_APP_USER: ${MONGO_APP_USER:-webserver}
-      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-password}
-      MONGO_APP_DB: ${MONGO_APP_DB:-appdb}
+      # Database & Cache
       MONGO_HOST: mongo
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${MONGO_SERVER_SELECTION_TIMEOUT_MS:-10000}
+      MONGO_CONNECT_TIMEOUT_MS: ${MONGO_CONNECT_TIMEOUT_MS:-10000}
+      MONGO_SOCKET_TIMEOUT_MS: ${MONGO_SOCKET_TIMEOUT_MS:-10000}
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
 
-      # Email (SMTP) and contact routing
+      # Auth & Security
+      FLASK_ENV: ${FLASK_ENV:-development}
+      JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:-false}
+      JWT_COOKIE_CSRF_PROTECT: ${JWT_COOKIE_CSRF_PROTECT:-true}
+      JWT_COOKIE_SAMESITE: ${JWT_COOKIE_SAMESITE:-Lax}
+      TALISMAN_FORCE_HTTPS: ${TALISMAN_FORCE_HTTPS:-false}
+      CSP_REPORT_URI: ${CSP_REPORT_URI:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5001,http://127.0.0.1:5001}
+      
+      # Proxy & Networking
+      PROXY_FIX_X_FOR: ${PROXY_FIX_X_FOR:-1}
+      PROXY_FIX_X_PROTO: ${PROXY_FIX_X_PROTO:-1}
+      PROXY_FIX_X_HOST: ${PROXY_FIX_X_HOST:-1}
+      PROXY_FIX_X_PREFIX: ${PROXY_FIX_X_PREFIX:-1}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+
+      # Email (SMTP)
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER}
@@ -44,12 +59,18 @@ services:
       TURNSTILE_ENABLED: ${TURNSTILE_ENABLED:-true}
       TURNSTILE_LOGIN_ENABLED: ${TURNSTILE_LOGIN_ENABLED:-false}
 
-      # Contact guard configuration
+      # App Specifics
       CONTACT_MIN_TIME_MS: ${CONTACT_MIN_TIME_MS:-1500}
       CONTACT_HONEYPOT_FIELDS: ${CONTACT_HONEYPOT_FIELDS:-website,company}
-
       FLASK_APP: main.py
       DOCKER_CONTAINER: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
     depends_on:
       mongo:
         condition: service_healthy
@@ -79,6 +100,10 @@ services:
       - "0.0.0.0:5001:80"
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     depends_on:
       - web
 
@@ -107,6 +132,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
   redis:
     image: "redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065"
@@ -120,6 +149,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
 volumes:
   mongo_data:
