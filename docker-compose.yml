@@ -116,12 +116,12 @@ services:
     restart: unless-stopped
     stop_grace_period: 60s
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
-      MONGO_APP_USER: ${MONGO_APP_USER:-webserver}
-      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:-password}
-      MONGO_APP_DB: ${MONGO_APP_DB:-appdb}
-      MONGO_TEST_DB: ${MONGO_TEST_DB:-pytest_appdb}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_APP_USER: ${MONGO_APP_USER}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+      MONGO_APP_DB: ${MONGO_APP_DB}
+      MONGO_TEST_DB: ${MONGO_TEST_DB}
     volumes:
       - mongo_data:/data/db
       - ./docker/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
