@@ -93,6 +93,8 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -256,6 +258,8 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
