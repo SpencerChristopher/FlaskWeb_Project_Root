@@ -11,7 +11,7 @@ from src.models.user import User
 class Article(db.Document):
     """
     Represents a blog article.
-    Pinned to 'posts' collection for legacy compatibility during refactor.
+    Aligned with 'articles' collection for domain consistency.
     Uses string reference for User to break circular imports.
     """
 
@@ -26,7 +26,7 @@ class Article(db.Document):
     publication_date = mongoengine.DateTimeField()
     last_updated = mongoengine.DateTimeField(default=datetime.datetime.utcnow)
 
-    meta = {"collection": "posts", "indexes": ["slug", "-publication_date"]}
+    meta = {"collection": "articles", "indexes": ["slug", "-publication_date"]}
 
     def to_dict(self) -> dict:
         return {

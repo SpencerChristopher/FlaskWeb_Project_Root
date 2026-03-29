@@ -33,8 +33,8 @@ class TestApiRoutes:
         response = client.get("/api/blog")
         assert response.status_code == 200
         data = response.get_json()
-        assert "posts" in data
-        assert len(data["posts"]) >= 1
+        assert "articles" in data
+        assert len(data["articles"]) >= 1
 
     def test_blog_article_api_successful(self, app, client):
         with app.app_context():

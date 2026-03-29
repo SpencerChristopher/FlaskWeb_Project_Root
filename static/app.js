@@ -216,8 +216,8 @@ const ROUTES = {
         name: 'ArticleListView',
         fetch: async () => {
             const data = await fetchAPI('/api/blog');
-            if (data?.posts) {
-                data.posts.forEach(p => articleCache.set(p.slug, p));
+            if (data?.articles) {
+                data.articles.forEach(p => articleCache.set(p.slug, p));
             }
             return data;
         } 

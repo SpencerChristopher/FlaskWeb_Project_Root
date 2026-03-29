@@ -16,8 +16,8 @@ export const ArticleListView = {
 
     template(data) {
         // Initialize state from initial router fetch if present
-        if (data && data.posts && this._state.articles.length === 0) {
-            this._state.articles = data.posts;
+        if (data && data.articles && this._state.articles.length === 0) {
+            this._state.articles = data.articles;
             this._state.currentPage = data.pagination?.current_page || 1;
             this._state.hasNext = data.pagination?.has_next || false;
         }
@@ -88,14 +88,14 @@ export const ArticleListView = {
             const nextPage = this._state.currentPage + 1;
             const data = await ctx.api(`/api/blog?page=${nextPage}&per_page=6`);
             
-            if (data?.posts?.length) {
-                this._state.articles.push(...data.posts);
+            if (data?.articles?.length) {
+                this._state.articles.push(...data.articles);
                 this._state.currentPage = data.pagination.current_page;
                 this._state.hasNext = data.pagination.has_next;
 
                 // Append new cards to DOM without re-rendering everything
-                const newCardsHtml = data.posts.map((a, idx) => {
-                    const globalIdx = this._state.articles.length - data.posts.length + idx;
+                const newCardsHtml = data.articles.map((a, idx) => {
+                    const globalIdx = this._state.articles.length - data.articles.length + idx;
                     return ComponentFactory.createCard({
                         title: escapeHTML(a.title),
                         badge: "Article",

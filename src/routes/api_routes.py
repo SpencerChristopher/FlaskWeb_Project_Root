@@ -139,9 +139,9 @@ def blog_list_api() -> Response:
 
     return jsonify(
         {
-            "posts": articles_summary,
+            "articles": articles_summary,
             "pagination": {
-                "total_posts": paginated_articles.total,
+                "total_articles": paginated_articles.total,
                 "total_pages": paginated_articles.pages,
                 "current_page": paginated_articles.page,
                 "per_page": paginated_articles.per_page,

@@ -112,8 +112,8 @@ class TestProdReadiness:
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
         assert resp.status_code == 200
         data = resp.json()
-        assert "posts" in data
-        assert isinstance(data["posts"], list)
+        assert "articles" in data
+        assert isinstance(data["articles"], list)
 
     def test_unauthorized_content_access_blocked(self, base_url):
         """Verify that administrative endpoints are correctly gated."""

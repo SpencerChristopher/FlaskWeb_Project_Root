@@ -53,10 +53,10 @@ def test_contract_blog_list_shape(client, contract_article):
     response = client.get("/api/blog")
     assert response.status_code == 200
     data = response.get_json()
-    assert set(data.keys()) == {"posts", "pagination"}
-    assert isinstance(data["posts"], list)
+    assert set(data.keys()) == {"articles", "pagination"}
+    assert isinstance(data["articles"], list)
     art_summary = next(
-        (p for p in data["posts"] if p["slug"] == contract_article.slug), None
+        (p for p in data["articles"] if p["slug"] == contract_article.slug), None
     )
     assert art_summary is not None
     assert {"title", "summary", "slug", "publication_date"} <= set(art_summary.keys())
