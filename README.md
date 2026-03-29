@@ -11,7 +11,8 @@ This project is a personal website and blog built with Flask and MongoDB, featur
 *   **Event-Driven Architecture**: Utilizes **Blinker** for decoupled application logic.
 *   **User Authentication**: Secure JWT-based login with RBAC.
 *   **Security Hardening**: Rate limiting, HTML sanitization, and HTTPS proxying.
-*   **Dockerized Environment**: Consistent setup and deployment via Docker Compose.
+*   **Hardware Optimized**: Tuned for high stability on **2GB Raspberry Pi (ARM64)**.
+*   **Dockerized Environment**: Consistent setup and deployment via isolated environment lanes.
 
 ## Technologies Used
 
@@ -27,27 +28,31 @@ The project is fully containerized for consistent development and deployment. Ng
 
 ### 1. Prerequisites
 *   Docker Desktop (with Compose)
+*   GitHub CLI (`gh`) - Required for configuration sync.
 *   Python 3.11+ (if running host-side tests)
 
 ### 2. Configuration & Secrets
-For local development, secrets and overrides are managed via a `.env` file (never committed).
-1. Create your local `.env`: `cp .env.template .env`
-2. Update `.env` with your secrets (`SECRET_KEY`, `ADMIN_PASSWORD`, SMTP/contact routing, Turnstile keys, etc.).
-3. Configure your local dev overrides: `cp docker-compose.override.yml.template docker-compose.override.yml`
+Configuration is decoupled into **Secrets** (sensitive) and **Variables** (behavioral).
+1.  **Secrets**: Create your local `.env`: `cp .env.template .env` and add your keys.
+2.  **Variables**: Sync latest behavior settings from GitHub:
+    ```powershell
+    powershell.exe -File scripts/sync_vars.ps1
+    ```
+    This generates `.env.vars` which is used by the local stack.
+3.  **Overrides**: Initialize your local dev overrides: `cp docker-compose.override.yml.template docker-compose.override.yml`
 
 For a detailed explanation of the environment variable hierarchy, see [Deployment Guide](docs/DEPLOYMENT.md).
 
 ### 3. Quick Start
 ```bash
-# Build and start services
+# Build and start services (Uses isolated Port 5010)
 docker compose up --build -d
 
 # Seed the database
-docker compose exec web /app/.venv/bin/python scripts/create_admin.py
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py
 ```
 
-The application will be available at `http://localhost:5001`.
+The application will be available locally at `http://localhost:5010`.
 
 ---
 
@@ -70,7 +75,7 @@ docker compose exec web /app/.venv/bin/pytest tests/ -m "not e2e"
 ```
 . # Project Root
 +-- src/                      # Main application source code
-+-- scripts/                  # Utility scripts (seeding, admin creation)
++-- scripts/                  # Utility scripts (seeding, admin creation, sync)
 +-- static/                   # Frontend static files (JS, CSS)
 +-- templates/                # Base Jinja2 template for the SPA shell
 +-- docker/                   # Docker assets (nginx config, mongo init)
@@ -78,8 +83,7 @@ docker compose exec web /app/.venv/bin/pytest tests/ -m "not e2e"
 +-- tests/                    # Test suites (unit, integration, e2e)
 +-- certs/                    # TLS certs (self-signed for dev/CI)
 +-- .env.template             # Template for .env
-+-- config.env                # Non-secret defaults shared across envs
-+-- docker-compose.yml        # Main Docker Compose (prod-like)
++-- docker-compose.yml        # Main Docker Compose (Base configuration)
 +-- Dockerfile                # Dockerfile for the Flask application
 +-- main.py                   # Main application entry point
 +-- pyproject.toml            # Poetry project configuration

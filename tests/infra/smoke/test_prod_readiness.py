@@ -106,7 +106,7 @@ class TestProdReadiness:
         assert "auth" in data
 
     def test_db_connectivity_via_blog_api(self, base_url):
-        """Verify that the blog API can fetch posts (DB Check)."""
+        """Verify that the blog API can fetch articles (DB Check)."""
         base = self._get_base_url(base_url)
         url = f"{base}/api/blog"
         resp = session.get(url, verify=VERIFY, allow_redirects=True)
@@ -114,6 +114,7 @@ class TestProdReadiness:
         data = resp.json()
         assert "articles" in data
         assert isinstance(data["articles"], list)
+
 
     def test_unauthorized_content_access_blocked(self, base_url):
         """Verify that administrative endpoints are correctly gated."""

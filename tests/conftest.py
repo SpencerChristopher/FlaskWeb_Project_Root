@@ -3,6 +3,8 @@ import os
 # Talisman and other extensions initialize with test-safe defaults.
 os.environ.setdefault("FLASK_ENV", "development")
 os.environ["TALISMAN_FORCE_HTTPS"] = "false"
+os.environ.setdefault("MONGO_APP_DB", "appdb")
+os.environ.setdefault("MONGO_TEST_DB", "pytest_appdb")
 # Default E2E base URL for in-container runs when not explicitly set.
 if os.environ.get("DOCKER_CONTAINER") in {"1", "true"} and "E2E_BASE_URL" not in os.environ:
     os.environ["E2E_BASE_URL"] = "http://nginx"

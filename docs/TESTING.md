@@ -6,7 +6,7 @@ This document defines the standards for verifying the Flask Web Project. It dist
 
 | Environment | Where you run tests | Target URL | TLS behavior | Recommended use |
 | :--- | :--- | :--- | :--- | :--- |
-| **Local (Host)** | Local venv | `http://localhost:5001` | HTTP only (no HTTPS redirect, no Secure cookies) | E2E and fast iteration |
+| **Local (Host)** | Local venv | `http://localhost:5010` | HTTP only (no HTTPS redirect, no Secure cookies) | E2E and fast iteration |
 | **Local (Container)** | `docker compose exec web` | `http://nginx` | HTTP only | Integration, smoke, performance |
 | **Staging** | Local venv | `https://staging.spencerscooking.uk` | HTTPS via Cloudflare edge | Real-world smoke/e2e/perf |
 
@@ -16,16 +16,16 @@ The project supports three testing perspectives. Choosing the wrong one will cau
 
 ### A. Host-Side Testing (Standard, Recommended for E2E)
 Run from your local terminal/IDE.
-*   **Target:** `http://localhost:5001` (via Nginx proxy)
+*   **Target:** `http://localhost:5010` (via Nginx proxy)
 *   **Scope:** Best for E2E (Playwright) and quick iterative unit tests.
-*   **Requirement:** App stack running via Docker (nginx on port 5001).
+*   **Requirement:** App stack running via Docker (nginx on port 5010).
 *   **Tip:** Local dev uses HTTP, so the container override should set:
     * `TALISMAN_FORCE_HTTPS=false`
     * `JWT_COOKIE_SECURE=false`
 *   **Command:** 
     ```powershell
     # End-to-End (Requires Playwright installed on host)
-    # Zero-Config: base_url defaults to http://localhost:5001
+    # Zero-Config: base_url defaults to http://localhost:5010
     $env:SKIP_DB_CHECK="1"
     python -m pytest tests/e2e/ -m e2e -p no:flask
     ```
@@ -180,6 +180,6 @@ Tests verifying access must account for both gates.
 ## 5. Common Pitfalls
 
 *   **401 Unauthorized in E2E:** Usually caused by a `SECRET_KEY` mismatch between the Host `.env` and the Container environment. Ensure they match.
-*   **Login works but UI stays guest (local HTTP):** Ensure `JWT_COOKIE_SECURE=false` for local dev and use `http://localhost:5001`.
+*   **Login works but UI stays guest (local HTTP):** Ensure `JWT_COOKIE_SECURE=false` for local dev and use `http://localhost:5010`.
 *   **Connection Refused (Container):** Occurs if a test tries to hit `localhost` while running inside the container. Use the `base_url` fixture which handles this automatically.
 *   **HTTPS-only checks skipped locally:** Set `REQUIRE_HTTPS=1` when running against HTTPS (staging) to enforce cookie/security expectations.
