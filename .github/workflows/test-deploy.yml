@@ -141,12 +141,8 @@ jobs:
 
       - name: Reset compose stack
         run: |
-          if [ "${{ github.event.inputs.hard_rebuild }}" = "true" ]; then
-            echo "Performing hard reset with volume removal for functional verify..."
-            docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
-          else
-            docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
-          fi
+          echo "Performing hard reset with volume removal to prevent stale data drift..."
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -229,7 +225,14 @@ jobs:
           docker cp pytest.ini flask_web_app:/app/pytest.ini
 
       - name: Run tests (exclude e2e, performance, smoke, and heavy)
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
+        run: |
+          docker exec \
+            -e MONGO_APP_USER="${{ secrets.MONGO_APP_USER }}" \
+            -e MONGO_APP_PASSWORD="${{ secrets.MONGO_APP_PASSWORD }}" \
+            -e MONGO_APP_DB="${{ secrets.MONGO_APP_DB }}" \
+            -e MONGO_TEST_DB="${{ secrets.MONGO_TEST_DB }}" \
+            -e PYTHONPATH=/app \
+            flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
 
       - name: Push Verified Image
         if: success()
