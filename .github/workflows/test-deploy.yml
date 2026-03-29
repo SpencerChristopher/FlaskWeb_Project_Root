@@ -181,11 +181,12 @@ jobs:
         with:
           context: .
           load: true
-          pull: false
+          pull: true # Always pull latest base images
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
             PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+          # Use gha cache for speed, but 'load: true' ensures it's in the local daemon
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
