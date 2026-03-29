@@ -111,10 +111,15 @@ def base_url(request):
     if opt_url:
         return opt_url
 
+    # If in Docker, use the internal service name
     if os.environ.get("DOCKER_CONTAINER") in {"1", "true"}:
         return "http://nginx"
 
-    # Default to 5001 to match docker-compose.yml (5000 is often occupied)
+    # For WSL Runner isolation
+    if os.environ.get("DEPLOY_ENV") == "staging":
+        return "http://localhost:5005"
+
+    # Default to 5001 for local dev
     return "http://localhost:5001"
 
 

@@ -25,6 +25,11 @@ services:
 
   # Staging-specific overrides for the Web App (Matching Low-Memory Tuning)
   web:
+...
+  # Bind Nginx to isolated port 5005 for WSL Runner parity
+  nginx:
+    ports:
+      - "5005:80"
     environment:
       FLASK_ENV: production
       TALISMAN_FORCE_HTTPS: "true"
