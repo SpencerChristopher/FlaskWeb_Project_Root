@@ -112,6 +112,8 @@ jobs:
       FLASK_ENV: ${{ vars.FLASK_ENV || 'development' }}
       PYTHON_VERSION: "3.11"
       HOST_PORT: 5005
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 1
       # Repository Variables (Config migration)
       JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
       JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
