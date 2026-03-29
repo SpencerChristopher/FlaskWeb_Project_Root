@@ -1,4 +1,4 @@
-pip-audit allow list for reviewed vulnerabilities without a fix
+# pip-audit allow list for reviewed vulnerabilities without a fix
 # Format: <VULN ID> (comments after # are ignored)
 CVE-2026-27614  # GHSA-vp6q-7m36-pq3w: local AdlLexer regex DoS, upstream fix pending
 CVE-2026-4539  # AdlLexer regex DoS (local), no fix yet

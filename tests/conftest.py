@@ -111,16 +111,22 @@ def base_url(request):
     if opt_url:
         return opt_url
 
-    # If in Docker, use the internal service name
+    # 1. Prioritize explicit target URL (e.g. for Production/Staging smoke)
+    env_url = (
+        os.environ.get("PYTEST_BASE_URL")
+        or os.environ.get("E2E_BASE_URL")
+        or os.environ.get("TEST_TARGET_URL")
+    )
+    if env_url:
+        return env_url
+
+    # 2. Inside Docker, always use service name
     if os.environ.get("DOCKER_CONTAINER") in {"1", "true"}:
         return "http://nginx"
 
-    # For WSL Runner isolation
-    if os.environ.get("DEPLOY_ENV") == "staging":
-        return "http://localhost:5005"
-
-    # Default to 5001 for local dev
-    return "http://localhost:5001"
+    # 3. Handle Port Isolation via HOST_PORT
+    host_port = os.environ.get("HOST_PORT") or os.environ.get("STAGING_HOST_PORT") or "5010"
+    return f"http://localhost:{host_port}"
 
 
 @pytest.fixture(scope="session", autouse=True)
