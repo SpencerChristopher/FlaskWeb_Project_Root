@@ -145,8 +145,13 @@ jobs:
 
       - name: Reset compose stack
         run: |
-          echo "Performing hard reset with volume removal to prevent stale data drift..."
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
+          if [ "${{ github.event.inputs.hard_rebuild }}" = "true" ]; then
+            echo "Hard rebuild requested: removing volumes and orphans."
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
+          else
+            echo "Soft reset: stopping containers without volume/orphan cleanup."
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down || true
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -232,8 +237,36 @@ jobs:
             exit 1
           fi
 
+      - name: Detect empty DB (CI)
+        id: ci_db_empty
+        run: |
+          db_empty=$(docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/python - <<'PY'
+          import os
+          from mongoengine import connect, disconnect
+          from src.models.article import Article
+          from src.models.profile import Profile
+
+          connect(host=os.environ.get("MONGO_URI"))
+          article_count = Article.objects.count()
+          profile_exists = Profile.objects.first() is not None
+          disconnect()
+
+          print(f"articles={article_count}")
+          print(f"profile_exists={profile_exists}")
+          print("true" if (article_count == 0 or not profile_exists) else "false")
+          PY
+          )
+          db_empty="$(echo "$db_empty" | tail -n 1)"
+          echo "db_empty=${db_empty}" >> "$GITHUB_OUTPUT"
+
       - name: Seed Database (CI)
-        run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
+        if: ${{ steps.ci_db_empty.outputs.db_empty == 'true' || github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true' }}
+        run: |
+          seed_args=""
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            seed_args="--heavy"
+          fi
+          docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py $seed_args
 
       - name: Inject tests into container
         run: |
@@ -349,7 +382,8 @@ jobs:
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Reset staging compose stack
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down --remove-orphans || true
+        if: ${{ github.event.inputs.hard_rebuild == 'true' }}
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down -v --remove-orphans || true
 
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
@@ -392,6 +426,7 @@ jobs:
           # Only perform clean start if manually requested via hard_rebuild input
           DEPLOY_CLEAN_START: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
           DEPLOY_RESET_VOLUMES: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_REMOVE_ORPHANS: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
           DEPLOY_BACKUP_BEFORE_RESET: "true"
           DEPLOY_REQUIRE_BACKUP: "true"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
@@ -419,6 +454,28 @@ jobs:
         run: |
           curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${{ vars.STAGING_HOST_PORT }}/
           curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/home
+
+      - name: Detect empty DB (staging)
+        id: staging_db_empty
+        run: |
+          db_empty=$(docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/python - <<'PY'
+          import os
+          from mongoengine import connect, disconnect
+          from src.models.article import Article
+          from src.models.profile import Profile
+
+          connect(host=os.environ.get("MONGO_URI"))
+          article_count = Article.objects.count()
+          profile_exists = Profile.objects.first() is not None
+          disconnect()
+
+          print(f"articles={article_count}")
+          print(f"profile_exists={profile_exists}")
+          print("true" if (article_count == 0 or not profile_exists) else "false")
+          PY
+          )
+          db_empty="$(echo "$db_empty" | tail -n 1)"
+          echo "db_empty=${db_empty}" >> "$GITHUB_OUTPUT"
 
       - name: Detect seed-relevant changes
         if: ${{ env.CI_SEED_ENABLED == 'true' }}
@@ -451,8 +508,25 @@ jobs:
             echo "should_seed=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Decide seeding
+        id: seed_decision
+        shell: bash
+        run: |
+          should_seed="false"
+          reason=""
+          if [ "${{ steps.staging_db_empty.outputs.db_empty }}" = "true" ]; then
+            should_seed="true"
+            reason="empty-db"
+          elif [ "${{ env.CI_SEED_ENABLED }}" = "true" ] && [ "${{ steps.seed_changes.outputs.should_seed }}" = "true" ]; then
+            should_seed="true"
+            reason="explicit-or-change"
+          fi
+          echo "should_seed=${should_seed}" >> "$GITHUB_OUTPUT"
+          echo "seed_reason=${reason}" >> "$GITHUB_OUTPUT"
+          echo "Seed decision: ${should_seed} (${reason:-none})"
+
       - name: Create Admin User
-        if: ${{ env.CI_SEED_ENABLED == 'true' && steps.seed_changes.outputs.should_seed == 'true' }}
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
@@ -460,7 +534,7 @@ jobs:
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
       - name: Seed Database
-        if: ${{ env.CI_SEED_ENABLED == 'true' && steps.seed_changes.outputs.should_seed == 'true' }}
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
           seed_args=""
           if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
@@ -473,7 +547,7 @@ jobs:
             flask_web_app /app/.venv/bin/python scripts/seed_db.py $seed_args
 
       - name: Verify API after seed
-        if: ${{ env.CI_SEED_ENABLED == 'true' && steps.seed_changes.outputs.should_seed == 'true' }}
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
           curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/blog
           curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/auth/status

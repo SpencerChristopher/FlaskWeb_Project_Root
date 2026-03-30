@@ -39,7 +39,11 @@ backup_before_reset_optional() {
 }
 
 start_compose_stack() {
-  docker compose "${COMPOSE_ARGS[@]}" up -d --wait --pull always --no-build --remove-orphans
+  local args=(up -d --wait --pull always --no-build)
+  if [ "${DEPLOY_REMOVE_ORPHANS:-false}" = "true" ]; then
+    args+=(--remove-orphans)
+  fi
+  docker compose "${COMPOSE_ARGS[@]}" "${args[@]}"
 }
 
 mongo_is_auth_unhealthy() {
@@ -103,7 +107,11 @@ if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
     docker compose "${COMPOSE_ARGS[@]}" down -v --remove-orphans || true
   else
     echo "Performing clean compose start..."
-    docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans || true
+    if [ "${DEPLOY_REMOVE_ORPHANS:-false}" = "true" ]; then
+      docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans || true
+    else
+      docker compose "${COMPOSE_ARGS[@]}" down || true
+    fi
   fi
 fi
 
