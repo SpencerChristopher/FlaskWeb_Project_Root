@@ -182,35 +182,37 @@ if (-not $SkipCloud -and -not $Offline) {
             }
         }
         $changedFiles = $changedFiles | Where-Object { $_ -and (Test-Path $_) }
+        $workflowFiles = $changedFiles | Where-Object { $_ -match '^\.github[\\/].*\.(yml|yaml)$' }
 
         $secretRefs = New-Object System.Collections.Generic.HashSet[string]
         $varRefs = New-Object System.Collections.Generic.HashSet[string]
 
-        foreach ($file in $changedFiles) {
+        foreach ($file in $workflowFiles) {
             try {
                 $content = Get-Content -Raw -Path $file
             } catch {
                 continue
             }
 
-            foreach ($m in [regex]::Matches($content, "secrets\.(\w+)", "IgnoreCase")) {
+            foreach ($m in [regex]::Matches($content, 'secrets\.(\w+)', 'IgnoreCase')) {
                 [void]$secretRefs.Add($m.Groups[1].Value)
             }
-            foreach ($m in [regex]::Matches($content, "secrets\\[['\"]([^'\"]+)['\"]\\]", "IgnoreCase")) {
+            foreach ($m in [regex]::Matches($content, 'secrets\[[''"]([^''"]+)[''"]\]', 'IgnoreCase')) {
                 [void]$secretRefs.Add($m.Groups[1].Value)
             }
 
-            foreach ($m in [regex]::Matches($content, "vars\.(\w+)", "IgnoreCase")) {
+            foreach ($m in [regex]::Matches($content, 'vars\.(\w+)', 'IgnoreCase')) {
                 [void]$varRefs.Add($m.Groups[1].Value)
             }
-            foreach ($m in [regex]::Matches($content, "vars\\[['\"]([^'\"]+)['\"]\\]", "IgnoreCase")) {
+            foreach ($m in [regex]::Matches($content, 'vars\[[''"]([^''"]+)[''"]\]', 'IgnoreCase')) {
                 [void]$varRefs.Add($m.Groups[1].Value)
             }
         }
 
-        if ($secretRefs.Count -gt 0) {
+        if ($secretRefs.Count -gt 0 -and $workflowFiles.Count -gt 0) {
             $missingSecrets = @()
             foreach ($s in $secretRefs) {
+                if ($s -eq "GITHUB_TOKEN") { continue }
                 if ($s -notin $remoteRepoSecrets -and $s -notin $remoteStagingSecrets -and $s -notin $remoteProdSecrets) {
                     $missingSecrets += $s
                 }
@@ -221,7 +223,7 @@ if (-not $SkipCloud -and -not $Offline) {
             }
         }
 
-        if ($varRefs.Count -gt 0) {
+        if ($varRefs.Count -gt 0 -and $workflowFiles.Count -gt 0) {
             $missingVars = @()
             foreach ($v in $varRefs) {
                 if ($v -notin $allVarNames) {
@@ -243,7 +245,7 @@ if (-not $SkipCloud -and -not $Offline) {
         }
 
         if ($dotEnv.Count -gt 0) {
-            $localOnlySecrets = @($dotEnv.Keys | Where-Object { $_ -notin $remoteRepoSecrets -and $_ -notin $remoteStagingSecrets -and $_ -notin $remoteProdSecrets })
+            $localOnlySecrets = @($dotEnv.Keys | Where-Object { $_ -notin $dotVars.Keys -and $_ -notin $remoteRepoSecrets -and $_ -notin $remoteStagingSecrets -and $_ -notin $remoteProdSecrets })
             if ($localOnlySecrets.Count -gt 0) {
                 Write-Host "Warning: .env contains secrets not present in GitHub (repo + env):" -ForegroundColor Yellow
                 $localOnlySecrets | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
@@ -295,17 +297,21 @@ if ($RunAct) {
 # [6/8] CI Parity Smoke Test
 if ($SmokeTest) {
     Write-Host "[6/8] Running CI-Parity Smoke Test (Up -> Seed -> Test)..."
+    $prevTurnstileEnabled = $env:TURNSTILE_ENABLED
+    $prevTurnstileLoginEnabled = $env:TURNSTILE_LOGIN_ENABLED
+    $env:TURNSTILE_ENABLED = "false"
+    $env:TURNSTILE_LOGIN_ENABLED = "false"
     try {
         Write-Host "Resetting stack..."
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans
+        docker compose --env-file .env --env-file .env.vars -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans
         
         Write-Host "Building & Starting CI stack..."
         $env:IMAGE_TAG = "preflight-local"
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait --wait-timeout 180
+        docker compose --env-file .env --env-file .env.vars -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait --wait-timeout 180
         
         Write-Host "Verifying container health (localhost:5005)..."
-        curl -f --retry 12 --retry-delay 5 --retry-connrefused http://localhost:5005/ | Out-Null
-        curl -f --retry 8 --retry-delay 3 http://localhost:5005/api/home | Out-Null
+        curl.exe -f --retry 12 --retry-delay 5 --retry-connrefused http://localhost:5005/ | Out-Null
+        curl.exe -f --retry 8 --retry-delay 3 http://localhost:5005/api/home | Out-Null
 
         Write-Host "Asserting web container health..."
         $healthStatus = docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app
@@ -325,13 +331,18 @@ if ($SmokeTest) {
 
         Write-Host "Running containerized tests (including prod readiness)..."
         docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
+        if ($LASTEXITCODE -ne 0) {
+            throw "CI-parity tests failed."
+        }
         
         Write-Host "Smoke and functional tests PASSED." -ForegroundColor Green
     } catch {
         Write-Host "Tests FAILED." -ForegroundColor Red
         exit 1
     } finally {
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+        docker compose --env-file .env --env-file .env.vars -f docker-compose.yml -f docker-compose.ci.yml down
+        if ($null -ne $prevTurnstileEnabled) { $env:TURNSTILE_ENABLED = $prevTurnstileEnabled } else { Remove-Item Env:TURNSTILE_ENABLED -ErrorAction SilentlyContinue }
+        if ($null -ne $prevTurnstileLoginEnabled) { $env:TURNSTILE_LOGIN_ENABLED = $prevTurnstileLoginEnabled } else { Remove-Item Env:TURNSTILE_LOGIN_ENABLED -ErrorAction SilentlyContinue }
     }
 } else {
     Write-Host "[6/8] Skipping CI-Parity Smoke Test." -ForegroundColor Gray
@@ -354,7 +365,7 @@ if (Require-Command "docker") {
 Write-Host "Validating Compose Configuration (Staging Parity)..."
 $env:IMAGE_TAG = "preflight-local"
 # Include all staging-relevant files to ensure they merge correctly
-docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml config -q
+docker compose --env-file .env --env-file .env.vars -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml config -q
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Error: Docker Compose configuration is invalid or files do not merge correctly." -ForegroundColor Red
     exit 1

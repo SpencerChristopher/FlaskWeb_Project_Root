@@ -46,7 +46,7 @@ For a detailed explanation of the environment variable hierarchy, see [Deploymen
 ### 3. Quick Start
 ```bash
 # Build and start services (Uses isolated Port 5010)
-docker compose up --build -d
+docker compose --env-file .env --env-file .env.vars up --build -d
 
 # Seed the database
 docker compose exec web /app/.venv/bin/python scripts/seed_db.py

@@ -33,7 +33,7 @@ services:
     ports:
       - "443:443"
     environment:
-      - NGINX_HOST=${DOMAIN_NAME:-localhost}
+      - NGINX_HOST=${DOMAIN_NAME:?DOMAIN_NAME required}
     logging:
       driver: "json-file"
       options:

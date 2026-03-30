@@ -86,7 +86,7 @@ This keeps the runner standing by with predictable data while you run the Playwr
 
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
-*   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` provides a safe default (e.g., `3`) via `GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}`.
+*   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` now requires explicit values (no fallbacks) so missing config fails fast.
 *   **Gunicorn Hardening:** Gunicorn is configured with `--limit-request-line 4094`, `--limit-request-fields 100`, and `--max-requests 1000`. `--preload` is enabled to force atomic app factory loading, ensuring the container fails immediately if the application cannot bootstrap. `FORWARDED_ALLOW_IPS` is used to restrict which IPs the WSGI server trusts for proxy headers.
 *   **Flask App Env:** `FLASK_ENV` is set to `development` for CI/test and `production` for staging/deployment.
 *   **Talisman/HTTPS:** `TALISMAN_FORCE_HTTPS` is configured (default `true` for deployment).
