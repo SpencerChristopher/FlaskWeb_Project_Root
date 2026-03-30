@@ -7,6 +7,11 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      deploy_to_staging:
+        description: "STAGING ONLY: Deploy to WSL runner (manual trigger)"
+        type: boolean
+        required: false
+        default: false
       hard_rebuild:
         description: "STAGING ONLY: Use down -v to purge volumes (fixes credential drift)"
         type: boolean
@@ -79,11 +84,11 @@ jobs:
             PYTHON_VERSION=3.11
           cache-from: type=gha
 
-  # --- 3. AMD64 VERIFICATION: Functional tests on Staging ---
+  # --- 3. AMD64 VERIFICATION: Functional tests on GitHub-hosted runner ---
   amd64-verify:
     name: Verify Functional (amd64)
     needs: static-analysis
-    runs-on: wsl-staging
+    runs-on: ubuntu-latest
     environment: staging
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
@@ -317,6 +322,7 @@ jobs:
     needs: [amd64-verify, arm64-compatibility-check]
     runs-on: wsl-staging
     environment: staging
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_staging == 'true' }}
     timeout-minutes: 30
     env:
       DEPLOY_ENV: staging
