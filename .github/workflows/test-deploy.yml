@@ -317,7 +317,7 @@ jobs:
     needs: [amd64-verify, arm64-compatibility-check]
     runs-on: wsl-staging
     environment: staging
-    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_staging == 'true' }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_staging == 'true') }}
     timeout-minutes: 30
     env:
       DEPLOY_ENV: staging
