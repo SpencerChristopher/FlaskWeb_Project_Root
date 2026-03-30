@@ -22,6 +22,11 @@ on:
         type: boolean
         required: false
         default: false
+      seed_if_empty:
+        description: "STAGING ONLY: Allow auto-seed when DB is empty (manual only)"
+        type: boolean
+        required: false
+        default: false
       heavy_seed:
         description: "STAGING ONLY: Use heavy seed (150+ articles) for stress testing"
         type: boolean
@@ -373,6 +378,7 @@ jobs:
       TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
       # Flip to 'true' only when you intend to reset or reseed profiles/articles.
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
+      SEED_IF_EMPTY: ${{ (github.event.inputs.seed_if_empty == 'true') && 'true' || 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -515,7 +521,7 @@ jobs:
         run: |
           should_seed="false"
           reason=""
-          if [ "${{ steps.staging_db_empty.outputs.db_empty }}" = "true" ]; then
+          if [ "${{ env.SEED_IF_EMPTY }}" = "true" ] && [ "${{ steps.staging_db_empty.outputs.db_empty }}" = "true" ]; then
             should_seed="true"
             reason="empty-db"
           elif [ "${{ env.CI_SEED_ENABLED }}" = "true" ] && [ "${{ steps.seed_changes.outputs.should_seed }}" = "true" ]; then
