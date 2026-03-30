@@ -322,7 +322,7 @@ jobs:
     needs: [amd64-verify, arm64-compatibility-check]
     runs-on: wsl-staging
     environment: staging
-    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.deploy_to_staging == 'true') }}
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_to_staging == 'true' || github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true' || github.event.inputs.seed_if_empty == 'true')) }}
     timeout-minutes: 30
     env:
       DEPLOY_ENV: staging
