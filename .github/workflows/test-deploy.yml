@@ -380,8 +380,8 @@ jobs:
 
       - name: Verify staging health
         run: |
-          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${{ vars.STAGING_HOST_PORT || 5005 }}/
-          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT || 5005 }}/api/home
+          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${{ vars.STAGING_HOST_PORT || 5001 }}/
+          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT || 5001 }}/api/home
 
       - name: Detect seed-relevant changes
         if: ${{ env.CI_SEED_ENABLED == 'true' }}
@@ -391,6 +391,11 @@ jobs:
           set -euo pipefail
           # Force seeding if heavy_seed input is checked
           if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Force seeding if reseed_db input is checked
+          if [ "${{ github.event.inputs.reseed_db }}" = "true" ]; then
             echo "should_seed=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -431,10 +436,10 @@ jobs:
             flask_web_app /app/.venv/bin/python scripts/seed_db.py $seed_args
 
       - name: Verify API after seed
-        if: ${{ steps.seed_changes.outputs.should_seed == 'true' }}
+        if: ${{ env.CI_SEED_ENABLED == 'true' && steps.seed_changes.outputs.should_seed == 'true' }}
         run: |
-          curl -f --retry 8 --retry-delay 3 http://localhost:5005/api/blog
-          curl -f --retry 8 --retry-delay 3 http://localhost:5005/api/auth/status
+          curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT || 5001 }}/api/blog
+          curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT || 5001 }}/api/auth/status
 
       - name: Capture deploy logs on failure
         if: failure()
