@@ -4,7 +4,7 @@ This document covers the current deployment flow, CI/CD, runner expectations, an
 
 ## Overview
 -   **CI/CD System:** GitHub Actions
--   **CI/Test Environment:** Runs on GitHub-hosted `ubuntu-latest` for build and initial testing.
+-   **CI/Test Environment:** Runs entirely on GitHub-hosted `ubuntu-latest` for build and functional testing.
 -   **Staging Deployment:** Deploys to a self-hosted WSL runner using `scripts/deploy.sh`.
 -   **Production Deployment (Future):** Will deploy to a self-hosted Raspberry Pi runner (ARM architecture).
 -   **Architecture:** Nginx terminates TLS (HTTPS) and proxies to the Flask API (Gunicorn). Docker Compose manages all services.
@@ -27,6 +27,8 @@ When manually triggering the workflow from GitHub, the following levers are avai
 -   **`hard_rebuild` (Staging Only):** Executes `down -v` to purge persistent volumes. Invaluable for fixing credential drift or volume corruption. **Blocked in Production** without a break-glass variable.
 -   **`reseed_db`:** Forces the database seeder to run even if no relevant files changed.
 -   **`heavy_seed` (Staging Only):** Triggers a heavy seed (150+ articles) for stress testing infinite scroll and pagination.
+-   **`seed_if_empty` (Staging Only):** Allows auto-seeding only when the DB is empty (manual runs only).
+-   **`deploy_to_staging` (Staging Only):** Manual deploy trigger (optional if you set any seed flag).
 
 ## CI Pipeline (dev branch)
 **Workflow:** `.github/workflows/test-deploy.yml`
@@ -44,14 +46,14 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 *   **Rationale:** Uses QEMU on GitHub-hosted runners to verify that all Python wheels and C-extensions (like `argon2-cffi` or `cryptography`) are available for ARM64 without being affected by local networking issues on self-hosted infrastructure. **Does not push to registry.**
 
 ### 3. Verify Functional (amd64)
-*   **Runner:** `wsl-staging` (Self-hosted)
+*   **Runner:** `ubuntu-latest` (GitHub-hosted)
 *   **Tasks:**
     *   Builds the `linux/amd64` image natively (no QEMU overhead).
     *   Starts the full stack (`nginx`, `web`, `mongo`, `redis`).
     *   **Smoke Test:** Explicitly verifies that the `web` container can reach the `nginx` proxy via the internal Docker network.
     *   **Pytest:** Runs the functional test suite (excluding e2e/performance).
     *   **Push:** If all tests pass, the verified image is pushed to `ghcr.io` for deployment.
-*   **Rationale:** Functional verification happens on the self-hosted runner to mirror the production-like environment (WSL/Linux).
+*   **Rationale:** Functional verification stays on GitHub-hosted runners to avoid impacting the live staging environment.
 
 ### 4. Deploy to WSL (Staging)
 *   **Runner:** `wsl-staging` (Self-hosted)
@@ -59,7 +61,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 *   **Tasks:** Executes `scripts/deploy.sh` to update the staging environment with the newly verified image.
 
 ## Staging Deployment (WSL Runner)
-**Triggered by:** Runs after the `build-and-test` job successfully completes.
+**Triggered by:** Automatic on push to `dev`/`main`, or manual workflow dispatch when `deploy_to_staging` or seed flags are set.
 **Runs on:** A self-hosted runner explicitly labeled `wsl-staging`.
 
 **Key Steps:**
@@ -67,22 +69,19 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 2.  **Make Deploy Script Executable:** Ensures `scripts/deploy.sh` can be run.
 3.  **Validate Required Secrets:** Checks for the presence of necessary secrets.
 4.  **Deploy to WSL:** Executes `scripts/deploy.sh` which:
-    *   Generates self-signed certificates.
     *   Optionally performs a hard reset (`down -v`) when manually triggered with `workflow_dispatch` input `hard_rebuild=true`; before reset it attempts a MongoDB backup archive.
-    *   Auto-recovers once from Mongo auth/volume drift on staging (`DEPLOY_AUTO_RECOVER_MONGO_AUTH=true`) by performing a guarded hard reset if Mongo healthcheck reports `Authentication failed`.
-    *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services.
+    *   If Mongo auth drift is detected, the deploy **aborts** and requires manual intervention.
+    *   Executes `docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --pull always --no-build`. This pulls the exact commit image from `ghcr.io` (via `docker-compose.ci.yml`) and starts all services without removing volumes.
     *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
-5.  **Verify Staging Health:** Runs `curl -f` check against `http://localhost:5000/` (or `5010` locally) to ensure the application stack is responsive.
-6.  **Create Admin & Seed DB:** Sets up the admin user and populates initial data (articles + profile) in the staging environment.
+5.  **Verify Staging Health:** Runs `curl -f` check against `http://localhost:${STAGING_HOST_PORT}/` to ensure the application stack is responsive.
+6.  **Create Admin & Seed DB:** Runs only when explicitly requested via workflow inputs (`reseed_db`, `heavy_seed`, or `seed_if_empty`).
 
-### Runner data refresh (for local E2E)
-Before each local E2E run, ensure the runner’s database reflects the baseline data by clearing and reseeding it with the latest fixtures:
+### Runner data refresh (manual only)
+Staging data is treated as stable. If you need to reseed for testing, use a manual workflow dispatch:
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/drop_db.py
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/seed_db.py --heavy
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/create_admin.py
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f reseed_db=true
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f heavy_seed=true
 ```
-This keeps the runner standing by with predictable data while you run the Playwright suite from your local machine (see the Testing guide for the host-side invocation).
 
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.

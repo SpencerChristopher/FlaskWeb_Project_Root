@@ -43,7 +43,7 @@ Run from your local terminal/IDE.
     ```powershell
     powershell.exe -File scripts/sync_vars.ps1
     ```
-    This generates `.env.vars`, which is automatically loaded by the `docker-compose.override.yml`.
+    This generates `.env.vars`. Start Docker Compose with `--env-file .env --env-file .env.vars` to load it.
 
 ### B. Container-Side Testing (CI Parity)
 Run from inside the `web` container.
@@ -92,18 +92,14 @@ Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while 
     2. Export the same env vars every run (including `E2E_BASE_URL`/`PROD_BASE_URL`).
     3. Use a dedicated service token for staging only.
     4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
-    5. Boot the stack with `FLASK_ENV=staging` before triggering the verify steps.
-    6. Ensure the staging runner is seeded and healthy (drop the DB and rerun `scripts/seed_db.py --heavy`) before invoking your Playwright suite.
+    5. Staging data is treated as stable. Do not reseed unless explicitly required.
 
-You can refresh the staging dataset with the runner commands below before launching the host-side tests:
+If you need to refresh staging data, use a manual workflow dispatch:
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/drop_db.py
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web /app/.venv/bin/python scripts/seed_db.py --heavy
-# Optional: recreate admin user from the secrets file
-docker compose -f docker-compose.yml -f docker-compose.ci.yml exec web \
-  /app/.venv/bin/python scripts/create_admin.py
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f reseed_db=true
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f heavy_seed=true
 ```
-These commands keep the runner’s data fresh while you continue to execute the E2E suite from your local terminal with the exported secrets.
+Set `REQUIRE_HEAVY_SEED=1` to hard-fail infinite scroll E2E when the dataset is too small.
 
 ---
 
@@ -130,7 +126,10 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 
 ### E. CI seeding guard
 
-`CI_SEED_ENABLED` controls whether the `deploy-to-wsl` job runs `scripts/seed_db.py`. The workflow now defaults this env var to `false`, so seeded data (including the profile singleton) is left untouched during most runs. When you deliberately need to reseed, set `CI_SEED_ENABLED=true` for that run and flip it back afterward; the seed detection logic stays in place so only targeted changes trigger the seeding commands.
+Staging seeding is **manual only**. On push, the workflow deploys but will not seed or overwrite data. Seeding runs only when you explicitly set:
+*   `reseed_db=true` (force reseed)
+*   `heavy_seed=true` (force heavy seed)
+*   `seed_if_empty=true` (allow auto-seed only if DB is empty)
 
 ---
 
@@ -139,7 +138,7 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 ### A. Multi-Platform Verification
 To ensure the application runs on both staging (AMD64) and production (ARM64/Raspberry Pi), the CI pipeline performs separate checks:
 1.  **ARM64 Dry-Run:** Verified on GitHub-hosted runners to ensure wheels/binaries are valid.
-2.  **AMD64 Functional:** Verified on the self-hosted WSL runner to ensure the full integration stack works as expected.
+2.  **AMD64 Functional:** Verified on GitHub-hosted runners to avoid impacting staging.
 
 ### A. Accessibility (Axe)
 E2E tests include accessibility checks via `axe-core`. To enable these, you must download the script to the local directory:

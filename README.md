@@ -70,6 +70,33 @@ Comprehensive documentation for developing and verifying the system is available
 docker compose exec web /app/.venv/bin/pytest tests/ -m "not e2e"
 ```
 
+### E2E Testing (Local & Staging)
+Local E2E (host-side):
+```powershell
+# Start stack (uses .env + .env.vars)
+docker compose --env-file .env --env-file .env.vars up -d
+
+# Run E2E from host venv
+$env:SKIP_DB_CHECK="1"
+python -m pytest tests/e2e -m e2e -p no:flask
+```
+
+Staging E2E (Cloudflare Access):
+```powershell
+$env:E2E_BASE_URL="https://staging.spencerscooking.uk"
+$env:PROD_BASE_URL="https://staging.spencerscooking.uk"
+$env:REQUIRE_HTTPS="1"
+$env:REQUIRE_CF_ACCESS="1"
+$env:CF_ACCESS_CLIENT_ID="<token>"
+$env:CF_ACCESS_CLIENT_SECRET="<secret>"
+python -m pytest tests/e2e -m e2e
+```
+
+Notes:
+* Staging data is stable and is not reseeded on push.
+* If you need a fresh dataset, trigger a manual workflow with `reseed_db` or `heavy_seed`.
+* Set `REQUIRE_HEAVY_SEED=1` if you want infinite-scroll E2E to hard-fail when the dataset is too small.
+
 ## Project Structure
 
 ```
