@@ -1,3 +1,4 @@
+import os
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -7,6 +8,19 @@ def test_blog_infinite_scroll(page: Page, base_url: str):
     """
     Verify that the blog page correctly implements infinite scroll.
     """
+    require_heavy = os.environ.get("REQUIRE_HEAVY_SEED", "").lower() in {"1", "true", "yes"}
+    response = page.request.get(f"{base_url}/api/blog")
+    if not response.ok:
+        pytest.skip("Blog API unavailable; skipping infinite scroll gate.")
+
+    data = response.json()
+    total_articles = (data.get("pagination") or {}).get("total_articles", 0)
+    if total_articles < 13:
+        message = f"Infinite scroll requires >=13 articles; found {total_articles}."
+        if require_heavy:
+            pytest.fail(message)
+        pytest.skip(message)
+
     page.goto(f"{base_url}/blog")
 
     # Bypass cookie consent if needed

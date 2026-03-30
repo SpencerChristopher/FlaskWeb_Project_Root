@@ -149,6 +149,11 @@ if (navToggle && mainNavList) {
     navToggle.addEventListener('click', () => {
         const isOpen = mainNavList.classList.toggle('is-open');
         navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        if (isOpen) {
+            mainNavList.style.display = 'flex';
+        } else {
+            mainNavList.style.display = '';
+        }
     });
 }
 
