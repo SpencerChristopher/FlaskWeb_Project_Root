@@ -151,6 +151,12 @@ if (navToggle && mainNavList) {
         navToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         if (isOpen) {
             mainNavList.style.display = 'flex';
+            // Ensure class remains applied even if other async UI updates run.
+            setTimeout(() => {
+                if (navToggle.getAttribute('aria-expanded') === 'true') {
+                    mainNavList.classList.add('is-open');
+                }
+            }, 0);
         } else {
             mainNavList.style.display = '';
         }
