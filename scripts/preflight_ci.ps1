@@ -34,6 +34,21 @@ function Get-PipAuditAllowlistArgs {
     return " " + (($entries | ForEach-Object { "--ignore-vuln $_" }) -join " ")
 }
 
+function Read-DotEnv([string]$path) {
+    $map = @{}
+    if (-not (Test-Path $path)) { return $map }
+    Get-Content $path | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#")) { return }
+        $parts = $line.Split("=", 2)
+        if ($parts.Count -lt 2) { return }
+        $key = $parts[0].Trim()
+        if (-not $key) { return }
+        $map[$key] = $parts[1]
+    }
+    return $map
+}
+
 $PipAuditAllowlistArgs = Get-PipAuditAllowlistArgs
 
 Write-Host "`n--- Preflight Security & Integrity Checks (PowerShell) ---" -ForegroundColor Cyan
@@ -49,6 +64,34 @@ foreach ($tool in $tools) {
         } else {
             exit 1 
         }
+    }
+}
+
+# Local env alignment: .env (secrets) + .env.vars (non-secrets) should cover .env.template
+$dotEnvPath = Join-Path $PSScriptRoot "..\.env"
+$dotVarsPath = Join-Path $PSScriptRoot "..\.env.vars"
+$dotTemplatePath = Join-Path $PSScriptRoot "..\.env.template"
+$dotEnv = Read-DotEnv $dotEnvPath
+$dotVars = Read-DotEnv $dotVarsPath
+$dotTemplate = Read-DotEnv $dotTemplatePath
+
+if ($dotTemplate.Count -gt 0) {
+    $unknownInEnv = @($dotEnv.Keys | Where-Object { -not $dotTemplate.ContainsKey($_) })
+    if ($unknownInEnv.Count -gt 0) {
+        Write-Host "Warning: .env contains keys not in .env.template (new secrets?):" -ForegroundColor Yellow
+        $unknownInEnv | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+    }
+
+    $unknownInVars = @($dotVars.Keys | Where-Object { -not $dotTemplate.ContainsKey($_) })
+    if ($unknownInVars.Count -gt 0) {
+        Write-Host "Warning: .env.vars contains keys not in .env.template:" -ForegroundColor Yellow
+        $unknownInVars | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+    }
+
+    $missing = @($dotTemplate.Keys | Where-Object { -not $dotEnv.ContainsKey($_) -and -not $dotVars.ContainsKey($_) })
+    if ($missing.Count -gt 0) {
+        Write-Host "Warning: Missing keys from both .env and .env.vars (local config incomplete):" -ForegroundColor Yellow
+        $missing | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
     }
 }
 
@@ -112,6 +155,103 @@ if (-not $SkipCloud -and -not $Offline) {
     } catch {
         Write-Host "Warning: Could not fetch secret list." -ForegroundColor Yellow
     }
+
+    # Validate that secrets/vars referenced in changed files exist in GitHub
+    try {
+        $repoVars = gh variable list --json name,value | ConvertFrom-Json
+        $stagingVars = gh variable list --env staging --json name,value | ConvertFrom-Json
+        $prodVars = gh variable list --env production --json name,value | ConvertFrom-Json
+
+        $repoVarNames = @($repoVars | ForEach-Object { $_.name })
+        $stagingVarNames = @($stagingVars | ForEach-Object { $_.name })
+        $prodVarNames = @($prodVars | ForEach-Object { $_.name })
+        $allVarNames = @($repoVarNames + $stagingVarNames + $prodVarNames | Sort-Object -Unique)
+
+        $changedFiles = @()
+        try {
+            $base = git merge-base HEAD origin/dev 2>$null
+            if ($base) {
+                $changedFiles = git diff --name-only $base HEAD
+            }
+        } catch {
+            $changedFiles = @()
+        }
+        if (-not $changedFiles -or $changedFiles.Count -eq 0) {
+            $changedFiles = git status --porcelain | ForEach-Object {
+                if ($_.Length -ge 4) { $_.Substring(3) } else { $null }
+            }
+        }
+        $changedFiles = $changedFiles | Where-Object { $_ -and (Test-Path $_) }
+
+        $secretRefs = New-Object System.Collections.Generic.HashSet[string]
+        $varRefs = New-Object System.Collections.Generic.HashSet[string]
+
+        foreach ($file in $changedFiles) {
+            try {
+                $content = Get-Content -Raw -Path $file
+            } catch {
+                continue
+            }
+
+            foreach ($m in [regex]::Matches($content, "secrets\.(\w+)", "IgnoreCase")) {
+                [void]$secretRefs.Add($m.Groups[1].Value)
+            }
+            foreach ($m in [regex]::Matches($content, "secrets\\[['\"]([^'\"]+)['\"]\\]", "IgnoreCase")) {
+                [void]$secretRefs.Add($m.Groups[1].Value)
+            }
+
+            foreach ($m in [regex]::Matches($content, "vars\.(\w+)", "IgnoreCase")) {
+                [void]$varRefs.Add($m.Groups[1].Value)
+            }
+            foreach ($m in [regex]::Matches($content, "vars\\[['\"]([^'\"]+)['\"]\\]", "IgnoreCase")) {
+                [void]$varRefs.Add($m.Groups[1].Value)
+            }
+        }
+
+        if ($secretRefs.Count -gt 0) {
+            $missingSecrets = @()
+            foreach ($s in $secretRefs) {
+                if ($s -notin $remoteRepoSecrets -and $s -notin $remoteStagingSecrets -and $s -notin $remoteProdSecrets) {
+                    $missingSecrets += $s
+                }
+            }
+            if ($missingSecrets.Count -gt 0) {
+                Write-Host "Warning: Secrets referenced in changed files missing from GitHub (repo + env):" -ForegroundColor Yellow
+                $missingSecrets | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+            }
+        }
+
+        if ($varRefs.Count -gt 0) {
+            $missingVars = @()
+            foreach ($v in $varRefs) {
+                if ($v -notin $allVarNames) {
+                    $missingVars += $v
+                }
+            }
+            if ($missingVars.Count -gt 0) {
+                Write-Host "Warning: Vars referenced in changed files missing from GitHub (repo + env):" -ForegroundColor Yellow
+                $missingVars | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+            }
+        }
+
+        if ($dotVars.Count -gt 0 -and $allVarNames.Count -gt 0) {
+            $localOnlyVars = @($dotVars.Keys | Where-Object { $_ -notin $allVarNames })
+            if ($localOnlyVars.Count -gt 0) {
+                Write-Host "Warning: .env.vars contains keys not present in GitHub variables (repo + env):" -ForegroundColor Yellow
+                $localOnlyVars | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+            }
+        }
+
+        if ($dotEnv.Count -gt 0) {
+            $localOnlySecrets = @($dotEnv.Keys | Where-Object { $_ -notin $remoteRepoSecrets -and $_ -notin $remoteStagingSecrets -and $_ -notin $remoteProdSecrets })
+            if ($localOnlySecrets.Count -gt 0) {
+                Write-Host "Warning: .env contains secrets not present in GitHub (repo + env):" -ForegroundColor Yellow
+                $localOnlySecrets | Sort-Object -Unique | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+            }
+        }
+    } catch {
+        Write-Host "Warning: Could not validate secrets/vars referenced in changed files." -ForegroundColor Yellow
+    }
 }
 
 # [3/8] Containerized Validation (Lint & Audit)
@@ -161,7 +301,19 @@ if ($SmokeTest) {
         
         Write-Host "Building & Starting CI stack..."
         $env:IMAGE_TAG = "preflight-local"
-        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait
+        docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --build --wait --wait-timeout 180
+        
+        Write-Host "Verifying container health (localhost:5005)..."
+        curl -f --retry 12 --retry-delay 5 --retry-connrefused http://localhost:5005/ | Out-Null
+        curl -f --retry 8 --retry-delay 3 http://localhost:5005/api/home | Out-Null
+
+        Write-Host "Asserting web container health..."
+        $healthStatus = docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app
+        if ($healthStatus -ne "healthy") {
+            Write-Host "flask_web_app did not reach healthy state." -ForegroundColor Red
+            docker logs --tail 200 flask_web_app
+            exit 1
+        }
         
         Write-Host "Seeding..."
         docker exec flask_web_app /app/.venv/bin/python scripts/seed_db.py
@@ -172,8 +324,7 @@ if ($SmokeTest) {
         docker cp pytest.ini flask_web_app:/app/pytest.ini
 
         Write-Host "Running containerized tests (including prod readiness)..."
-        # We explicitly run prod readiness tests to catch 'nginx' resolution issues locally
-        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests/smoke/test_prod_readiness.py /app/tests -m "not e2e and not performance and not heavy"
+        docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
         
         Write-Host "Smoke and functional tests PASSED." -ForegroundColor Green
     } catch {

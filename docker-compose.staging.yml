@@ -37,10 +37,10 @@ services:
         limits:
           memory: 384M
 
-  # Bind Nginx to isolated port 5005 for WSL Runner parity
+  # Bind Nginx to staging port 5001 (Cloudflare tunnel expects this mapping)
   nginx:
     ports:
-      - "5005:80"
+      - "5001:80"
 
   # Staging-specific overrides for MongoDB (Matching Low-Memory Tuning)
   mongo:
