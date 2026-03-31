@@ -130,6 +130,7 @@ commit_message.txt
 constraints.txt
 
 docker-compose.override.yml
+.env.vars
 Phased_plan_DEVOPs.md
 phased_plan_backend.md
 phased_plan_db_fix.md

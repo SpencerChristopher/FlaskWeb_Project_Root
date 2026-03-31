@@ -10,12 +10,12 @@
 8. Optimize Test Suite for CI/Pi:
    - Evaluate moving high-payload integration tests (Profile API, Media) to a post-deploy smoke suite.
    - Keep core CI lightweight to reduce log bloat and save resources on Raspberry Pi.
-9. Enforce Resource Parity (Staging/Prod):
+9. [DONE] Enforce Resource Parity (Staging/Prod):
    - Goal: Make staging behave like Raspberry Pi prod (2GB RAM, ARM64 constraints) without destabilizing data.
-   - Add hard memory limits per service (web/mongo/redis/nginx) in staging/prod compose files.
-   - Prefer real enforcement (`mem_limit`/`cpus`) over `deploy.resources` (non‑Swarm).
-   - Define target budgets per service and document them (docs/DEPLOYMENT.md).
-   - Validate limits locally (WSL) and on staging; watch for OOM/restart loops.
+   - [DONE] Add hard memory limits per service (web/mongo/redis/nginx) in staging/prod compose files.
+   - [DONE] Prefer real enforcement (`mem_limit`/`cpus`) over `deploy.resources` (non‑Swarm).
+   - [DONE] Define target budgets per service and document them (docs/DEPLOYMENT.md).
+   - [DONE] Validate limits locally (WSL) and on staging; watch for OOM/restart loops.
    - Disk: document data growth expectations, ensure volumes persist, and avoid teardown unless explicitly triggered.
 10. Raspberry Pi Storage & Backups:
    - Context: Pi 4 uses 64GB SD for OS/containers.
