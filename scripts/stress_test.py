@@ -51,7 +51,7 @@ def run_load_test(url, concurrent_users, total_requests):
     }
 
 if __name__ == "__main__":
-    TARGET_URL = "https://127.0.0.1/api/bootstrap"
+    TARGET_URL = "http://127.0.0.1:5010/api/bootstrap"
     
     results = []
     # Ramp up to find the breaking point
