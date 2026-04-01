@@ -144,7 +144,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD CLOUDFLARE_TUNNEL_TOKEN DOMAIN_NAME; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD ADMIN_EMAIL MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD CLOUDFLARE_TUNNEL_TOKEN DOMAIN_NAME; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
@@ -167,6 +167,7 @@ jobs:
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
       - name: Seed Database

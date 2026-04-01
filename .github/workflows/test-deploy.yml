@@ -329,6 +329,7 @@ jobs:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
@@ -398,7 +399,7 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD ADMIN_EMAIL MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
@@ -538,6 +539,7 @@ jobs:
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
       - name: Seed Database
