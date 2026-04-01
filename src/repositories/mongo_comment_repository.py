@@ -22,6 +22,14 @@ class MongoCommentRepository(CommentRepository):
                 f"Database error while deleting comments for article {article_id}: {e}"
             ) from e
 
+    def delete_by_author_id(self, author_id: str) -> int:
+        try:
+            return Comment.objects(author=author_id).delete()
+        except PyMongoError as e:
+            raise DatabaseConnectionException(
+                f"Database error while deleting comments for author {author_id}: {e}"
+            ) from e
+
     def save(self, comment: Comment) -> Comment:
         try:
             return comment.save()

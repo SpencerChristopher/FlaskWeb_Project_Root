@@ -1,4 +1,4 @@
-from .auth import UserRegistration, ChangePasswordRequest, UserIdentity
+from .auth import UserRegistration, ChangePasswordRequest, ChangeEmailRequest, UserIdentity
 from .article import ArticleCreateUpdate, ArticlePublic
 from .profile import WorkHistoryItem, ProfileSchema, ProfilePublic
 

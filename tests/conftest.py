@@ -349,3 +349,21 @@ def signal_tracker():
             signal.disconnect(t.handler)
 
     return _tracker
+
+
+@pytest.fixture(autouse=True)
+def mock_turnstile_verification(request, monkeypatch):
+    """
+    Globally mock the external network call to Cloudflare for integration/security tests.
+    Unit tests for TurnstileService are EXEMPT to allow testing failure cases.
+    """
+    # Skip mock for the specific service unit test file
+    if "tests/unit/test_turnstile_service.py" in str(request.node.fspath):
+        return
+
+    from src.services.turnstile_service import TurnstileService
+
+    # We patch the method to always return True for integration/security tests
+    monkeypatch.setattr(
+        TurnstileService, "verify_token", lambda self, token, remote_ip=None: True
+    )

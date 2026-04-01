@@ -25,7 +25,7 @@ from src.extensions import limiter
 from src.exceptions import BadRequestException, UnauthorizedException
 from src.app.security import permission_required
 from src.services.roles import Permissions
-from src.schemas import UserRegistration, ChangePasswordRequest
+from src.schemas import UserRegistration, ChangePasswordRequest, ChangeEmailRequest
 from src.services import get_auth_service
 from src.services import get_turnstile_service
 
@@ -243,3 +243,51 @@ def change_password() -> Response:
     )
 
     return jsonify({"message": "Password updated successfully"}), 200
+
+
+@bp.route("/change-email", methods=["POST"])
+@jwt_required()
+def change_email() -> Response:
+    """
+    Allows a logged-in user to change their email.
+    """
+    data = ChangeEmailRequest(**request.get_json())
+    user_id = get_jwt_identity()
+    auth_service.change_email(
+        user_id=user_id,
+        current_password=data.current_password,
+        new_email=data.new_email,
+    )
+    current_app.logger.info(
+        f"Email successfully changed for user ID: {user_id} from IP: {request.remote_addr}"
+    )
+
+    return jsonify({"message": "Email updated successfully"}), 200
+
+
+@bp.route("/delete-account", methods=["POST"])
+@jwt_required()
+def delete_account() -> Response:
+    """
+    Allows a logged-in user to delete their own account.
+    """
+    data = request.get_json()
+    if not data or not data.get("current_password"):
+        raise BadRequestException("Current password is required for account deletion.")
+
+    user_id = get_jwt_identity()
+    
+    # Phase 3: Invalidate active session in Redis before deletion
+    auth_service.invalidate_session(user_id)
+
+    auth_service.delete_account(
+        user_id=user_id,
+        current_password=data["current_password"],
+    )
+    current_app.logger.info(
+        f"Account successfully deleted for user ID: {user_id} from IP: {request.remote_addr}"
+    )
+
+    response = jsonify({"message": "Account deleted successfully"})
+    unset_jwt_cookies(response)
+    return response, 200

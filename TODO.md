@@ -17,6 +17,14 @@
    - [DONE] Define target budgets per service and document them (docs/DEPLOYMENT.md).
    - [DONE] Validate limits locally (WSL) and on staging; watch for OOM/restart loops.
    - Disk: document data growth expectations, ensure volumes persist, and avoid teardown unless explicitly triggered.
+
+10. [IN PROGRESS] GDPR & Data Sovereignty:
+   - [DONE] Implement "Right to Erasure" (Delete Account) with re-authentication.
+   - [DONE] Implement "Privacy by Design" (Bcrypt, Token Revocation).
+   - [DONE] Implement cascaded cleanup (Comments deleted on User/Article removal).
+   - [TODO] Implement "Right to Portability" (Export user data to JSON).
+   - [TODO] Add a public-facing "Privacy Policy" page explaining data usage (City-level location, limited PII).
+   - [TODO] Enable host-level encryption (LUKS/BitLocker) as documented in review.
 10. Raspberry Pi Storage & Backups:
    - Context: Pi 4 uses 64GB SD for OS/containers.
    - Goal: Add automated MongoDB backups to attached 32GB USB storage volume.

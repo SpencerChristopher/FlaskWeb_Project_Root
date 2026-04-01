@@ -62,7 +62,7 @@ class TestRateLimiting:
         for _ in range(5):
             response = client.post(
                 "/api/contact",
-                json={"name": "test", "email": "test@example.com", "message": "hello"},
+                json={"name": "test", "email": "test@example.com", "message": "hello", "turnstile_token": "dummy"},
             )
             assert response.status_code == 200  # Expecting 200 OK for valid submission
 
@@ -86,7 +86,7 @@ class TestRateLimiting:
         for _ in range(5):
             response = client.post(
                 "/api/contact",
-                json={"name": "test", "email": "test1@example.com", "message": "hello"},
+                json={"name": "test", "email": "test1@example.com", "message": "hello", "turnstile_token": "dummy"},
                 headers=ip1_headers,
             )
             assert response.status_code == 200
@@ -106,7 +106,7 @@ class TestRateLimiting:
         for _ in range(5):
             response = client.post(
                 "/api/contact",
-                json={"name": "test", "email": "test2@example.com", "message": "hello"},
+                json={"name": "test", "email": "test2@example.com", "message": "hello", "turnstile_token": "dummy"},
                 headers=ip2_headers,
             )
             assert response.status_code == 200

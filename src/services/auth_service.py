@@ -215,6 +215,46 @@ class AuthService:
         self._user_repository.save(user)
         self._invalidate_cached_version(user_id)
 
+    def change_email(
+        self, *, user_id: str, current_password: str, new_email: str
+    ) -> None:
+        """Change a user's email and increment their token version.
+
+        Requires re-authentication with current password.
+
+        Args:
+            user_id: ID of the user changing their email.
+            current_password: The existing plaintext password for verification.
+            new_email: The new email address.
+
+        Raises:
+            UnauthorizedException: If the current password is incorrect.
+        """
+        user = self.get_user_or_raise(user_id)
+        if not user.check_password(current_password):
+            raise UnauthorizedException("Invalid current password")
+
+        user.email = new_email
+        user.token_version = (user.token_version or 0) + 1
+        self._user_repository.save(user)
+        self._invalidate_cached_version(user_id)
+
+    def delete_account(self, *, user_id: str, current_password: str) -> None:
+        """Permanently delete the user's own account after re-authentication.
+
+        Args:
+            user_id: ID of the user deleting their account.
+            current_password: The existing plaintext password for verification.
+
+        Raises:
+            UnauthorizedException: If the current password is incorrect.
+        """
+        user = self.get_user_or_raise(user_id)
+        if not user.check_password(current_password):
+            raise UnauthorizedException("Invalid current password")
+
+        self.delete_user(user_id=user_id)
+
     def change_role(self, *, user_id: str, role: str) -> User:
         """Update a user's role and increment their token version.
 

@@ -25,6 +25,11 @@ class ChangePasswordRequest(BaseModel):
         return password_strength_validator(cls, v, info)
 
 
+class ChangeEmailRequest(BaseModel):
+    current_password: str
+    new_email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
+
 class UserIdentity(BaseModel):
     id: str
     username: str

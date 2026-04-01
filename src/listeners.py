@@ -40,6 +40,34 @@ def cleanup_comments_on_article_delete(sender, **kwargs):
         )
 
 
+def cleanup_user_data_on_delete(sender, **kwargs):
+    """
+    GDPR Cleanup: Listener that deletes all data associated with a deleted user.
+    """
+    user_id = kwargs.get("user_id")
+    if not user_id:
+        return
+
+    from src.repositories import get_comment_repository
+
+    comment_repo = get_comment_repository()
+    try:
+        # Assuming delete_by_author_id exists or we add it to the interface
+        # For now, we'll log it as a placeholder if the repo doesn't have it yet
+        if hasattr(comment_repo, "delete_by_author_id"):
+            count = comment_repo.delete_by_author_id(user_id)
+            current_app.logger.info(
+                f"GDPR Cleanup: Deleted {count} comments for user_id={user_id}"
+            )
+        else:
+            current_app.logger.warning(
+                f"GDPR Cleanup: Repository {type(comment_repo)} lacks delete_by_author_id. "
+                f"Comments for user_id={user_id} may be orphaned."
+            )
+    except Exception as e:
+        logger.error("GDPR Cleanup failed for user_id %s: %s", user_id, e, exc_info=True)
+
+
 def log_blinker_event(sender, **kwargs):
     """A generic listener that logs all dispatched Blinker events."""
     event_name = kwargs.get("event_type", "unknown_signal")
@@ -66,3 +94,4 @@ article_deleted.connect(log_blinker_event)
 article_deleted.connect(cleanup_comments_on_article_delete)
 user_logged_in.connect(log_blinker_event)
 user_deleted.connect(log_blinker_event)
+user_deleted.connect(cleanup_user_data_on_delete)

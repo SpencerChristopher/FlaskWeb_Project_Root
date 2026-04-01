@@ -10,8 +10,8 @@ def test_contact_api_csrf_exemption(client):
         "name": "Spammer",
         "email": "spam@example.com",
         "message": "Bulk spam message",
+        "turnstile_token": "dummy-token"
     }
-
     # Attempt Article without CSRF token
     response = client.post("/api/contact", json=payload)
 

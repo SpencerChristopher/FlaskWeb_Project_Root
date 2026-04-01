@@ -199,7 +199,7 @@ export const ProfileView = {
 
                         <!-- Security Tab -->
                         <div class="tab-pane fade" id="tab-security">
-                            <div class="row justify-content-center">
+                            <div class="row g-4">
                                 <div class="col-lg-6">
                                     <div class="card border-0 shadow-sm rounded-4 bg-white">
                                         <div class="card-header bg-white border-bottom p-4">
@@ -228,7 +228,61 @@ export const ProfileView = {
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <div class="col-lg-6">
+                                    <div class="card border-0 shadow-sm rounded-4 bg-white mb-4">
+                                        <div class="card-header bg-white border-bottom p-4">
+                                            <h5 class="mb-0 fw-bold"><i class="bi bi-envelope mr-2"></i> Change Email</h5>
+                                        </div>
+                                        <div class="card-body p-4">
+                                            <form id="changeEmailForm">
+                                                <div class="mb-3">
+                                                    <label class="form-label small fw-bold">Current Email</label>
+                                                    <input type="email" class="form-control" value="${auth.user?.email || ""}" readonly disabled>
+                                                </div>
+                                                <div class="mb-4">
+                                                    <label class="form-label small fw-bold">New Email Address</label>
+                                                    <input type="email" id="new-email" class="form-control" required>
+                                                </div>
+                                                <div id="email-error" class="alert alert-danger mb-3" style="display:none;"></div>
+                                                <div id="email-success" class="alert alert-success mb-3" style="display:none;">Email updated successfully!</div>
+                                                <button type="submit" class="btn btn-outline-dark w-100 rounded-pill py-3">Update Email Address</button>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <div class="card border-danger shadow-sm rounded-4 bg-white">
+                                        <div class="card-header bg-white border-bottom p-4 text-danger">
+                                            <h5 class="mb-0 fw-bold"><i class="bi bi-exclamation-triangle mr-2"></i> Danger Zone</h5>
+                                        </div>
+                                        <div class="card-body p-4">
+                                            <p class="small text-muted mb-4">Permanently delete your account and all associated data. This action is irreversible.</p>
+                                            <button type="button" id="delete-account-btn" class="btn btn-outline-danger w-100 rounded-pill py-3">Delete My Account</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Re-authentication Modal (Shared for Email Change / Deletion) -->
+                <div id="reauth-modal" class="modal-overlay" style="display:none;">
+                    <div class="modal-content card shadow-lg border-0 rounded-4" style="max-width: 450px;">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center">
+                            <h5 class="fw-bolder mb-0" id="reauth-modal-title">Confirm Identity</h5>
+                            <button type="button" class="btn-close" id="close-reauth-modal"></button>
+                        </div>
+                        <div class="card-body p-4 text-center">
+                            <p id="reauth-message" class="mb-4">Please confirm your current password to proceed with this sensitive action.</p>
+                            <form id="reauthForm">
+                                <input type="password" id="reauth-password" class="form-control form-control-lg mb-3" placeholder="Current Password" required>
+                                <div id="reauth-error" class="alert alert-danger mb-3 small" style="display:none;"></div>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" class="btn btn-danger flex-grow-1 py-3 rounded-pill" id="reauth-confirm-btn">Confirm & Execute</button>
+                                    <button type="button" class="btn btn-light px-4 rounded-pill" id="cancel-reauth-modal">Cancel</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -580,6 +634,89 @@ export const ProfileView = {
             } catch (err) {
                 errorEl.textContent = err.message;
                 errorEl.style.display = 'block';
+            }
+        };
+
+        // --- Re-authentication & Advanced Security Actions ---
+        const reauthModal = document.getElementById('reauth-modal');
+        const reauthForm = document.getElementById('reauthForm');
+        const reauthError = document.getElementById('reauth-error');
+        const changeEmailForm = document.getElementById('changeEmailForm');
+        const deleteAccountBtn = document.getElementById('delete-account-btn');
+        
+        let reauthContext = null; // 'email' or 'delete'
+
+        const openReauthModal = (context) => {
+            reauthContext = context;
+            const titleEl = document.getElementById('reauth-modal-title');
+            const messageEl = document.getElementById('reauth-message');
+            const confirmBtn = document.getElementById('reauth-confirm-btn');
+
+            if (context === 'delete') {
+                titleEl.textContent = 'Permanently Delete Account?';
+                messageEl.innerHTML = '<strong class="text-danger">Warning:</strong> This will delete your profile, work history, and all comments. This cannot be undone.';
+                confirmBtn.className = 'btn btn-danger flex-grow-1 py-3 rounded-pill';
+                confirmBtn.textContent = 'Confirm Permanent Deletion';
+            } else {
+                titleEl.textContent = 'Confirm Email Change';
+                messageEl.textContent = 'Please enter your password to authorize updating your account email address.';
+                confirmBtn.className = 'btn btn-dark flex-grow-1 py-3 rounded-pill';
+                confirmBtn.textContent = 'Authorize Update';
+            }
+
+            reauthError.style.display = 'none';
+            reauthForm.reset();
+            reauthModal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        };
+
+        const closeReauthModal = () => {
+            reauthModal.style.display = 'none';
+            document.body.style.overflow = '';
+            reauthContext = null;
+        };
+
+        document.getElementById('close-reauth-modal').onclick = closeReauthModal;
+        document.getElementById('cancel-reauth-modal').onclick = closeReauthModal;
+
+        changeEmailForm.onsubmit = (e) => {
+            e.preventDefault();
+            document.getElementById('email-error').style.display = 'none';
+            document.getElementById('email-success').style.display = 'none';
+            openReauthModal('email');
+        };
+
+        deleteAccountBtn.onclick = () => {
+            openReauthModal('delete');
+        };
+
+        reauthForm.onsubmit = async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('reauth-password').value;
+            reauthError.style.display = 'none';
+
+            try {
+                if (reauthContext === 'email') {
+                    const newEmail = document.getElementById('new-email').value;
+                    await fetchAPI('/api/auth/change-email', {
+                        method: 'POST',
+                        body: JSON.stringify({ current_password: password, new_email: newEmail })
+                    });
+                    document.getElementById('email-success').style.display = 'block';
+                    // Optional: Update local user object if stored in memory
+                    closeReauthModal();
+                } else if (reauthContext === 'delete') {
+                    await fetchAPI('/api/auth/delete-account', {
+                        method: 'POST',
+                        body: JSON.stringify({ current_password: password })
+                    });
+                    // Success means we are logged out and account is gone
+                    alert('Your account has been permanently deleted. Goodbye.');
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                reauthError.textContent = err.message;
+                reauthError.style.display = 'block';
             }
         };
     }
