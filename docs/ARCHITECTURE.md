@@ -75,9 +75,19 @@ graph LR
 ### A. The "Double Gate" Authorization
 To balance performance and security, we use a two-step validation:
 1.  **Gate 1 (JWT Claims):** Fast, stateless check of permissions stored in the token.
-2.  **Gate 2 (DB Sync):** Verifies the `token_version` against the database. If a user changes their password or role, the version increments, instantly invalidating all existing JWTs.
+2.  **Gate 2 (DB Sync):** Verifies the `token_version` against the database. If a user changes their password, **email**, or role, the version increments, instantly invalidating all existing JWTs.
 
-### B. Interface-Based Mocking
+### B. The "Right to Erasure" (GDPR Cleanup)
+To ensure compliance with GDPR and maintain data integrity, the system implements a **Cascaded Deletion** pattern:
+1.  **The Trigger:** A user deletes their account via `/api/auth/delete-account` (requires re-authentication).
+2.  **The Signal:** `AuthService` dispatches a `user_deleted` signal.
+3.  **The Listeners:** Decoupled listeners in `src/listeners.py` catch the signal and perform atomic cleanup of all associated data:
+    *   **Comments**: Permanently deleted from the `comments` collection.
+    *   **Profile**: Personal information and work history are removed.
+    *   **Session**: The active session is invalidated in Redis.
+This decoupling ensures that the core `AuthService` remains focused on identity, while side-effect cleanup logic is managed by the listeners.
+
+### C. Interface-Based Mocking
 For testing stability, we mandate mocking at the **Repository Interface** level. 
 *   **Do not** mock `mongoengine.Document.objects`.
 *   **Do** mock `service._article_repository`.

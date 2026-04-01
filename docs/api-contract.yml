@@ -110,6 +110,26 @@ endpoints:
     body:
       required: [message]
 
+  - method: POST
+    path: /api/auth/change-email
+    status: 200
+    security: jwt_required
+    description: Change email for current user. Requires re-authentication.
+    request_body:
+      required: [current_password, new_email]
+    body:
+      required: [message]
+
+  - method: POST
+    path: /api/auth/delete-account
+    status: 200
+    security: jwt_required
+    description: Permanently delete current user account. Requires re-authentication.
+    request_body:
+      required: [current_password]
+    body:
+      required: [message]
+
   # --- Public Blog Content ---
   - method: GET
     path: /api/blog
