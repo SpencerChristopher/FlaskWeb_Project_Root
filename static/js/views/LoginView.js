@@ -65,5 +65,20 @@ export const LoginView = {
             });
         }
         form.addEventListener('submit', onLogin, { signal: context.signal });
+
+        // Handle security reason messages
+        const params = new URLSearchParams(window.location.search);
+        const reason = params.get('reason');
+        const msgEl = form.querySelector('[data-test="login-message"]');
+        
+        if (msgEl) {
+            if (reason === 'session_expired') {
+                msgEl.textContent = 'Session expired. Please login again.';
+                msgEl.className = 'small text-warning';
+            } else if (reason === 'session_invalidated') {
+                msgEl.textContent = 'For your security, you have been logged out after a credential change.';
+                msgEl.className = 'small text-danger';
+            }
+        }
     },
 };

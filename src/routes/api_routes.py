@@ -195,6 +195,59 @@ def license_api() -> Response:
     )
 
 
+@bp.route("/privacy", methods=["GET"])
+def privacy_api() -> Response:
+    """Return the privacy policy information.
+
+    Returns:
+        Response: JSON payload with privacy policy details.
+    """
+    return jsonify(
+        {
+            "title": "Privacy Policy",
+            "last_updated": "2026-04-01",
+            "sections": [
+                {
+                    "heading": "Data Sovereignty & GDPR",
+                    "content": (
+                        "Spencer's Cooking is committed to data privacy and the 'Right to be Forgotten.' "
+                        "All data processing is conducted within the EU/UK region."
+                    ),
+                },
+                {
+                    "heading": "Data Collection",
+                    "content": (
+                        "We collect minimal PII: Email (for account identification), "
+                        "User Profiles (optional work history), and Comments. "
+                        "Standard access logs (IP address, User Agent) are captured by our infrastructure."
+                    ),
+                },
+                {
+                    "heading": "Third-Party Processors",
+                    "content": (
+                        "We use Cloudflare for DDoS protection and Edge security. "
+                        "Requests may be processed by Cloudflare's global network according to their privacy policy."
+                    ),
+                },
+                {
+                    "heading": "Retention & Deletion",
+                    "content": (
+                        "Account data is kept until you request deletion via the Security tab in your profile. "
+                        "Deleting an account instantly wipes all associated comments and profile data."
+                    ),
+                },
+                {
+                    "heading": "Your Rights",
+                    "content": (
+                        "You have the right to access, rectify, or erase your personal data. "
+                        "Contact us if you require a portable export of your data."
+                    ),
+                },
+            ],
+        }
+    )
+
+
 @bp.route("/contact", methods=["POST"])
 @limiter.limit("5 per minute")
 def contact_api() -> Response:

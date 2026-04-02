@@ -82,6 +82,7 @@ async function fetchAPI(url, options = {}) {
                 console.error('Silent refresh failed:', refreshErr);
             }
             auth.logout(); // Use service to notify listeners
+            navigate('/login?reason=session_expired');
             throw new Error('Session expired. Please login again.');
         }
 
@@ -90,6 +91,7 @@ async function fetchAPI(url, options = {}) {
             auth.user = null;
             auth.loggedIn = false;
             auth.notify();
+            navigate('/login?reason=session_invalidated');
             throw new Error('Session invalidated.');
         }
 
@@ -238,6 +240,7 @@ const ROUTES = {
     '/admin/articles': { module: './js/views/ContentManagerView.js', name: 'ContentManagerView', auth: true },
     '/about': { module: './js/views/AboutView.js', name: 'AboutView', fetch: () => fetchAPI('/api/about') },
     '/license': { module: './js/views/LicenseView.js', name: 'LicenseView', fetch: () => fetchAPI('/api/license') },
+    '/privacy': { module: './js/views/PrivacyView.js', name: 'PrivacyView', fetch: () => fetchAPI('/api/privacy') },
     '/contact': { module: './js/views/ContactView.js', name: 'ContactView' },
 };
 

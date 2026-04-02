@@ -18,20 +18,27 @@
    - [DONE] Validate limits locally (WSL) and on staging; watch for OOM/restart loops.
    - Disk: document data growth expectations, ensure volumes persist, and avoid teardown unless explicitly triggered.
 
-10. [IN PROGRESS] GDPR & Data Sovereignty:
+10. [DONE] GDPR & Data Sovereignty:
    - [DONE] Implement "Right to Erasure" (Delete Account) with re-authentication.
    - [DONE] Implement "Privacy by Design" (Bcrypt, Token Revocation).
    - [DONE] Implement cascaded cleanup (Comments deleted on User/Article removal).
+   - [DONE] Add a public-facing "Privacy Policy" page explaining data usage.
    - [TODO] Implement "Right to Portability" (Export user data to JSON).
-   - [TODO] Add a public-facing "Privacy Policy" page explaining data usage (City-level location, limited PII).
    - [TODO] Enable host-level encryption (LUKS/BitLocker) as documented in review.
-10. Raspberry Pi Storage & Backups:
+11. [DONE] Raspberry Pi Storage & Backups:
    - Context: Pi 4 uses 64GB SD for OS/containers.
    - Goal: Add automated MongoDB backups to attached 32GB USB storage volume.
-   - Define backup retention + rotation (e.g., daily + keep last N).
-   - Ensure backups run before any destructive reset (hard_rebuild) and on a schedule.
-   - Document restore procedure and verify backups are readable.
-11. Review Architectural Patterns for Multi-User Transition:
+   - [DONE] Define backup retention + rotation logic in deployment scripts.
+   - [DONE] Ensure backups run before any destructive reset and on a schedule.
+   - [TODO] Document restore procedure and verify backups are readable.
+
+12. Security & Identity Hardening:
+   - [DONE] Cloudflare Zero Trust (Access): Easiest 2FA/Identity solution. Enforce email OTP/Social IdP at the edge to protect `/api/auth/login` and management routes.
+   - [TODO] Native TOTP (Google Authenticator): Add as "Defense in Depth" backup to Zero Trust.
+     - Note: Requires NTP (Network Time Protocol) on Raspberry Pi to prevent clock drift issues.
+     - Strategy: Implement using `pyotp` with a ±1 verification window.
+
+13. Review Architectural Patterns for Multi-User Transition:
    - Current state: Single-admin content model where the Admin is the only provider.
    - Requirement: Future migration to "True User Access" (Comments, User-Generated Content).
    - Task: Review Backend Singletons and Frontend Factory/Observer patterns to ensure they scale for multiple resource owners.

@@ -9,6 +9,11 @@ services:
     depends_on:
       nginx:
         condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -24,6 +29,11 @@ services:
     depends_on:
       web:
         condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # Staging-specific overrides for the Web App (Matching Low-Memory Tuning)
   web:
@@ -34,6 +44,11 @@ services:
       CORS_ORIGINS: https://staging.spencerscooking.uk
       GUNICORN_WORKERS: 1
       GUNICORN_THREADS: 1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -45,6 +60,11 @@ services:
   nginx:
     ports:
       - "5001:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -55,6 +75,11 @@ services:
   # Staging-specific overrides for MongoDB (Matching Low-Memory Tuning)
   mongo:
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:
@@ -64,6 +89,11 @@ services:
 
   # Staging-specific overrides for Redis
   redis:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     deploy:
       resources:
         limits:

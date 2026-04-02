@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Determine deployment environment and compose files
 DEPLOY_ENV="${DEPLOY_ENV:-staging}"
+USB_BACKUP_DIR="${USB_BACKUP_DIR:-/mnt/usb-storage/backups}"
 echo "Deploying to environment: ${DEPLOY_ENV}"
 
 if [ "${DEPLOY_ENV}" = "production" ]; then
@@ -17,8 +18,14 @@ backup_before_reset() {
     return 0
   fi
 
-  mkdir -p backups
-  backup_path="backups/mongo-pre-reset-$(date +%Y%m%d-%H%M%S).archive.gz"
+  # Determine backup path (prefer USB storage if mounted)
+  local target_dir="backups"
+  if mountpoint -q "/mnt/usb-storage" 2>/dev/null; then
+      target_dir="${USB_BACKUP_DIR}"
+  fi
+  mkdir -p "${target_dir}"
+
+  backup_path="${target_dir}/mongo-pre-reset-$(date +%Y%m%d-%H%M%S).archive.gz"
   echo "Creating MongoDB backup at ${backup_path}..."
   if docker exec mongodb sh -lc 'mongodump --archive --gzip --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin' > "${backup_path}"; then
     echo "MongoDB backup completed."
@@ -153,3 +160,8 @@ if ! verify_mongo_auth_ping; then
 fi
 
 echo "Deployment complete."
+
+if [ "${DEPLOY_PRUNE_IMAGES:-false}" = "true" ]; then
+  echo "Pruning unused Docker images..."
+  docker image prune -af
+fi
