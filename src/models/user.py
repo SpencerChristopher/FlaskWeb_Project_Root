@@ -18,6 +18,7 @@ class User(db.Document):
     Represents a user in the application, providing authentication methods.
     Inherits from db.Document to be a MongoEngine model.
     """
+
     username = db.StringField(required=True, unique=True, max_length=80)
     email = db.EmailField(required=True, unique=True)
     password_hash = db.StringField(required=True)
@@ -30,15 +31,11 @@ class User(db.Document):
 
     def set_password(self, password: str) -> None:
         """Hashes the provided password and sets it for the user."""
-        self.password_hash = bcrypt.generate_password_hash(password).decode(
-            'utf-8'
-        )
+        self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password: str) -> bool:
         """Checks if the provided password matches the user's hashed password."""
-        return bcrypt.check_password_hash(
-            self.password_hash, password
-        )
+        return bcrypt.check_password_hash(self.password_hash, password)
 
     def to_dict(self) -> dict:
         """
@@ -48,10 +45,7 @@ class User(db.Document):
             "id": str(self.id),
             "username": self.username,
             "email": self.email,
-            "role": self.role
+            "role": self.role,
         }
 
-    meta = {
-        'collection': 'users',
-        'indexes': ['username', 'email']
-    }
+    meta = {"collection": "users", "indexes": ["username", "email"]}

@@ -4,10 +4,12 @@ Utility module for setting up application logging.
 This module provides a function to configure logging for the Flask application,
 including file rotation and console output.
 """
+
 import logging
 import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
+
 
 def setup_logging(app):
     """
@@ -23,17 +25,17 @@ def setup_logging(app):
     Returns:
         logging.Logger: The configured logger instance.
     """
-    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+    log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
     numeric_level = getattr(logging, log_level, logging.INFO)
 
     # Ensure the logs directory exists
-    log_dir = Path(app.root_path).parent / 'logs'
+    log_dir = Path(app.root_path).parent / "logs"
     log_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
 
-    log_file = log_dir / 'app.log'
+    log_file = log_dir / "app.log"
 
     # Create a logger
-    logger = logging.getLogger() # Get the root logger
+    logger = logging.getLogger()  # Get the root logger
     logger.setLevel(numeric_level)
 
     # Create handlers
@@ -46,7 +48,9 @@ def setup_logging(app):
     console_handler.setLevel(numeric_level)
 
     # Create formatters and add them to handlers
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 

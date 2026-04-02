@@ -21,5 +21,5 @@ The system maps roles to a set of granular permissions.
 
 ## Implementation Rules
 1. **Deny by Default:** If a permission check is required but the user role has no matching permission, access is denied.
-2. **Resource Focus:** Authorization is checked at the Service layer using the resource ID (e.g., `is_owner(user_id, post_id)` for authors).
+2. **Resource Focus:** Authorization is checked at the Service layer using the resource ID (e.g., `is_owner(user_id, article_id)` for authors).
 3. **Stateless Claims:** Permissions are derived from the `role` claim in the JWT to minimize database lookups, but verified against `token_version` for immediate revocation.

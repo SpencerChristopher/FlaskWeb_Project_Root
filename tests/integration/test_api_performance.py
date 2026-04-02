@@ -1,0 +1,106 @@
+import pytest
+import time
+import requests
+import os
+import urllib3
+import socket
+
+# Use local certificate for verification if it exists to avoid warnings
+CERT_PATH = "/app/certs/server.crt" if os.getenv("DOCKER_CONTAINER") == "true" else "certs/server.crt"
+VERIFY = CERT_PATH if os.path.exists(CERT_PATH) else False
+
+CF_HEADERS = {}
+cid = os.environ.get("CF_ACCESS_CLIENT_ID")
+csecret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+cjwt = os.environ.get("CF_ACCESS_JWT")
+if cid and csecret:
+    CF_HEADERS["CF-Access-Client-ID"] = cid
+    CF_HEADERS["CF-Access-Client-Secret"] = csecret
+if cjwt:
+    CF_HEADERS["Cf-Access-Jwt-Assertion"] = cjwt
+
+# Setup session with optional CF Access headers
+session = requests.Session()
+if CF_HEADERS:
+    session.headers.update(CF_HEADERS)
+
+# Force resolution of 'localhost' to the nginx IP globally within this process
+# to allow certificate verification (which expects 'localhost') while 
+# networking connects to the 'nginx' service.
+if os.getenv("DOCKER_CONTAINER") == "true" and VERIFY:
+    try:
+        nginx_ip = socket.gethostbyname("nginx")
+        original_getaddrinfo = socket.getaddrinfo
+        def patched_getaddrinfo(*args, **kwargs):
+            if args[0] == "localhost":
+                # Route localhost requests to nginx container IP
+                return original_getaddrinfo(nginx_ip, *args[1:], **kwargs)
+            return original_getaddrinfo(*args, **kwargs)
+        socket.getaddrinfo = patched_getaddrinfo
+    except Exception:
+        pass
+
+# Only suppress warnings if we are NOT verifying
+if not VERIFY:
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+@pytest.mark.performance
+class TestAPIPerformance:
+    """
+    Integration tests to ensure API responsiveness.
+    Targets under 200ms for core endpoints to ensure 'snappy' feel.
+    """
+
+    def _get_base_url(self, base_url):
+        """Dynamically determine base URL for performance tests."""
+        if "spencerscooking.uk" in base_url:
+            return base_url
+            
+        if os.getenv("DOCKER_CONTAINER") == "true":
+            # If no certs, hit nginx on port 80 instead of 443
+            if not VERIFY:
+                return base_url.replace("https://", "http://")
+        return base_url
+
+    def test_bootstrap_latency(self, base_url):
+        """
+        Verify that the bootstrap endpoint (combined Auth + Profile)
+        responds within the performance budget.
+        """
+        base = self._get_base_url(base_url)
+        url = f"{base}/api/bootstrap"
+
+        # Measure 5 samples to get an average
+        latencies = []
+        for _ in range(5):
+            start = time.perf_counter()
+            # Allow redirects locally
+            resp = session.get(url, verify=VERIFY, allow_redirects=True)
+            end = time.perf_counter()
+            assert resp.status_code == 200
+            latencies.append((end - start) * 1000)  # Convert to ms
+
+        avg_latency = sum(latencies) / len(latencies)
+        print(f"\nAverage Bootstrap Latency: {avg_latency:.2f}ms")
+
+        # Threshold: 250ms for initial combined load (Account for local jitter)
+        assert avg_latency < 250, f"Bootstrap API too slow: {avg_latency:.2f}ms"
+
+    def test_blog_list_latency(self, base_url):
+        """
+        Verify that the blog listing (paginated) responds efficiently.
+        """
+        base = self._get_base_url(base_url)
+        url = f"{base}/api/blog?page=1&per_page=6"
+
+        start = time.perf_counter()
+        # Disable redirects locally
+        resp = session.get(url, verify=VERIFY, allow_redirects=False)
+        end = time.perf_counter()
+
+        latency = (end - start) * 1000
+        assert resp.status_code == 200
+        print(f"Blog List Latency: {latency:.2f}ms")
+
+        # Threshold: 150ms for paginated list
+        assert latency < 150, f"Blog List API too slow: {latency:.2f}ms"

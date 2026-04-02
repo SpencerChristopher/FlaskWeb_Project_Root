@@ -17,8 +17,10 @@ from src.utils.logger import setup_logging
 
 
 def load_environment() -> None:
-    """Load environment variables from the local environment and .env file."""
-    load_dotenv()
+    """Load environment variables from the local environment, .env, and config.env files."""
+    # Load config.env first so that .env can override its values (secrets vs defaults)
+    load_dotenv("config.env")
+    load_dotenv(".env")
 
 
 def create_flask_app(import_name: str) -> Flask:
@@ -33,6 +35,10 @@ def create_flask_app(import_name: str) -> Flask:
 
 def configure_proxy_fix(app: Flask) -> None:
     """Apply ProxyFix based on trusted proxy hop configuration."""
+    # Skip ProxyFix in local testing unless explicitly requested
+    if app.config.get("TESTING") and os.environ.get("FORCE_PROXY_FIX") != "true":
+        return
+
     proxy_x_for = int(os.environ.get("PROXY_FIX_X_FOR", "1"))
     proxy_x_proto = int(os.environ.get("PROXY_FIX_X_PROTO", "1"))
     proxy_x_host = int(os.environ.get("PROXY_FIX_X_HOST", "1"))
@@ -62,13 +68,16 @@ def configure_core_runtime(app: Flask) -> None:
     mongo_pass = os.environ.get("MONGO_APP_PASSWORD", "password")
     mongo_host = os.environ.get("MONGO_HOST", "mongo")
     mongo_db = os.environ.get("MONGO_APP_DB", "appdb")
-    
+
     # Check if testing mode is active to use test database
-    if app.config.get("TESTING"):
+    is_testing = bool(
+        app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST")
+    )
+    if is_testing:
         mongo_db = os.environ.get("MONGO_TEST_DB", "pytest_appdb")
 
     mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host}:27017/{mongo_db}?authSource={os.environ.get('MONGO_APP_DB', 'appdb')}"
-    
+
     # Configure Redis URL
     redis_host = os.environ.get("REDIS_HOST", "redis")
     redis_pass = os.environ.get("REDIS_PASSWORD", "changeme")
@@ -79,7 +88,9 @@ def configure_core_runtime(app: Flask) -> None:
     app.config["MONGODB_SETTINGS"] = {
         "host": mongo_uri,
         "uuidRepresentation": "standard",
-        "serverSelectionTimeoutMS": int(os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", 10000)),
+        "serverSelectionTimeoutMS": int(
+            os.environ.get("MONGO_SERVER_SELECTION_TIMEOUT_MS", 10000)
+        ),
         "connectTimeoutMS": int(os.environ.get("MONGO_CONNECT_TIMEOUT_MS", 10000)),
         "socketTimeoutMS": int(os.environ.get("MONGO_SOCKET_TIMEOUT_MS", 10000)),
     }
@@ -93,7 +104,9 @@ def configure_core_runtime(app: Flask) -> None:
 
     for i in range(max_db_retries):
         try:
-            app.logger.info(f"Attempting to connect to MongoDB (attempt {i + 1}/{max_db_retries})...")
+            app.logger.info(
+                f"Attempting to connect to MongoDB (attempt {i + 1}/{max_db_retries})..."
+            )
             if check_db_connection(app):
                 db_connected = True
                 break
@@ -102,15 +115,20 @@ def configure_core_runtime(app: Flask) -> None:
                 f"MongoDB connection failed: {err}. Retrying in {db_retry_delay_seconds} seconds..."
             )
         except Exception as err:
-            app.logger.error(f"An unexpected error occurred during database initialization: {err}")
+            app.logger.error(
+                f"An unexpected error occurred during database initialization: {err}"
+            )
             break
         time.sleep(db_retry_delay_seconds)
 
     if not db_connected:
-        app.logger.critical("Failed to connect to MongoDB after multiple retries. Exiting application.")
-        raise ConnectionError("Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status.")
+        app.logger.critical(
+            "Failed to connect to MongoDB after multiple retries. Exiting application."
+        )
+        raise ConnectionError(
+            "Failed to connect to MongoDB. Please check MONGO_URI and MongoDB server status."
+        )
 
     # Ensure media upload directory exists
     upload_dir = Path(app.static_folder) / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True, mode=0o755)
-

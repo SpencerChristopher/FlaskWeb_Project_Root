@@ -1,0 +1,102 @@
+services:
+  # The Cloudflare Tunnel connector for Staging
+  cloudflared:
+    image: cloudflare/cloudflared:latest@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
+    container_name: cloudflared_tunnel
+    restart: unless-stopped
+    # --no-tls-verify allows connection to staging's self-signed Nginx certificates.
+    command: tunnel --no-autoupdate --no-tls-verify run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      nginx:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+
+  # Thin helper to ensure Playwright browsers are available for staging e2e runs
+  playwright-install:
+    image: ${IMAGE_TAG:?IMAGE_TAG required}
+    command: ["/bin/sh", "-c", ". /app/.venv/bin/activate && playwright install chromium --with-deps"]
+    profiles: ["e2e-install"]
+    depends_on:
+      web:
+        condition: service_started
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Staging-specific overrides for the Web App (Matching Low-Memory Tuning)
+  web:
+    environment:
+      FLASK_ENV: production
+      TALISMAN_FORCE_HTTPS: "true"
+      JWT_COOKIE_SECURE: "true"
+      CORS_ORIGINS: https://staging.spencerscooking.uk
+      GUNICORN_WORKERS: 1
+      GUNICORN_THREADS: 1
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+
+  # Bind Nginx to staging port 5001 (Cloudflare tunnel expects this mapping)
+  nginx:
+    ports:
+      - "5001:80"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 16M
+
+  # Staging-specific overrides for MongoDB (Matching Low-Memory Tuning)
+  mongo:
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Staging-specific overrides for Redis
+  redis:
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+        reservations:
+          memory: 16M

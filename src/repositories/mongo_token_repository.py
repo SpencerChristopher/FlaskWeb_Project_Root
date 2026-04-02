@@ -19,10 +19,16 @@ class MongoTokenRepository(TokenRepository):
         try:
             return TokenBlocklist.objects(jti=jti).first() is not None
         except PyMongoError as e:
-            raise DatabaseConnectionException(f"Database error while checking token jti={jti}: {e}") from e
+            raise DatabaseConnectionException(
+                f"Database error while checking token jti={jti}: {e}"
+            ) from e
 
-    def add_to_blocklist(self, jti: str, expires_at: datetime.datetime, ttl: Optional[int] = None) -> None:
+    def add_to_blocklist(
+        self, jti: str, expires_at: datetime.datetime, ttl: Optional[int] = None
+    ) -> None:
         try:
             TokenBlocklist(jti=jti, expires_at=expires_at).save()
         except PyMongoError as e:
-            raise DatabaseConnectionException(f"Database error while blocklisting token jti={jti}: {e}") from e
+            raise DatabaseConnectionException(
+                f"Database error while blocklisting token jti={jti}: {e}"
+            ) from e

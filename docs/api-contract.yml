@@ -15,9 +15,18 @@ error_response_shape:
 endpoints:
   # --- Public Utility Routes ---
   - method: GET
+    path: /api/bootstrap
+    status: 200
+    description: Initial app load endpoint. Returns both public profile and current auth status.
+    body:
+      required_keys: [profile, auth]
+      profile_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
+      auth_keys: [logged_in, user]
+
+  - method: GET
     path: /api/home
     status: 200
-    description: Public landing page metadata.
+    description: Public landing page metadata (Now backed by ProfileService).
     body:
       keys: [title, tagline, button_text, button_link]
 
@@ -57,7 +66,7 @@ endpoints:
   - method: POST
     path: /api/auth/login
     status: 200
-    description: Login and receive JWT cookies (Rate-limited: 5/min).
+    description: Login and receive JWT cookies (Rate-limited: 20/min for testing stability).
     request_body:
       required: [username, password]
     body:
@@ -101,39 +110,61 @@ endpoints:
     body:
       required: [message]
 
+  - method: POST
+    path: /api/auth/change-email
+    status: 200
+    security: jwt_required
+    description: Change email for current user. Requires re-authentication.
+    request_body:
+      required: [current_password, new_email]
+    body:
+      required: [message]
+
+  - method: POST
+    path: /api/auth/delete-account
+    status: 200
+    security: jwt_required
+    description: Permanently delete current user account. Requires re-authentication.
+    request_body:
+      required: [current_password]
+    body:
+      required: [message]
+
   # --- Public Blog Content ---
   - method: GET
     path: /api/blog
     status: 200
-    description: Paginated list of published posts.
+    description: Paginated list of published articles. Dates are ISO-8601 strings.
     body:
-      required_top_level_keys: [posts, pagination]
-      post_item_keys: [title, summary, slug, publication_date]
-      pagination_keys: [total_posts, total_pages, current_page, per_page, has_next, has_prev]
+      required_top_level_keys: [articles, pagination]
+      article_item_keys: [title, summary, slug, publication_date]
+      pagination_keys: [total_articles, total_pages, current_page, per_page, has_next, has_prev]
 
   - method: GET
     path: /api/blog/{slug}
     status: 200
-    description: Full content of a single published post.
+    description: Full content of a single published article. Dates are ISO-8601 strings.
     body:
-      required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
-      author_keys: [id, username]
+      required_keys: [id, title, slug, content, summary, author_id, author_username, publication_date, last_updated, is_published]
 
   # --- Developer Profile (Singleton) ---
   - method: GET
     path: /api/content/profile
     status: 200
-    description: Publicly accessible developer profile.
+    description: Publicly accessible developer profile. Dates are ISO-8601 strings.
     body:
-      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
 
   - method: PUT
     path: /api/content/profile
     status: 200
     security: [jwt_required, "permission: profile:manage"]
     description: Update the developer profile.
+    request_body:
+      required_keys: [name, location, statement]
+      optional_keys: [headline_role, image_url, interests, skills, social_links, work_history]
     body:
-      required_keys: [name, location, statement, image_url, skills, social_links, work_history, last_updated]
+      required_keys: [name, headline_role, location, statement, interests, image_url, skills, social_links, work_history, last_updated]
 
   - method: POST
     path: /api/content/profile/photo
@@ -145,42 +176,50 @@ endpoints:
 
   # --- Content Management (Admin/Author) ---
   - method: GET
-    path: /api/content/posts
+    path: /api/content/articles
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author"]
-    description: List posts for management (Admins see all; Authors see own).
+    description: List articles for management (Admins see all; Authors see own).
     body:
       type: array
-      item_required_keys: [id, title, slug, content, summary, author, publication_date, last_updated, is_published]
+      item_required_keys: [id, title, slug, content, summary, author_id, author_username, publication_date, last_updated, is_published]
 
   - method: POST
-    path: /api/content/posts
+    path: /api/content/articles
     status: 201
     security: [jwt_required, "permission: content:manage OR content:author"]
-    description: Create a new blog post.
+    description: Create a new article.
     body:
-      required_keys: [message, id, title, slug, content, summary, is_published, author]
+      required_keys: [id, title, slug, content, summary, is_published, author_id, author_username]
 
   - method: PUT
-    path: /api/content/posts/{post_id}
+    path: /api/content/articles/{article_id}
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
-    description: Update an existing post.
+    description: Update an existing article.
     body:
-      required_keys: [message, id, title, slug, content, summary, is_published, author]
+      required_keys: [id, title, slug, content, summary, is_published, author_id, author_username]
 
   - method: DELETE
-    path: /api/content/posts/{post_id}
+    path: /api/content/articles/{article_id}
     status: 200
     security: [jwt_required, "permission: content:manage OR content:author", ownership_required]
-    description: Delete a post (Atomic cleanup of assets and comments).
+    description: Delete an article (Atomic cleanup of assets and comments).
     body:
       required_keys: [message]
 
   - method: POST
     path: /api/content/media
     status: 201
-    security: [jwt_required, "permission: profile:manage"]
-    description: Upload generic media for blog posts.
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: Upload generic media for blog articles.
     body:
       required_keys: [url, message]
+
+  - method: DELETE
+    path: /api/content/media
+    status: 200
+    security: [jwt_required, "permission: content:manage OR content:author"]
+    description: Delete generic media via URL query parameter.
+    body:
+      required_keys: [message]

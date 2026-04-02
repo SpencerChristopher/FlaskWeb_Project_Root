@@ -1,0 +1,184 @@
+# Testing Strategy & Execution Guide
+
+This document defines the standards for verifying the Flask Web Project. It distinguishes between continuous development testing and pre-push validation (Preflight), with clear runbooks for local, container, and staging contexts.
+
+## 0. Environment Quick Matrix
+
+| Environment | Where you run tests | Target URL | TLS behavior | Recommended use |
+| :--- | :--- | :--- | :--- | :--- |
+| **Local (Host)** | Local venv | `http://localhost:5010` | HTTP only (no HTTPS redirect, no Secure cookies) | E2E and fast iteration |
+| **Local (Container)** | `docker compose exec web` | `http://nginx` | HTTP only | Integration, smoke, performance |
+| **Staging** | Local venv | `https://staging.spencerscooking.uk` | HTTPS via Cloudflare edge | Real-world smoke/e2e/perf |
+
+## 1. Execution Environments
+
+The project supports three testing perspectives. Choosing the wrong one will cause network failures for integration and smoke tests.
+
+### A. Host-Side Testing (Standard, Recommended for E2E)
+Run from your local terminal/IDE.
+*   **Target:** `http://localhost:5010` (via Nginx proxy)
+*   **Scope:** Best for E2E (Playwright) and quick iterative unit tests.
+*   **Requirement:** App stack running via Docker (nginx on port 5010).
+*   **Tip:** Local dev uses HTTP, so the container override should set:
+    * `TALISMAN_FORCE_HTTPS=false`
+    * `JWT_COOKIE_SECURE=false`
+*   **Command:** 
+    ```powershell
+    # End-to-End (Requires Playwright installed on host)
+    # Zero-Config: base_url defaults to http://localhost:5010
+    $env:SKIP_DB_CHECK="1"
+    python -m pytest tests/e2e/ -m e2e -p no:flask
+    ```
+*   **Seed data (required for blog/infinite scroll tests):**
+    ```powershell
+    docker compose exec web /app/.venv/bin/python scripts/seed_db.py --heavy
+    ```
+*   **Playwright install (host):**
+    ```powershell
+    python -m playwright install chromium
+    ```
+
+*   **Local Configuration Sync:**
+    To ensure your local dev environment matches GitHub Repository Variables (CORS, timeouts, etc.), run:
+    ```powershell
+    powershell.exe -File scripts/sync_vars.ps1
+    ```
+    This generates `.env.vars`. Start Docker Compose with `--env-file .env --env-file .env.vars` to load it.
+
+### B. Container-Side Testing (CI Parity)
+Run from inside the `web` container.
+*   **Target:** `http://nginx` (Internal Docker network)
+*   **Scope:** Best for verifying integration, infrastructure risks (chaos), and performance benchmarks.
+*   **Requirement:** The container detects it is inside Docker and automatically switches routing.
+*   **Playwright install (container, for E2E):**
+    ```bash
+    docker compose exec -T web /app/.venv/bin/python -m pip install -U playwright
+    docker compose exec -T web /app/.venv/bin/python -m playwright install chromium
+    ```
+*   **E2E (container):**
+    ```bash
+    docker compose exec -e E2E_BASE_URL=http://nginx -e PYTEST_BASE_URL=http://nginx \
+      web /app/.venv/bin/pytest /app/tests/e2e -m e2e
+    ```
+*   **Command:** 
+    ```bash
+    docker compose exec -T web /app/.venv/bin/pytest tests/ -m "not e2e"
+    ```
+*   **Full suite in container (including E2E):**
+    ```bash
+    docker compose exec -e E2E_BASE_URL=http://nginx -e PYTEST_BASE_URL=http://nginx web /app/.venv/bin/pytest /app/tests
+    ```
+
+### C. Staging with Cloudflare Access (Service Token)
+Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while bypassing Zero Trust via a service token.
+*   **Env (required):**
+    * `E2E_BASE_URL=https://staging.spencerscooking.uk`
+    * `PROD_BASE_URL=https://staging.spencerscooking.uk`
+    * `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` (or `CF_ACCESS_JWT`)
+    * Optional hard-fail: `REQUIRE_CF_ACCESS=1`
+    * HTTPS-only tests: `REQUIRE_HTTPS=1`
+*   **Command (smoke/perf/e2e):**
+    ```bash
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/infra/smoke -m smoke
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/integration -m performance
+    CF_ACCESS_CLIENT_ID=xxx CF_ACCESS_CLIENT_SECRET=yyy \
+      python -m pytest tests/e2e -m e2e
+    ```
+*   Quick token sanity check: `python debug_playwright_headers.py`
+*   **Runbook (repeatable/frozen):**
+    1. Run from local venv (not container) to avoid Playwright reinstall on recreate.
+    2. Export the same env vars every run (including `E2E_BASE_URL`/`PROD_BASE_URL`).
+    3. Use a dedicated service token for staging only.
+    4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
+    5. Staging data is treated as stable. Do not reseed unless explicitly required.
+
+If you need to refresh staging data, use a manual workflow dispatch:
+```bash
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f reseed_db=true
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f heavy_seed=true
+```
+Set `REQUIRE_HEAVY_SEED=1` to hard-fail infinite scroll E2E when the dataset is too small.
+
+---
+
+## 2. Testing vs. Preflight
+
+| Tool | Purpose | Frequency | Context |
+| :--- | :--- | :--- | :--- |
+| **Pytest** | Functional validation, TDD, and debugging. | **Always** during dev. | Local/Container |
+| **Preflight** | Final gatekeeper. Checks linting, audit logs, and CI parity. | **Before Push** only. | Host (calls Docker) |
+
+### Preflight CI Script (`scripts/preflight_ci.ps1`)
+The preflight script has been enhanced to catch CI-specific failures locally:
+*   `.\scripts\preflight_ci.ps1`: Default run (Static Analysis + Linting).
+*   `.\scripts\preflight_ci.ps1 -CheckArm`: Performs a local dry-run build for `linux/arm64` to verify dependency compatibility.
+*   `.\scripts\preflight_ci.ps1 -SmokeTest`: Triggers a targeted functional check that verifies the `web -> nginx` network bridge, catching the "NameResolutionError" locally.
+*   `.\scripts\preflight_ci.ps1 -RunAct`: (Optional) Runs the entire GitHub Actions workflow locally using `act`.
+    *   **Note:** The GitHub Actions workflow intentionally skips `smoke`, `performance/heavy`, and `e2e` markers; run those manually (see Staging section).
+
+### D. `pip-audit` allowlist
+
+`pip-audit-allowlist.txt` lives at the repository root and is automatically fed into every `pip-audit` execution inside the preflight scripts (`bash` or PowerShell). Each non-comment line is appended as `--ignore-vuln <id>`, so you can document reviewed vulnerabilities that upstream has not yet patched. The current entries cover `CVE-2026-27614`/`GHSA-vp6q-7m36-pq3w` and `CVE-2026-4539` (local `AdlLexer` regex DoS); update the file and rerun preflight whenever a fix appears.
+
+`pip-audit-allowlist.txt` is also consumed by the `static-analysis` job in `.github/workflows/test-deploy.yml`, so CI's `pip-audit` command aligns with your local preflight runs (the workflow builds the arg string via the same allowlist file).
+
+### E. CI seeding guard
+
+Staging seeding is **manual only**. On push, the workflow deploys but will not seed or overwrite data. Seeding runs only when you explicitly set:
+*   `reseed_db=true` (force reseed)
+*   `heavy_seed=true` (force heavy seed)
+*   `seed_if_empty=true` (allow auto-seed only if DB is empty)
+
+---
+
+## 3. Special Test Requirements
+
+### A. Multi-Platform Verification
+To ensure the application runs on both staging (AMD64) and production (ARM64/Raspberry Pi), the CI pipeline performs separate checks:
+1.  **ARM64 Dry-Run:** Verified on GitHub-hosted runners to ensure wheels/binaries are valid.
+2.  **AMD64 Functional:** Verified on GitHub-hosted runners to avoid impacting staging.
+
+### A. Accessibility (Axe)
+E2E tests include accessibility checks via `axe-core`. To enable these, you must download the script to the local directory:
+```bash
+curl -L -o tests/axe/axe.min.js https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.9.1/axe.min.js
+```
+
+### B. Performance & Heavy Tests
+Tests marked with `@pytest.mark.heavy` or `@pytest.mark.performance` should ideally be run in the container to avoid host-side network jitter.
+Heavy datasets require seeding with `scripts/seed_db.py --heavy` before running the suite.
+
+### C. Architectural Integrity (Design Gate)
+To ensure that code changes do not violate the boundaries defined in `docs/ARCHITECTURE.md`, run the design gate:
+```powershell
+# Fast, host-side AST scan (No DB or Container needed)
+$env:SKIP_DB_CHECK="1"; .venv/Scripts/python.exe -m pytest tests/integration/domain/test_arch_integrity.py -p no:flask -p no:base-url
+```
+
+---
+
+## 4. Engineering Standards
+
+### Mocking Standards
+To prevent "fragile tests" that break on repository optimizations:
+1.  **Mock Interfaces, Not Internals:** Never mock MongoEngine's `Article.objects`. Always mock the **Repository instance** on the service.
+    *   *Bad:* `patch('models.Article.objects')`
+    *   *Good:* `patch.object(article_service._article_repository, 'get_published_paginated')`
+2.  **DTO Trust:** The Service layer trusts the `UserIdentity` DTO provided by the Authorization layer. Unit tests for services should mock the `AuthzService` result rather than expecting the service to re-validate user existence.
+
+### The "Double Gate" Pattern
+Authorization is enforced twice:
+1.  **Stateless Gate:** Permissions are derived from JWT claims for speed.
+2.  **Stateful Gate:** Role and Token Version are verified against the DB for security.
+Tests verifying access must account for both gates.
+
+---
+
+## 5. Common Pitfalls
+
+*   **401 Unauthorized in E2E:** Usually caused by a `SECRET_KEY` mismatch between the Host `.env` and the Container environment. Ensure they match.
+*   **Login works but UI stays guest (local HTTP):** Ensure `JWT_COOKIE_SECURE=false` for local dev and use `http://localhost:5010`.
+*   **Connection Refused (Container):** Occurs if a test tries to hit `localhost` while running inside the container. Use the `base_url` fixture which handles this automatically.
+*   **HTTPS-only checks skipped locally:** Set `REQUIRE_HTTPS=1` when running against HTTPS (staging) to enforce cookie/security expectations.

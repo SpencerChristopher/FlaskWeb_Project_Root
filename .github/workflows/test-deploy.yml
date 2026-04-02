@@ -7,8 +7,28 @@ on:
       - main
   workflow_dispatch:
     inputs:
+      deploy_to_staging:
+        description: "STAGING ONLY: Deploy to WSL runner (manual trigger)"
+        type: boolean
+        required: false
+        default: false
       hard_rebuild:
-        description: "Use down -v on staging deploy (includes pre-reset Mongo backup)"
+        description: "STAGING ONLY: Use down -v to purge volumes (fixes credential drift)"
+        type: boolean
+        required: false
+        default: false
+      reseed_db:
+        description: "Force database reseed (even if no relevant files changed)"
+        type: boolean
+        required: false
+        default: false
+      seed_if_empty:
+        description: "STAGING ONLY: Allow auto-seed when DB is empty (manual only)"
+        type: boolean
+        required: false
+        default: false
+      heavy_seed:
+        description: "STAGING ONLY: Use heavy seed (150+ articles) for stress testing"
         type: boolean
         required: false
         default: false
@@ -17,9 +37,64 @@ permissions:
   contents: read
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
-  build-and-test:
+  # --- 1. STATIC ANALYSIS: Fast checks on GitHub runners ---
+  static-analysis:
+    name: Security & Linting
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Security Audit (pip-audit)
+        run: |
+          allowlist_args=""
+          if [ -f pip-audit-allowlist.txt ]; then
+            allowlist_args=$(awk ' /^[[:space:]]*([^#[:space:]])/ { printf("--ignore-vuln %s ", $1) }' pip-audit-allowlist.txt)
+          fi
+          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
+            pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
+            poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
+            pip-audit -r constraints.txt ${allowlist_args} && \
+            bandit -r src/ -ll"
+
+      - name: Workflow Lint (actionlint)
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+
+  # --- 2. ARM64 COMPATIBILITY: Verify wheels/compilation (Isolated) ---
+  arm64-compatibility-check:
+    name: Check ARM64 Wheels
+    runs-on: ubuntu-latest # GitHub-hosted: No TLS issues
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Dry-run ARM64 Build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false # Verify build only, no push
+          build-args: |
+            PYTHON_VERSION=3.11
+          cache-from: type=gha
+
+  # --- 3. AMD64 VERIFICATION: Functional tests on GitHub-hosted runner ---
+  amd64-verify:
+    name: Verify Functional (amd64)
+    needs: static-analysis
+    runs-on: ubuntu-latest
+    environment: staging
     env:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
@@ -28,42 +103,75 @@ jobs:
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      LOG_LEVEL: INFO
-      FLASK_ENV: development
-      TALISMAN_FORCE_HTTPS: "false"
+      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_USE_TLS: ${{ secrets.SMTP_USE_TLS }}
+      SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_ENABLED: "false"
+      TURNSTILE_LOGIN_ENABLED: "false"
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+      FLASK_ENV: ${{ vars.FLASK_ENV }}
+      PYTHON_VERSION: "3.11"
+      HOST_PORT: 5005
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 1
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      # Repository Variables (Config migration)
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Security Audit (pip-audit)
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
-            pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
-            poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
-            pip-audit -r constraints.txt && \
-            bandit -r src/ -ll"
-
-      - name: Workflow Lint (actionlint)
-        run: |
-          docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
+        with:
+          fetch-depth: 0
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Reset compose stack
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+        run: |
+          if [ "${{ github.event.inputs.hard_rebuild }}" = "true" ]; then
+            echo "Hard rebuild requested: removing volumes and orphans."
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
+          else
+            echo "Soft reset: stopping containers without volume/orphan cleanup."
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml down || true
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
 
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
               missing=1
@@ -72,14 +180,19 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
-
-      - name: Generate Self-Signed Certificates (CI)
+      
+      - name: Validate required vars
         run: |
-          mkdir -p certs
-          openssl genrsa -out certs/server.key 2048
-          openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
-          chmod 600 certs/server.key
-          chmod 644 certs/server.crt
+          missing=0
+          for key in LOG_LEVEL FLASK_ENV JWT_COOKIE_SECURE JWT_COOKIE_CSRF_PROTECT JWT_COOKIE_SAMESITE PROXY_FIX_X_FOR PROXY_FIX_X_PROTO PROXY_FIX_X_HOST PROXY_FIX_X_PREFIX CORS_ORIGINS GUNICORN_TIMEOUT FORWARDED_ALLOW_IPS MONGO_SERVER_SELECTION_TIMEOUT_MS MONGO_CONNECT_TIMEOUT_MS MONGO_SOCKET_TIMEOUT_MS TALISMAN_FORCE_HTTPS CONTACT_MIN_TIME_MS CONTACT_HONEYPOT_FIELDS; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required var: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -93,15 +206,30 @@ jobs:
         with:
           context: .
           load: true
+          pull: true # Always pull latest base images
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
+            PYTHON_VERSION=${{ env.PYTHON_VERSION }}
+          # Use gha cache for speed, but 'load: true' ensures it's in the local daemon
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Debug Environment Variables
+        run: |
+          echo "Verifying environment variable names (not values)..."
+          env | grep MONGO || echo "No MONGO variables found in env."
+          echo "IMAGE_TAG: ${{ env.IMAGE_TAG }}"
 
       - name: Start containers
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
+
+      - name: Verify container health (Fail-Fast Gate)
+        run: |
+          echo "Waiting for web app to respond on isolated port 5005..."
+          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:5005/
+          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:5005/api/home
 
       - name: Assert web healthy before seed
         run: |
@@ -114,26 +242,60 @@ jobs:
             exit 1
           fi
 
+      - name: Detect empty DB (CI)
+        id: ci_db_empty
+        run: |
+          db_empty=$(docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/python - <<'PY'
+          import os
+          from mongoengine import connect, disconnect
+          from src.models.article import Article
+          from src.models.profile import Profile
+
+          connect(host=os.environ.get("MONGO_URI"))
+          article_count = Article.objects.count()
+          profile_exists = Profile.objects.first() is not None
+          disconnect()
+
+          print(f"articles={article_count}")
+          print(f"profile_exists={profile_exists}")
+          print("true" if (article_count == 0 or not profile_exists) else "false")
+          PY
+          )
+          db_empty="$(echo "$db_empty" | tail -n 1)"
+          echo "db_empty=${db_empty}" >> "$GITHUB_OUTPUT"
+
       - name: Seed Database (CI)
-        run: docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py
+        if: ${{ steps.ci_db_empty.outputs.db_empty == 'true' || github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true' }}
+        run: |
+          seed_args=""
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            seed_args="--heavy"
+          fi
+          docker exec flask_web_app /app/.venv/bin/python -u scripts/seed_db.py $seed_args
 
       - name: Inject tests into container
         run: |
           docker exec flask_web_app /bin/sh -c "mkdir -p /app/tests"
           docker cp tests/. flask_web_app:/app/tests
           docker cp pytest.ini flask_web_app:/app/pytest.ini
-          docker exec flask_web_app /bin/sh -c "ls -la /app/tests"
 
-      - name: Run tests
-        run: docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests
+      - name: Run tests (exclude e2e, performance, smoke, and heavy)
+        run: |
+          docker exec \
+            -e MONGO_APP_USER="${{ secrets.MONGO_APP_USER }}" \
+            -e MONGO_APP_PASSWORD="${{ secrets.MONGO_APP_PASSWORD }}" \
+            -e MONGO_APP_DB="${{ secrets.MONGO_APP_DB }}" \
+            -e MONGO_TEST_DB="${{ secrets.MONGO_TEST_DB }}" \
+            -e PYTHONPATH=/app \
+            flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
 
-      - name: Push Verified Multi-platform Image
+      - name: Push Verified Image
         if: success()
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           tags: ${{ env.IMAGE_TAG }}
           build-args: |
             LOG_LEVEL=${{ env.LOG_LEVEL }}
@@ -154,31 +316,82 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
 
+  # --- 4. DEPLOYMENT: Rollout to Staging ---
   deploy-to-wsl:
     name: Deploy to WSL
-    needs: build-and-test
+    needs: [amd64-verify, arm64-compatibility-check]
     runs-on: wsl-staging
+    environment: staging
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && (github.event.inputs.deploy_to_staging == 'true' || github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true' || github.event.inputs.seed_if_empty == 'true')) }}
     timeout-minutes: 30
     env:
+      DEPLOY_ENV: staging
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      LOG_LEVEL: INFO
+      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_USE_TLS: ${{ secrets.SMTP_USE_TLS }}
+      SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
+      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
+      TURNSTILE_LOGIN_ENABLED: "false"
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
       FLASK_ENV: production
-      TALISMAN_FORCE_HTTPS: "true"
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
+      GUNICORN_WORKERS: ${{ vars.GUNICORN_WORKERS }}
+      GUNICORN_THREADS: ${{ vars.GUNICORN_THREADS }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      STAGING_HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
+      # Repository Variables (Config migration)
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
+      # Flip to 'true' only when you intend to reset or reseed profiles/articles.
+      CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
+      SEED_IF_EMPTY: ${{ (github.event.inputs.seed_if_empty == 'true') && 'true' || 'false' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set image tag
         run: echo "IMAGE_TAG=ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA}" >> "$GITHUB_ENV"
 
       - name: Reset staging compose stack
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down --remove-orphans || true
+        if: ${{ github.event.inputs.hard_rebuild == 'true' }}
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down -v --remove-orphans || true
 
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
@@ -186,9 +399,22 @@ jobs:
       - name: Validate required secrets
         run: |
           missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD; do
+          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD ADMIN_EMAIL MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
             if [ -z "${!key}" ]; then
               echo "Missing required secret: $key"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+      
+      - name: Validate required vars
+        run: |
+          missing=0
+          for key in LOG_LEVEL JWT_COOKIE_SECURE JWT_COOKIE_CSRF_PROTECT JWT_COOKIE_SAMESITE PROXY_FIX_X_FOR PROXY_FIX_X_PROTO PROXY_FIX_X_HOST PROXY_FIX_X_PREFIX CORS_ORIGINS GUNICORN_TIMEOUT FORWARDED_ALLOW_IPS MONGO_SERVER_SELECTION_TIMEOUT_MS MONGO_CONNECT_TIMEOUT_MS MONGO_SOCKET_TIMEOUT_MS TALISMAN_FORCE_HTTPS CONTACT_MIN_TIME_MS CONTACT_HONEYPOT_FIELDS GUNICORN_WORKERS GUNICORN_THREADS STAGING_HOST_PORT; do
+            if [ -z "${!key}" ]; then
+              echo "Missing required var: $key"
               missing=1
             fi
           done
@@ -205,41 +431,139 @@ jobs:
 
       - name: Deploy to WSL
         env:
-          DEPLOY_CLEAN_START: "true"
-          DEPLOY_RESET_VOLUMES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          # Only perform clean start if manually requested via hard_rebuild input
+          DEPLOY_CLEAN_START: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_RESET_VOLUMES: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_REMOVE_ORPHANS: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
           DEPLOY_BACKUP_BEFORE_RESET: "true"
           DEPLOY_REQUIRE_BACKUP: "true"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"
         run: |
+          # Use --pull always to ensure we have the verified image from the earlier job
+          # but don't use --build to avoid local compilation on the runner.
           ./scripts/deploy.sh
+
+      - name: "Fail-Fast: Verify Tunnel Connectivity"
+        run: |
+          echo "Waiting for cloudflared to connect..."
+          for i in {1..15}; do
+            echo "Attempt $i: Checking connectivity..."
+            if docker logs cloudflared_tunnel 2>&1 | grep -E -q "Connected to|Registered tunnel connection"; then
+              echo "Tunnel connected successfully."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Error: Tunnel failed to connect to Cloudflare Edge."
+          docker logs cloudflared_tunnel
+          exit 1
 
       - name: Verify staging health
         run: |
-          curl -k -f --retry 12 --retry-delay 5 --retry-connrefused https://localhost/
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/home
+          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${{ vars.STAGING_HOST_PORT }}/
+          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/home
+
+      - name: Detect empty DB (staging)
+        id: staging_db_empty
+        run: |
+          db_empty=$(docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/python - <<'PY'
+          import os
+          from mongoengine import connect, disconnect
+          from src.models.article import Article
+          from src.models.profile import Profile
+
+          connect(host=os.environ.get("MONGO_URI"))
+          article_count = Article.objects.count()
+          profile_exists = Profile.objects.first() is not None
+          disconnect()
+
+          print(f"articles={article_count}")
+          print(f"profile_exists={profile_exists}")
+          print("true" if (article_count == 0 or not profile_exists) else "false")
+          PY
+          )
+          db_empty="$(echo "$db_empty" | tail -n 1)"
+          echo "db_empty=${db_empty}" >> "$GITHUB_OUTPUT"
+
+      - name: Detect seed-relevant changes
+        if: ${{ env.CI_SEED_ENABLED == 'true' }}
+        id: seed_changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Force seeding if heavy_seed input is checked
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Force seeding if reseed_db input is checked
+          if [ "${{ github.event.inputs.reseed_db }}" = "true" ]; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          
+          before="${{ github.event.before }}"
+          after="${{ github.sha }}"
+          if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
+            before="$(git rev-parse HEAD~1)"
+          fi
+          changed_files="$(git diff --name-only "$before" "$after")"
+          echo "Changed files:"
+          echo "$changed_files"
+          if echo "$changed_files" | grep -E -q "^(scripts/seed_db.py|src/models/|src/schemas/|docs/api-contract.yml)"; then
+            echo "should_seed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_seed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Decide seeding
+        id: seed_decision
+        shell: bash
+        run: |
+          should_seed="false"
+          reason=""
+          if [ "${{ env.SEED_IF_EMPTY }}" = "true" ] && [ "${{ steps.staging_db_empty.outputs.db_empty }}" = "true" ]; then
+            should_seed="true"
+            reason="empty-db"
+          elif [ "${{ env.CI_SEED_ENABLED }}" = "true" ] && [ "${{ steps.seed_changes.outputs.should_seed }}" = "true" ]; then
+            should_seed="true"
+            reason="explicit-or-change"
+          fi
+          echo "should_seed=${should_seed}" >> "$GITHUB_OUTPUT"
+          echo "seed_reason=${reason}" >> "$GITHUB_OUTPUT"
+          echo "Seed decision: ${should_seed} (${reason:-none})"
 
       - name: Create Admin User
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
       - name: Seed Database
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
+          seed_args=""
+          if [ "${{ github.event.inputs.heavy_seed }}" = "true" ]; then
+            echo "Heavy seed requested for staging stress test."
+            seed_args="--heavy"
+          fi
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py $seed_args
 
       - name: Verify API after seed
+        if: ${{ steps.seed_decision.outputs.should_seed == 'true' }}
         run: |
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/blog
-          curl -k -f --retry 8 --retry-delay 3 https://localhost/api/auth/status
+          curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/blog
+          curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/auth/status
 
       - name: Capture deploy logs on failure
         if: failure()
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose-deploy.log
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml logs --no-color > docker-compose-deploy.log
 
       - name: Upload deploy logs on failure
         if: failure()

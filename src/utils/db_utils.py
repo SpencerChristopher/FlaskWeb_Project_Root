@@ -1,3 +1,5 @@
+"""Database utility functions."""
+
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from mongoengine import get_db
 

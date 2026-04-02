@@ -1,30 +1,38 @@
+import os
+# CRITICAL: These must be set BEFORE any other project imports to ensure
+# Talisman and other extensions initialize with test-safe defaults.
+os.environ.setdefault("FLASK_ENV", "development")
+os.environ["TALISMAN_FORCE_HTTPS"] = "false"
+os.environ.setdefault("MONGO_APP_DB", "appdb")
+os.environ.setdefault("MONGO_TEST_DB", "pytest_appdb")
+# Default E2E base URL for in-container runs when not explicitly set.
+if os.environ.get("DOCKER_CONTAINER") in {"1", "true"} and "E2E_BASE_URL" not in os.environ:
+    os.environ["E2E_BASE_URL"] = "http://nginx"
+
 import re
 import pytest
-import os
+from flask import Flask
 from dotenv import load_dotenv
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 load_dotenv()
-# Ensure test env disables HTTPS redirects before app creation
-os.environ.setdefault('FLASK_ENV', 'development')
-os.environ['TALISMAN_FORCE_HTTPS'] = 'false'
 from src.server import create_app
 from mongoengine import disconnect, connect, get_db
 from pymongo.errors import ServerSelectionTimeoutError
 from src.models.user import User
-from src.models.post import Post
+from src.models.article import Article
 from src.extensions import limiter
-
 
 def _clear_test_collections() -> None:
     db = get_db()
     db.get_collection(User._get_collection_name()).delete_many({})
-    db.get_collection(Post._get_collection_name()).delete_many({})
+    db.get_collection(Article._get_collection_name()).delete_many({})
     from src.models.token_blocklist import TokenBlocklist
     from src.models.profile import Profile
 
     db.get_collection(TokenBlocklist._get_collection_name()).delete_many({})
     db.get_collection(Profile._get_collection_name()).delete_many({})
+
 
 def _build_test_mongo_uri(in_container: bool) -> str:
     if in_container:
@@ -54,70 +62,128 @@ def _build_test_mongo_uri(in_container: bool) -> str:
 
     return os.environ.get("PYTEST_MONGO_URI", "mongodb://mongo:27017/pytest_appdb")
 
+
 def _add_markers_by_path(item):
     path = str(item.fspath)
-    if "tests\\risk_tests\\" in path or "tests/risk_tests/" in path:
-        item.add_marker(pytest.mark.risk)
+    if "tests\\unit\\" in path or "tests/unit/" in path:
+        item.add_marker(pytest.mark.unit)
+        return
+    if "tests\\integration\\" in path or "tests/integration/" in path:
         item.add_marker(pytest.mark.integration)
         return
-    if "tests\\api_tests\\" in path or "tests/api_tests/" in path:
-        item.add_marker(pytest.mark.integration)
-        return
-    if "tests\\security_tests\\" in path or "tests/security_tests/" in path:
+    if "tests\\security\\" in path or "tests/security/" in path:
         item.add_marker(pytest.mark.security)
         item.add_marker(pytest.mark.integration)
         return
-    if "tests\\service_tests\\" in path or "tests/service_tests/" in path:
+    if "tests\\infra\\" in path or "tests/infra/" in path:
         item.add_marker(pytest.mark.integration)
+        # Inherit specific sub-markers based on filename if needed
+        if "smoke" in path:
+            item.add_marker(pytest.mark.smoke)
+        if "risk" in path or "chaos" in path:
+            item.add_marker(pytest.mark.risk)
         return
-    if "tests\\routing_tests\\" in path or "tests/routing_tests/" in path:
-        item.add_marker(pytest.mark.integration)
+    if "tests\\e2e\\" in path or "tests/e2e/" in path:
+        item.add_marker(pytest.mark.e2e)
         return
-    if "tests\\page_content_test\\" in path or "tests/page_content_test/" in path:
-        item.add_marker(pytest.mark.integration)
-        return
-    if "tests\\test_database_connection.py" in path or "tests/test_database_connection.py" in path:
-        item.add_marker(pytest.mark.integration)
-        return
+    # Default: treat uncategorized files as unit tests so -m selectors keep them
     item.add_marker(pytest.mark.unit)
+
 
 def pytest_collection_modifyitems(config, items):
     for item in items:
         _add_markers_by_path(item)
 
-@pytest.fixture(scope='session', autouse=True)
+
+@pytest.fixture(scope="session")
+def base_url(request):
+    """
+    Provide a stable base URL for e2e tests.
+    Prefers explicit env vars, then pytest-base-url option, then sensible defaults.
+    """
+    env_url = (
+        os.environ.get("PYTEST_BASE_URL")
+        or os.environ.get("E2E_BASE_URL")
+        or os.environ.get("PROD_BASE_URL")
+    )
+    if env_url:
+        return env_url
+
+    opt_url = getattr(request.config.option, "base_url", None)
+    if opt_url:
+        return opt_url
+
+    # 1. Prioritize explicit target URL (e.g. for Production/Staging smoke)
+    env_url = (
+        os.environ.get("PYTEST_BASE_URL")
+        or os.environ.get("E2E_BASE_URL")
+        or os.environ.get("TEST_TARGET_URL")
+    )
+    if env_url:
+        return env_url
+
+    # 2. Inside Docker, always use service name
+    if os.environ.get("DOCKER_CONTAINER") in {"1", "true"}:
+        return "http://nginx"
+
+    # 3. Handle Port Isolation via HOST_PORT
+    host_port = os.environ.get("HOST_PORT") or os.environ.get("STAGING_HOST_PORT") or "5010"
+    return f"http://localhost:{host_port}"
+
+
+@pytest.fixture(scope="session", autouse=True)
 def database_connection_check():
     """
     Gatekeeper fixture to check for database connection before running tests.
+    Can be skipped with SKIP_DB_CHECK=1 for E2E tests where the runner doesn't need DB access.
     """
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        return
+
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
 
     try:
-        client = connect(host=mongo_uri, serverSelectionTimeoutMS=2000, uuidRepresentation='standard')
+        client = connect(
+            host=mongo_uri, serverSelectionTimeoutMS=2000, uuidRepresentation="standard"
+        )
         client.server_info()
         disconnect()
     except ServerSelectionTimeoutError as e:
         pytest.exit(f"Database connection failed: {e}. Aborting tests.")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def app():
     """Create and configure a new app instance for the test session."""
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        # Return a minimal Flask app to satisfy pytest-flask autouse fixtures
+        # This app will not be used by E2E tests but prevents pytest-flask from crashing.
+        dummy_app = Flask(__name__)
+        dummy_app.config["TESTING"] = True
+        yield dummy_app
+        return
+
     # Determine MONGO_URI based on environment
     mongo_uri = _build_test_mongo_uri(bool(os.environ.get("DOCKER_CONTAINER")))
     os.environ["MONGO_URI"] = mongo_uri
-    os.environ['SECRET_KEY'] = 'test-secret-key'
-    os.environ.setdefault('FLASK_ENV', 'production')
-    os.environ.setdefault('TALISMAN_FORCE_HTTPS', 'false')
+    os.environ["SECRET_KEY"] = "test-secret-key-32-bytes-min-length-012345"
+    
+    # In local development/test containers, we must disable HTTPS forcing 
+    # because nginx is usually only listening on port 80 (HTTP).
+    # Staging/Production will override this via their own env vars.
+    os.environ["FLASK_ENV"] = "development"
+    os.environ["TALISMAN_FORCE_HTTPS"] = "false"
 
     app = create_app()
-    app.config.update({
-        'TESTING': True,
-        # RATELIMIT_STORAGE_URI is now loaded from .env
-        # RATELIMIT_KEY_FUNC is now loaded from extensions
-        'RATELIMIT_STRATEGY': 'fixed-window',
-        'RATELIMIT_DEFAULT': '100 per minute'
-    })
+    app.config.update(
+        {
+            "TESTING": True,
+            # RATELIMIT_STORAGE_URI is now loaded from .env
+            # RATELIMIT_KEY_FUNC is now loaded from extensions
+            "RATELIMIT_STRATEGY": "fixed-window",
+            "RATELIMIT_DEFAULT": "100 per minute",
+        }
+    )
 
     # Initialize and configure limiter for testing
     limiter.init_app(app)
@@ -138,6 +204,7 @@ def app():
             pass
         disconnect()
 
+
 @pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """Resets the Flask-Limiter storage before each test function."""
@@ -146,18 +213,18 @@ def reset_rate_limiter():
         limiter.reset()
 
 
-
-
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def setup_users(app):
     """Sets up test users for authentication tests."""
     with app.app_context():
-        admin_user = User(username='testadmin', email='admin@example.com', role='admin')
-        admin_user.set_password('testpassword')
+        admin_user = User(username="testadmin", email="admin@example.com", role="admin")
+        admin_user.set_password("testpassword")
         admin_user.save()
 
-        regular_user = User(username='testuser', email='user@example.com', role='member')
-        regular_user.set_password('testpassword')
+        regular_user = User(
+            username="testuser", email="user@example.com", role="member"
+        )
+        regular_user.set_password("testpassword")
         regular_user.save()
         yield admin_user, regular_user
 
@@ -165,7 +232,13 @@ def setup_users(app):
 @pytest.fixture(autouse=True)
 def clean_collections_per_function(app):
     """Cleans up specific collections after each test function."""
+    # For host-side E2E runs we skip DB entirely.
+    if os.environ.get("SKIP_DB_CHECK") == "1":
+        yield
+        return
     yield
+    if app is None:
+        return
     with app.app_context():
         try:
             # Explicitly drop collections that are modified by tests
@@ -178,36 +251,67 @@ def clean_collections_per_function(app):
 @pytest.fixture
 def login_user_fixture(client):
     def _login_user(username, password):
-        response = client.post('/api/auth/login', json={
-            'username': username,
-            'password': password
-        })
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
         assert response.status_code == 200
-        
+
         # Extract access token from Set-Cookie header
-        for cookie_header in response.headers.getlist('Set-Cookie'):
-            match = re.search(r'access_token_cookie=([^;]+)', cookie_header)
+        for cookie_header in response.headers.getlist("Set-Cookie"):
+            match = re.search(r"access_token_cookie=([^;]+)", cookie_header)
             if match:
                 return match.group(1)
         raise Exception("Access token cookie not found in response headers")
+
     return _login_user
+
 
 @pytest.fixture
 def get_refresh_token_fixture(client):
     def _get_refresh_token(username, password):
-        response = client.post('/api/auth/login', json={
-            'username': username,
-            'password': password
-        })
+        response = client.post(
+            "/api/auth/login", json={"username": username, "password": password}
+        )
         assert response.status_code == 200
 
         # Extract refresh token from Set-Cookie header
-        for cookie_header in response.headers.getlist('Set-Cookie'):
-            match = re.search(r'refresh_token_cookie=([^;]+)', cookie_header)
+        for cookie_header in response.headers.getlist("Set-Cookie"):
+            match = re.search(r"refresh_token_cookie=([^;]+)", cookie_header)
             if match:
                 return match.group(1)
         raise Exception("Refresh token cookie not found in response headers")
+
     return _get_refresh_token
+
+
+@pytest.fixture
+def browser_context_args(browser_context_args):
+    """
+    Override browser context arguments to include Cloudflare Access headers.
+    Supports Service Tokens (ID/Secret) or direct JWT assertions.
+    """
+    cf_id = os.environ.get("CF_ACCESS_CLIENT_ID")
+    cf_secret = os.environ.get("CF_ACCESS_CLIENT_SECRET")
+    cf_jwt = os.environ.get("CF_ACCESS_JWT")
+    require_cf = os.environ.get("REQUIRE_CF_ACCESS", "").lower() in {"1", "true", "yes"}
+
+    headers = dict(browser_context_args.get("extra_http_headers") or {})
+    
+    if cf_id and cf_secret:
+        headers["CF-Access-Client-ID"] = cf_id
+        headers["CF-Access-Client-Secret"] = cf_secret
+    
+    if cf_jwt:
+        headers["Cf-Access-Jwt-Assertion"] = cf_jwt
+
+    if require_cf and not headers:
+        pytest.skip("CF Access credentials required for this run (set CF_ACCESS_CLIENT_ID/CF_ACCESS_CLIENT_SECRET).")
+
+    return {
+        **browser_context_args,
+        "ignore_https_errors": True,
+        "extra_http_headers": headers,
+    }
 
 
 @pytest.fixture
@@ -245,3 +349,21 @@ def signal_tracker():
             signal.disconnect(t.handler)
 
     return _tracker
+
+
+@pytest.fixture(autouse=True)
+def mock_turnstile_verification(request, monkeypatch):
+    """
+    Globally mock the external network call to Cloudflare for integration/security tests.
+    Unit tests for TurnstileService are EXEMPT to allow testing failure cases.
+    """
+    # Skip mock for the specific service unit test file
+    if "tests/unit/test_turnstile_service.py" in str(request.node.fspath):
+        return
+
+    from src.services.turnstile_service import TurnstileService
+
+    # We patch the method to always return True for integration/security tests
+    monkeypatch.setattr(
+        TurnstileService, "verify_token", lambda self, token, remote_ip=None: True
+    )

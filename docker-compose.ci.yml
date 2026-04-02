@@ -2,3 +2,26 @@ services:
   web:
     build: null
     image: ${IMAGE_TAG}
+    volumes:
+      - ./certs:/app/certs:ro
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  mongo:
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  nginx:
+    ports:
+      - "5005:80"
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 128M

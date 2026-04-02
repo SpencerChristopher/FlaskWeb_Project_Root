@@ -1,7 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
-COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml)
+# Determine deployment environment and compose files
+DEPLOY_ENV="${DEPLOY_ENV:-staging}"
+USB_BACKUP_DIR="${USB_BACKUP_DIR:-/mnt/usb-storage/backups}"
+echo "Deploying to environment: ${DEPLOY_ENV}"
+
+if [ "${DEPLOY_ENV}" = "production" ]; then
+  COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.prod.yml)
+else
+  COMPOSE_ARGS=(-f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml)
+fi
 
 backup_before_reset() {
   if ! docker ps --format '{{.Names}}' | grep -q '^mongodb$'; then
@@ -9,8 +18,14 @@ backup_before_reset() {
     return 0
   fi
 
-  mkdir -p backups
-  backup_path="backups/mongo-pre-reset-$(date +%Y%m%d-%H%M%S).archive.gz"
+  # Determine backup path (prefer USB storage if mounted)
+  local target_dir="backups"
+  if mountpoint -q "/mnt/usb-storage" 2>/dev/null; then
+      target_dir="${USB_BACKUP_DIR}"
+  fi
+  mkdir -p "${target_dir}"
+
+  backup_path="${target_dir}/mongo-pre-reset-$(date +%Y%m%d-%H%M%S).archive.gz"
   echo "Creating MongoDB backup at ${backup_path}..."
   if docker exec mongodb sh -lc 'mongodump --archive --gzip --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin' > "${backup_path}"; then
     echo "MongoDB backup completed."
@@ -31,7 +46,11 @@ backup_before_reset_optional() {
 }
 
 start_compose_stack() {
-  docker compose "${COMPOSE_ARGS[@]}" up -d --wait --pull always --no-build --remove-orphans
+  local args=(up -d --wait --pull always --no-build)
+  if [ "${DEPLOY_REMOVE_ORPHANS:-false}" = "true" ]; then
+    args+=(--remove-orphans)
+  fi
+  docker compose "${COMPOSE_ARGS[@]}" "${args[@]}"
 }
 
 mongo_is_auth_unhealthy() {
@@ -76,17 +95,18 @@ if [ -z "${IMAGE_TAG:-}" ]; then
   exit 1
 fi
 
-echo "Ensuring certs directory..."
-mkdir -p certs
-if [ ! -f certs/server.key ] || [ ! -f certs/server.crt ]; then
-  openssl genrsa -out certs/server.key 2048
-  openssl req -x509 -sha256 -nodes -days 365 -new -key certs/server.key -out certs/server.crt -subj "/C=US/ST=State/L=City/O=Organization/OU=Unit/CN=localhost"
-  chmod 600 certs/server.key
-  chmod 644 certs/server.crt
-fi
-
 if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
   if [ "${DEPLOY_RESET_VOLUMES:-false}" = "true" ]; then
+    # --- Production Safety Guard ---
+    if [ "${DEPLOY_ENV}" = "production" ]; then
+      if [ "${FORCE_PRODUCTION_WIPE:-false}" != "true" ]; then
+        echo "ERROR: Destructive volume reset (DEPLOY_RESET_VOLUMES=true) is BLOCKED in production."
+        echo "If you really intended to wipe production data, set FORCE_PRODUCTION_WIPE=true."
+        exit 1
+      fi
+      echo "WARNING: FORCE_PRODUCTION_WIPE is active. Wiping production volumes..."
+    fi
+    
     echo "Performing hard reset with volume removal..."
     if [ "${DEPLOY_BACKUP_BEFORE_RESET:-true}" = "true" ]; then
       backup_before_reset
@@ -94,7 +114,11 @@ if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
     docker compose "${COMPOSE_ARGS[@]}" down -v --remove-orphans || true
   else
     echo "Performing clean compose start..."
-    docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans || true
+    if [ "${DEPLOY_REMOVE_ORPHANS:-false}" = "true" ]; then
+      docker compose "${COMPOSE_ARGS[@]}" down --remove-orphans || true
+    else
+      docker compose "${COMPOSE_ARGS[@]}" down || true
+    fi
   fi
 fi
 
@@ -136,3 +160,8 @@ if ! verify_mongo_auth_ping; then
 fi
 
 echo "Deployment complete."
+
+if [ "${DEPLOY_PRUNE_IMAGES:-false}" = "true" ]; then
+  echo "Pruning unused Docker images..."
+  docker image prune -af
+fi

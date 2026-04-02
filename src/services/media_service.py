@@ -1,6 +1,11 @@
 """
 Service for managing media uploads (images) for profile and blog posts.
-Optimized for Raspberry Pi: stores files on the local filesystem.
+
+Responsibilities:
+- Validate file extension and size constraints.
+- Normalize and re-encode images to a safe, consistent format.
+- Persist files to a local upload directory for lightweight deployments.
+- Provide deterministic hashes for observability and deduplication.
 """
 
 from __future__ import annotations
@@ -8,23 +13,68 @@ import os
 import uuid
 from pathlib import Path
 from typing import BinaryIO
-from werkzeug.utils import secure_filename
+from io import BytesIO
+
+from PIL import Image, ImageOps
+
 
 class MediaService:
-    """Application service for binary asset management."""
+    """Application service for binary asset management.
+
+    This service is optimized for local filesystem storage and low-resource
+    environments (e.g., Raspberry Pi). It enforces size/dimension limits,
+    strips metadata, and emits stable filenames to reduce collision risk.
+    """
 
     def __init__(self, upload_dir: str, allowed_extensions: set[str] | None = None):
+        """Initialize the media service with storage and validation settings.
+
+        Args:
+            upload_dir: Filesystem directory where uploads are persisted.
+            allowed_extensions: Optional set of allowed file extensions.
+        """
         self._upload_dir = Path(upload_dir)
-        self._allowed_extensions = allowed_extensions or {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-        self._max_size_bytes = 2 * 1024 * 1024 # 2MB Limit
+        self._allowed_extensions = allowed_extensions or {
+            "png",
+            "jpg",
+            "jpeg",
+            "gif",
+            "webp",
+        }
+        self._max_size_bytes = 2 * 1024 * 1024  # 2MB Limit
+        self._max_dimension_px = 1600
 
     def _is_allowed_file(self, filename: str) -> bool:
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in self._allowed_extensions
+        """Check if a filename has an allowed extension.
 
-    def save_image(self, file_stream: BinaryIO, original_filename: str) -> str:
+        Args:
+            filename: The original filename from the client.
+
+        Returns:
+            bool: True if extension is allowed, False otherwise.
         """
-        Saves an image to the local filesystem and returns the relative URL path.
+        return (
+            "." in filename
+            and filename.rsplit(".", 1)[1].lower() in self._allowed_extensions
+        )
+
+    def save_image(self, file_stream: BinaryIO, original_filename: str) -> tuple[str, str]:
+        """Save an image to the local filesystem after normalization.
+
+        Performs size validation, strips metadata, re-encodes to WebP, and
+        returns both the stored URL and the SHA-256 hash of the final bytes.
+
+        Args:
+            file_stream: Binary stream of the uploaded image.
+            original_filename: Original client-provided filename.
+
+        Returns:
+            tuple[str, str]: (relative_url, sha256_hash).
+
+        Raises:
+            ValueError: If the file type, size, or contents are invalid.
         """
+        import hashlib
         if not self._is_allowed_file(original_filename):
             raise ValueError("Unsupported file extension.")
 
@@ -33,32 +83,63 @@ class MediaService:
         size = file_stream.tell()
         file_stream.seek(0)
         if size > self._max_size_bytes:
-            raise ValueError(f"File too large. Maximum size is {self._max_size_bytes // 1024 // 1024}MB.")
+            raise ValueError(
+                f"File too large. Maximum size is {self._max_size_bytes // 1024 // 1024}MB."
+            )
 
         # Ensure directory exists (Defensive check)
         self._upload_dir.mkdir(parents=True, exist_ok=True)
 
-        # Generate UUID filename to prevent collisions and path injection
-        ext = original_filename.rsplit('.', 1)[1].lower()
-        new_filename = f"{uuid.uuid4().hex}.{ext}"
-        
-        file_path = self._upload_dir / new_filename
-        
-        # Save the file
-        with open(file_path, 'wb') as f:
-            f.write(file_stream.read())
+        # Load and normalize the image to enforce size and strip metadata
+        file_stream.seek(0)
+        raw = file_stream.read()
+        try:
+            image = Image.open(BytesIO(raw))
+            image = ImageOps.exif_transpose(image)
+        except Exception as exc:
+            raise ValueError("Unsupported image file.") from exc
 
-        # Return the path relative to static
-        return f"/static/uploads/{new_filename}"
+        image.thumbnail((self._max_dimension_px, self._max_dimension_px), Image.LANCZOS)
+
+        output = BytesIO()
+        if image.mode in ("RGBA", "LA") or "transparency" in image.info:
+            image.save(output, format="WEBP", lossless=True)
+        else:
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            image.save(output, format="WEBP", quality=82, method=6)
+
+        output.seek(0)
+        final_bytes = output.read()
+        if len(final_bytes) > self._max_size_bytes:
+            raise ValueError("Processed image exceeds size limit.")
+
+        # Calculate SHA-256 of the FINAL processed bytes
+        file_hash = hashlib.sha256(final_bytes).hexdigest()
+
+        # Generate UUID filename to prevent collisions and path injection
+        new_filename = f"{uuid.uuid4().hex}.webp"
+        file_path = self._upload_dir / new_filename
+
+        # Save the processed file
+        with open(file_path, "wb") as f:
+            f.write(final_bytes)
+
+        # Return the path relative to static and the hash
+        return f"/static/uploads/{new_filename}", file_hash
 
     def delete_image(self, image_url: str) -> bool:
-        """
-        Deletes an image file from the filesystem based on its relative URL path.
-        Returns True if successful, False otherwise.
+        """Delete an image file from the filesystem by its relative URL.
+
+        Args:
+            image_url: URL expected to point to a local static upload.
+
+        Returns:
+            bool: True if deletion succeeded, False otherwise.
         """
         if not image_url or not image_url.startswith("/static/uploads/"):
             return False
-        
+
         # Extract filename and resolve to absolute path
         filename = image_url.replace("/static/uploads/", "")
         file_path = (self._upload_dir / filename).resolve()
