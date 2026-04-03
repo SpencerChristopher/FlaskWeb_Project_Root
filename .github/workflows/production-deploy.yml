@@ -36,7 +36,12 @@ jobs:
           docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
             pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
             poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
-            pip-audit -r constraints.txt && \
+            allowlist_args=\"\" && \
+            if [ -f pip-audit-allowlist.txt ]; then \
+              allowlist_args=\$(grep -v '^#' pip-audit-allowlist.txt | grep -v '^[[:space:]]*$' | awk '{print \"--ignore-vuln \" \$1}' | xargs); \
+            fi && \
+            echo \"Running pip-audit with: \$allowlist_args\" && \
+            pip-audit \$allowlist_args -r constraints.txt && \
             bandit -r src/ -ll"
 
       - name: Workflow Lint (actionlint)
@@ -162,6 +167,31 @@ jobs:
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
         run: ./scripts/deploy.sh
 
+      - name: "Fail-Fast: Verify Tunnel Connectivity"
+        run: |
+          echo "Waiting for cloudflared to connect..."
+          for i in {1..15}; do
+            echo "Attempt $i: Checking connectivity..."
+            if docker logs cloudflared_tunnel 2>&1 | grep -E -q "Connected to|Registered tunnel connection"; then
+              echo "Tunnel connected successfully."
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "Error: Tunnel failed to connect to Cloudflare Edge."
+          docker logs cloudflared_tunnel
+          exit 1
+
+      - name: "Fail-Fast: Verify Database Connection"
+        run: |
+          docker exec flask_web_app /app/.venv/bin/python scripts/check_db_connection.py
+
+      - name: "Fail-Fast: Verify App Health (Local)"
+        run: |
+          echo "Waiting for web app to respond locally..."
+          # Port 80 inside container, mapped to 5010 on host usually, but let's check Nginx
+          docker exec nginx_proxy curl -f http://web:80/api/home
+
       - name: Create Admin User
         run: |
           docker exec \
@@ -170,12 +200,13 @@ jobs:
             -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
-      - name: Seed Database
+      - name: Seed Database (Admin Only)
         run: |
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
-            flask_web_app /app/.venv/bin/python scripts/seed_db.py
+            -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py --admin-only
 
       - name: Capture deploy logs on failure
         if: failure()

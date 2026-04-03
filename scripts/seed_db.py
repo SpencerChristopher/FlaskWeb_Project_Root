@@ -32,12 +32,13 @@ def generate_random_content(min_words=1000, max_words=1500):
     content = " ".join(random.choices(words, k=count))
     return content.capitalize() + "."
 
-def seed_db(heavy=False):
+def seed_db(heavy=False, admin_only=False):
     # Set up Flask app context
     app_context = get_flask_app_context()
 
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+    ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@example.com')
 
     if not all([ADMIN_USERNAME, ADMIN_PASSWORD]):
         print("Error: ADMIN_USERNAME and ADMIN_PASSWORD must be set as environment variables.")
@@ -46,6 +47,7 @@ def seed_db(heavy=False):
 
     print("Attempting to verify database connectivity...")
     try:
+        # Check connection by accessing a model
         User.objects.first()
         print("Successfully connected to MongoDB via MongoEngine.")
     except Exception as e:
@@ -58,10 +60,15 @@ def seed_db(heavy=False):
     if admin_user_obj:
         print(f"Admin user '{ADMIN_USERNAME}' already exists.")
     else:
-        admin_user_obj = User(username=ADMIN_USERNAME, email="admin@example.com", role='admin')
+        admin_user_obj = User(username=ADMIN_USERNAME, email=ADMIN_EMAIL, role='admin')
         admin_user_obj.set_password(ADMIN_PASSWORD)
         admin_user_obj.save()
-        print(f"Added admin user: {ADMIN_USERNAME}")
+        print(f"Added admin user: {ADMIN_USERNAME} ({ADMIN_EMAIL})")
+
+    if admin_only:
+        print("Admin-only seeding requested. Skipping articles and profile.")
+        app_context.pop()
+        return
 
     # --- Seed Basic Articles ---
     base_articles = [
@@ -165,5 +172,6 @@ def seed_db(heavy=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed initial data into MongoDB.")
     parser.add_argument("--heavy", action="store_true", help="Seed 150 large articles for performance testing.")
+    parser.add_argument("--admin-only", action="store_true", help="Only seed the admin user, skip articles and profile.")
     args = parser.parse_args()
-    seed_db(heavy=args.heavy)
+    seed_db(heavy=args.heavy, admin_only=args.admin_only)
