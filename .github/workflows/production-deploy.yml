@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      hard_rebuild:
+        description: "DANGER: Use down -v to purge volumes (Required for version rollbacks)"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -163,7 +169,8 @@ jobs:
       - name: Deploy to Raspberry Pi
         env:
           DEPLOY_CLEAN_START: "true"
-          DEPLOY_RESET_VOLUMES: "false"
+          DEPLOY_RESET_VOLUMES: "${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}"
+          FORCE_PRODUCTION_WIPE: "${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
         run: ./scripts/deploy.sh
 
