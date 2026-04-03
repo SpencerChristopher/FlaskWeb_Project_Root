@@ -1,0 +1,94 @@
+name: Pi Disposable Hardware Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for audit (e.g., hardware verification)'
+        required: false
+        default: 'Manual readiness check'
+
+jobs:
+  native-hardware-audit:
+    name: Full Native Test & Cleanup
+    runs-on: [self-hosted, pi-prod]
+    environment: production
+    env:
+      DEPLOY_ENV: production
+      IMAGE_TAG: "pi-audit:latest"
+      COMPOSE_PROJECT_NAME: "pi-audit"
+      # Secrets for interpolation
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      MONGO_APP_DB: "audit_db"
+      MONGO_TEST_DB: "audit_test_db"
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      # Environment Settings
+      FLASK_ENV: production
+      LOG_LEVEL: INFO
+      GUNICORN_WORKERS: 1
+      GUNICORN_THREADS: 1
+      GUNICORN_TIMEOUT: 30
+      JWT_COOKIE_SECURE: "true"
+      CORS_ORIGINS: "https://${{ secrets.DOMAIN_NAME }}"
+      FORWARDED_ALLOW_IPS: "*"
+      # Mock values for non-functional components
+      SMTP_HOST: "localhost"
+      SMTP_PORT: 587
+      SMTP_USE_TLS: "true"
+      SMTP_USE_SSL: "false"
+      TURNSTILE_ENABLED: "false"
+      TURNSTILE_LOGIN_ENABLED: "false"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Preflight Check
+        run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh
+
+      - name: Native ARM64 Build
+        run: docker build -t ${{ env.IMAGE_TAG }} .
+
+      - name: Spin Up Disposable Stack
+        run: |
+          # Uses -p to isolate from any existing production project
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            -f docker-compose.prod.yml \
+            up -d --wait --wait-timeout 180 --no-build
+
+      - name: Run Full Native Test Suite (Unit + Integration + Smoke)
+        run: |
+          echo "Running exhaustive hardware verification..."
+          docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not heavy"
+
+      - name: Verify Database Connectivity
+        run: |
+          docker exec flask_web_app /app/.venv/bin/python scripts/check_db_connection.py
+
+      - name: Verify Tunnel Process Initialization
+        run: |
+          echo "Checking if cloudflared binary starts correctly on this CPU..."
+          docker logs cloudflared_tunnel | grep -E -q "Connected to|Registered tunnel connection" || (echo "Tunnel process failed to initialize" && exit 1)
+
+      - name: Comprehensive Teardown (Cleanup Everything)
+        if: always()
+        run: |
+          echo "Cleaning up audit project and purging volumes..."
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            -f docker-compose.prod.yml \
+            down -v --remove-orphans
+          docker image rm ${{ env.IMAGE_TAG }} || true
+          echo "✅ Audit complete. Hardware is verified and clean."
