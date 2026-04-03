@@ -33,14 +33,14 @@ REQUIRED_DIRS=(
 
 for dir in "${REQUIRED_DIRS[@]}"; do
     if [ ! -d "$dir" ]; then
-        echo "Creating missing directory: $dir"
-        sudo mkdir -p "$dir"
-        sudo chown "$APP_USER":"$APP_USER" "$dir"
-        sudo chmod 770 "$dir"
+        echo "ERROR: Required directory $dir does not exist."
+        echo "Please create it as a user with sudo: sudo mkdir -p $dir && sudo chown -R webapp:webapp $dir"
+        exit 1
     fi
-    # Write Test
-    if ! sudo -u "$APP_USER" touch "$dir/.write_test"; then
+    # Passive Write Test
+    if ! touch "$dir/.write_test" 2>/dev/null; then
         echo "ERROR: User $APP_USER cannot write to $dir"
+        echo "Action required on Pi: sudo chown -R webapp:webapp $MOUNT_POINT"
         exit 1
     fi
     rm -f "$dir/.write_test"
