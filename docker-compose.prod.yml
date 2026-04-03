@@ -4,11 +4,9 @@ services:
     image: cloudflare/cloudflared:latest@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
     container_name: cloudflared_tunnel
     restart: unless-stopped
-    # --no-tls-verify is required because CI generates self-signed certificates for Nginx.
-    # The tunnel still provides full Edge encryption for users at spencerscooking.uk.
-    command: tunnel --no-autoupdate --no-tls-verify run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    # Mirrors staging setup: SSL at edge, internal routing.
+    # --no-tls-verify included for parity with staging workflow.
+    command: tunnel --no-autoupdate --no-tls-verify run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       nginx:
         condition: service_started
@@ -28,10 +26,10 @@ services:
 
   # Production-specific overrides for Nginx
   nginx:
-    # Bind to 443; reachable internally by the tunnel. 
-    # External access only via the tunnel.
+    # SSL is terminated at the Cloudflare Edge.
+    # Nginx handles internal routing via HTTP on Port 80.
     ports:
-      - "443:443"
+      - "80:80"
     environment:
       - NGINX_HOST=${DOMAIN_NAME:?DOMAIN_NAME required}
     logging:
@@ -42,9 +40,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
-        reservations:
           memory: 32M
+        reservations:
+          memory: 16M
 
   # Production-specific overrides for the Web App
   web:
@@ -53,7 +51,7 @@ services:
       TALISMAN_FORCE_HTTPS: "true"
       JWT_COOKIE_SECURE: "true"
       CORS_ORIGINS: https://spencerscooking.uk,https://prod.spencerscooking.uk
-      GUNICORN_WORKERS: 2
+      GUNICORN_WORKERS: 1
       GUNICORN_THREADS: 1
     logging:
       driver: "json-file"
@@ -63,13 +61,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 384M
-        reservations:
           memory: 128M
+        reservations:
+          memory: 64M
 
   # Production-specific overrides for MongoDB
   mongo:
-    # Cap WiredTiger cache to protect Pi RAM
+    # Cap WiredTiger cache to protect Pi RAM (Mirroring Staging Tuning)
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
     logging:
       driver: "json-file"
@@ -93,9 +91,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 32M
         reservations:
-          memory: 64M
+          memory: 16M
 
 networks:
   default:
