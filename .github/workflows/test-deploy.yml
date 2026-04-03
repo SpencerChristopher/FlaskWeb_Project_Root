@@ -51,16 +51,16 @@ jobs:
 
       - name: Security Audit (pip-audit)
         run: |
-          allowlist_args=""
-          if [ -f pip-audit-allowlist.txt ]; then
-            allowlist_args=$(awk ' /^[[:space:]]*([^#[:space:]])/ { printf("--ignore-vuln %s ", $1) }' pip-audit-allowlist.txt)
-          fi
           docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim-bookworm /bin/sh -c "\
             pip install --no-cache-dir poetry poetry-plugin-export pip-audit bandit && \
             poetry export --format=constraints.txt --output=constraints.txt --without-hashes && \
-            pip-audit -r constraints.txt ${allowlist_args} && \
+            allowlist_args=\"\" && \
+            if [ -f pip-audit-allowlist.txt ]; then \
+              allowlist_args=\$(grep -v '^#' pip-audit-allowlist.txt | grep -v '^[[:space:]]*$' | awk '{print \"--ignore-vuln \" \$1}' | xargs); \
+            fi && \
+            echo \"Running pip-audit with: \$allowlist_args\" && \
+            pip-audit \$allowlist_args -r constraints.txt && \
             bandit -r src/ -ll"
-
       - name: Workflow Lint (actionlint)
         run: |
           docker run --rm -v ${{ github.workspace }}:/app -w /app rhysd/actionlint:latest -config-file .github/actionlint.yaml .github/workflows/*.yml
