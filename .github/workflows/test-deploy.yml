@@ -86,7 +86,7 @@ jobs:
           platforms: linux/arm64
           push: false # Verify build only, no push
           build-args: |
-            PYTHON_VERSION=3.11
+            PYTHON_VERSION=3.12
           cache-from: type=gha
 
   # --- 3. AMD64 VERIFICATION: Functional tests on GitHub-hosted runner ---
@@ -106,43 +106,44 @@ jobs:
       MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
       MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      # Unified Repo Variables
+      FLASK_ENV: ${{ vars.FLASK_ENV }}
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+      GUNICORN_WORKERS: 2
+      GUNICORN_THREADS: 1
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      # SMTP & Turnstile
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
       SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       SMTP_USE_TLS: ${{ secrets.SMTP_USE_TLS }}
       SMTP_USE_SSL: ${{ secrets.SMTP_USE_SSL }}
-      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
-      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
-      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: "false"
       TURNSTILE_LOGIN_ENABLED: "false"
-      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-      FLASK_ENV: ${{ vars.FLASK_ENV }}
-      PYTHON_VERSION: "3.11"
+      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
+      PYTHON_VERSION: "3.12"
       HOST_PORT: 5005
-      GUNICORN_WORKERS: 2
-      GUNICORN_THREADS: 1
-      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
-      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
-      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
-      # Repository Variables (Config migration)
-      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
-      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
-      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
-      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
-      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
-      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
-      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
-      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
-      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
-      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
-      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
-      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
-      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
 
     steps:
       - name: Checkout code
@@ -168,31 +169,32 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Validate required secrets
+      - name: Environment Gatekeeper (Fail-Fast)
+        shell: bash
         run: |
-          missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required secret: $key"
-              missing=1
+          # 1. Extract required keys from .env.template, ignoring comments and empty lines
+          REQUIRED_VARS=$(grep -v '^#' .env.template | grep '=' | cut -d'=' -f1 | xargs)
+          
+          # 2. Loop through and verify each is set and not empty in the current env context
+          for VAR in $REQUIRED_VARS; do
+            # Skip optional keys
+            case "$VAR" in
+              CSP_REPORT_URI|CLOUDFLARE_TUNNEL_TOKEN|DEPLOY_ENV|KAGGLE_API_KEY|LINKEDIN_API_TOKEN|LEETCODE_SESSION|HTB_TOKEN) continue ;;
+            esac
+
+            # Check if variable is set in the environment
+            if [ -z "${!VAR}" ]; then
+              echo "::error::Missing required environment variable: $VAR"
+              FAILED=1
             fi
           done
-          if [ "$missing" -ne 0 ]; then
+
+          if [ "$FAILED" == "1" ]; then
+            echo "--- Environment Validation Failed ---"
+            echo "Please ensure all variables from .env.template are set in GitHub Secrets/Variables."
             exit 1
           fi
-      
-      - name: Validate required vars
-        run: |
-          missing=0
-          for key in LOG_LEVEL FLASK_ENV JWT_COOKIE_SECURE JWT_COOKIE_CSRF_PROTECT JWT_COOKIE_SAMESITE PROXY_FIX_X_FOR PROXY_FIX_X_PROTO PROXY_FIX_X_HOST PROXY_FIX_X_PREFIX CORS_ORIGINS GUNICORN_TIMEOUT FORWARDED_ALLOW_IPS MONGO_SERVER_SELECTION_TIMEOUT_MS MONGO_CONNECT_TIMEOUT_MS MONGO_SOCKET_TIMEOUT_MS TALISMAN_FORCE_HTTPS CONTACT_MIN_TIME_MS CONTACT_HONEYPOT_FIELDS; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required var: $key"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
+          echo "Environment Validated Successfully."
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -337,6 +339,30 @@ jobs:
       MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
       MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      # Unified Repo Variables
+      FLASK_ENV: production
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+      GUNICORN_WORKERS: ${{ vars.GUNICORN_WORKERS }}
+      GUNICORN_THREADS: ${{ vars.GUNICORN_THREADS }}
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      STAGING_HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      # Secrets (Env specific)
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -349,35 +375,8 @@ jobs:
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
-      TURNSTILE_LOGIN_ENABLED: "false"
-      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
-      FLASK_ENV: production
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
-      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
-      CF_ACCESS_JWT: ${{ secrets.CF_ACCESS_JWT }}
-      GUNICORN_WORKERS: ${{ vars.GUNICORN_WORKERS }}
-      GUNICORN_THREADS: ${{ vars.GUNICORN_THREADS }}
-      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
-      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
-      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
-      STAGING_HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
-      # Repository Variables (Config migration)
-      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
-      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
-      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
-      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
-      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
-      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
-      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
-      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
-      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
-      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
-      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
-      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
-      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
-      # Flip to 'true' only when you intend to reset or reseed profiles/articles.
+      # Staging Flags
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
       SEED_IF_EMPTY: ${{ (github.event.inputs.seed_if_empty == 'true') && 'true' || 'false' }}
     steps:

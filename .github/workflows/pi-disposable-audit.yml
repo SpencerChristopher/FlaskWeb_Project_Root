@@ -34,18 +34,29 @@ jobs:
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
-      # Environment Settings
+      # Unified Repo Variables
       FLASK_ENV: production
-      LOG_LEVEL: INFO
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
       GUNICORN_WORKERS: 1
       GUNICORN_THREADS: 1
       GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
       JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
       JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
       JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
       CORS_ORIGINS: "https://${{ secrets.DOMAIN_NAME }}"
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
       FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
-      # SMTP and non-functional mocks (Injected from secrets/vars if they exist)
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      # SMTP & Turnstile
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
       SMTP_USER: ${{ secrets.SMTP_USER }}
@@ -53,17 +64,6 @@ jobs:
       SMTP_USE_TLS: "true"
       SMTP_USE_SSL: "false"
       CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
-      # Extra orchestration vars from Repo Vars
-      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
-      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
-      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
-      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
-      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
-      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
-      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
-      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
-      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
 
     steps:
       - name: Checkout code

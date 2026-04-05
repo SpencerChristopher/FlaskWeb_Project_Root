@@ -1,6 +1,6 @@
 # --- Builder Stage ---
 # This stage installs dependencies using Poetry
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:4c50375fc4b8ea5ca06ac9485186ccb50171c99390b0e9300c2bac871cc2dc3e
+ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:06584c6c0b328c74577881be68b6b15e47820e1d087796d85915d311b7dfb2a4
 ARG NODE_IMAGE=node:20-slim@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92
 FROM ${PYTHON_IMAGE} AS builder
 

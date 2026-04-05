@@ -39,38 +39,68 @@ jobs:
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
-      # Production Variables (Aligned with Pi constraints)
+      # Unified Repo Variables
       FLASK_ENV: production
-      LOG_LEVEL: INFO
-      TALISMAN_FORCE_HTTPS: "true"
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
       GUNICORN_WORKERS: 1
       GUNICORN_THREADS: 1
-      GUNICORN_TIMEOUT: 30
-      MONGO_SERVER_SELECTION_TIMEOUT_MS: 10000
-      MONGO_CONNECT_TIMEOUT_MS: 10000
-      MONGO_SOCKET_TIMEOUT_MS: 10000
-      JWT_COOKIE_SECURE: "true"
-      JWT_COOKIE_CSRF_PROTECT: "true"
-      JWT_COOKIE_SAMESITE: "Lax"
-      CSP_REPORT_URI: ""
-      CORS_ORIGINS: "https://${{ secrets.DOMAIN_NAME }}"
-      PROXY_FIX_X_FOR: 1
-      PROXY_FIX_X_PROTO: 1
-      PROXY_FIX_X_HOST: 1
-      PROXY_FIX_X_PREFIX: 1
-      FORWARDED_ALLOW_IPS: "*"
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      TALISMAN_FORCE_HTTPS: ${{ vars.TALISMAN_FORCE_HTTPS }}
+      CORS_ORIGINS: ${{ vars.CORS_ORIGINS }}
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      # SMTP (Fixed mapping)
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
       SMTP_USE_TLS: "true"
       SMTP_USE_SSL: "false"
-      TURNSTILE_ENABLED: "false"
-      TURNSTILE_LOGIN_ENABLED: "false"
-      CONTACT_MIN_TIME_MS: 1500
-      CONTACT_HONEYPOT_FIELDS: "website,company"
+      # Turnstile
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_ENABLED: "true"
+      # Contact Routing
+      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Environment Gatekeeper (Fail-Fast)
+        shell: bash
+        run: |
+          # 1. Extract required keys from .env.template
+          REQUIRED_VARS=$(grep -v '^#' .env.template | grep '=' | cut -d'=' -f1 | xargs)
+          
+          # 2. Loop through and verify each is set in production env
+          for VAR in $REQUIRED_VARS; do
+            case "$VAR" in
+              CSP_REPORT_URI|CLOUDFLARE_TUNNEL_TOKEN|DEPLOY_ENV|KAGGLE_API_KEY|LINKEDIN_API_TOKEN|LEETCODE_SESSION|HTB_TOKEN) continue ;;
+            esac
+            if [ -z "${!VAR}" ]; then
+              echo "::error::Missing required environment variable: $VAR"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" == "1" ]; then
+            exit 1
+          fi
+          echo "Environment Validated."
 
       - name: Preflight Check (Pi Readiness)
         run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh

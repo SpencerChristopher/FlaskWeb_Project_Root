@@ -48,11 +48,12 @@ This plan outlines the sequential steps required to move the project from "Stagi
 
 ### Stage 1: Runner Scaffolding (Bootstrap Integration) [DONE]
 *   Created `scripts/preflight_pi.sh` to verify USB mount (`/mnt/usb-storage`), Docker permissions, and NTP sync.
+*   **Verified on Hardware:** Manually confirmed `/mnt/usb-storage/docker-volumes` and `/backups` are writable by `webapp` user.
 
 ### Stage 2: Deployment Script Guard [DONE]
 *   Modified `scripts/deploy.sh` to prioritize `mongodump` to the USB backup directory.
 
-**Gate:** Verified logic in `preflight_pi.sh` and `deploy.sh`.
+**Gate:** Verified logic in `preflight_pi.sh` and `deploy.sh` on physical Pi 4.
 
 ---
 

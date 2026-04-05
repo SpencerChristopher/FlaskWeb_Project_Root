@@ -1,4 +1,11 @@
 services:
+  web:
+    environment:
+      - TALISMAN_FORCE_HTTPS=false # Disable HTTPS enforcement for localhost
+      - TURNSTILE_ENABLED=false    # Disable Turnstile for local development
+      - FLASK_ENV=development
+      - LOG_LEVEL=DEBUG
+
   nginx:
     ports:
       - "5010:80" # Map host port 5010 to Nginx container port 80
