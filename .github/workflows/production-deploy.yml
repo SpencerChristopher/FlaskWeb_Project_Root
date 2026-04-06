@@ -72,6 +72,7 @@ jobs:
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: "true"
+      TURNSTILE_LOGIN_ENABLED: ${{ vars.TURNSTILE_LOGIN_ENABLED }}
       # Contact Routing
       CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
       CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
