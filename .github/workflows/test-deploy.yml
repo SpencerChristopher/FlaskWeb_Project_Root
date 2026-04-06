@@ -262,10 +262,10 @@ jobs:
       - name: Run tests (exclude e2e, performance, smoke, and heavy)
         run: |
           docker exec \
-            -e MONGO_APP_USER="${{ secrets.MONGO_APP_USER }}" \
+            -e MONGO_APP_USER="${{ vars.MONGO_APP_USER }}" \
             -e MONGO_APP_PASSWORD="${{ secrets.MONGO_APP_PASSWORD }}" \
-            -e MONGO_APP_DB="${{ secrets.MONGO_APP_DB }}" \
-            -e MONGO_TEST_DB="${{ secrets.MONGO_TEST_DB }}" \
+            -e MONGO_APP_DB="${{ vars.MONGO_APP_DB }}" \
+            -e MONGO_TEST_DB="${{ vars.MONGO_TEST_DB }}" \
             -e PYTHONPATH=/app \
             flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
 
