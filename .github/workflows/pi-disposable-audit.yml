@@ -11,14 +11,22 @@ on:
         required: false
         default: 'Manual readiness check'
 
+concurrency:
+  group: pi-disposable-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   native-hardware-audit:
     name: Full Native Test & Cleanup
     runs-on: [self-hosted, pi-prod]
     environment: production
+    timeout-minutes: 45
     env:
       DEPLOY_ENV: production
-      IMAGE_TAG: "pi-audit:latest"
+      IMAGE_TAG: "pi-audit:${{ github.sha }}"
       COMPOSE_PROJECT_NAME: "pi-audit"
       # Secrets for interpolation
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
@@ -69,6 +77,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Guard Against Live Production Containers
+        run: |
+          set -euo pipefail
+          if docker ps -a --format '{{.Names}}' | grep -E -q '^(flask_web_app|nginx_proxy|mongodb|redis|cloudflared_tunnel)$'; then
+            echo "Production containers detected. Stop the prod stack before running the audit."
+            exit 1
+          fi
+
       - name: Preflight Check
         run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh
 
@@ -87,16 +103,26 @@ jobs:
       - name: Run Full Native Test Suite (Unit + Integration + Smoke)
         run: |
           echo "Running exhaustive hardware verification..."
-          docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not heavy"
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web \
+            /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not heavy"
 
       - name: Verify Database Connectivity
         run: |
-          docker exec flask_web_app /app/.venv/bin/python scripts/check_db_connection.py
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web \
+            /app/.venv/bin/python scripts/check_db_connection.py
 
       - name: Verify Tunnel Process Initialization
         run: |
           echo "Checking if cloudflared binary starts correctly on this CPU..."
-          docker logs cloudflared_tunnel | grep -E -q "Connected to|Registered tunnel connection" || (echo "Tunnel process failed to initialize" && exit 1)
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} logs cloudflared | \
+            grep -E -q "Connected to|Registered tunnel connection" || \
+            (echo "Tunnel process failed to initialize" && exit 1)
+
+      - name: Dump Audit Logs on Failure
+        if: failure()
+        run: |
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} logs --tail 200 web nginx mongo redis cloudflared || true
 
       - name: Comprehensive Teardown (Cleanup Everything)
         if: always()
@@ -108,4 +134,4 @@ jobs:
             -f docker-compose.prod.yml \
             down -v --remove-orphans
           docker image rm ${{ env.IMAGE_TAG }} || true
-          echo "✅ Audit complete. Hardware is verified and clean."
+          echo "Audit complete. Hardware is verified and clean."
