@@ -101,10 +101,10 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER || secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
-      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB || secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB || secrets.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       # Unified Repo Variables
       FLASK_ENV: ${{ vars.FLASK_ENV }}
@@ -169,32 +169,9 @@ jobs:
         with:
           driver: docker-container
 
-      - name: Environment Gatekeeper (Fail-Fast)
+      - name: Validate required env
         shell: bash
-        run: |
-          # 1. Extract required keys from .env.template, ignoring comments and empty lines
-          REQUIRED_VARS=$(grep -v '^#' .env.template | grep '=' | cut -d'=' -f1 | xargs)
-          
-          # 2. Loop through and verify each is set and not empty in the current env context
-          for VAR in $REQUIRED_VARS; do
-            # Skip optional keys
-            case "$VAR" in
-              CSP_REPORT_URI|CLOUDFLARE_TUNNEL_TOKEN|DEPLOY_ENV|KAGGLE_API_KEY|LINKEDIN_API_TOKEN|LEETCODE_SESSION|HTB_TOKEN) continue ;;
-            esac
-
-            # Check if variable is set in the environment
-            if [ -z "${!VAR}" ]; then
-              echo "::error::Missing required environment variable: $VAR"
-              FAILED=1
-            fi
-          done
-
-          if [ "$FAILED" == "1" ]; then
-            echo "--- Environment Validation Failed ---"
-            echo "Please ensure all variables from .env.template are set in GitHub Secrets/Variables."
-            exit 1
-          fi
-          echo "Environment Validated Successfully."
+        run: ./scripts/ci/validate_env.sh ci/required-verify.env
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -334,10 +311,10 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER || secrets.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      MONGO_APP_DB: ${{ secrets.MONGO_APP_DB }}
-      MONGO_TEST_DB: ${{ secrets.MONGO_TEST_DB }}
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB || secrets.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB || secrets.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       # Unified Repo Variables
       FLASK_ENV: production
@@ -395,31 +372,9 @@ jobs:
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
 
-      - name: Validate required secrets
-        run: |
-          missing=0
-          for key in SECRET_KEY ADMIN_USERNAME ADMIN_PASSWORD ADMIN_EMAIL MONGO_ROOT_USER MONGO_ROOT_PASSWORD MONGO_APP_USER MONGO_APP_PASSWORD REDIS_PASSWORD CLOUDFLARE_TUNNEL_TOKEN SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD CONTACT_TO_EMAIL CONTACT_FROM_EMAIL PASSWORD_SERVICE_FROM_EMAIL TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY TURNSTILE_ENABLED; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required secret: $key"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
-      
-      - name: Validate required vars
-        run: |
-          missing=0
-          for key in LOG_LEVEL JWT_COOKIE_SECURE JWT_COOKIE_CSRF_PROTECT JWT_COOKIE_SAMESITE PROXY_FIX_X_FOR PROXY_FIX_X_PROTO PROXY_FIX_X_HOST PROXY_FIX_X_PREFIX CORS_ORIGINS GUNICORN_TIMEOUT FORWARDED_ALLOW_IPS MONGO_SERVER_SELECTION_TIMEOUT_MS MONGO_CONNECT_TIMEOUT_MS MONGO_SOCKET_TIMEOUT_MS TALISMAN_FORCE_HTTPS CONTACT_MIN_TIME_MS CONTACT_HONEYPOT_FIELDS GUNICORN_WORKERS GUNICORN_THREADS STAGING_HOST_PORT; do
-            if [ -z "${!key}" ]; then
-              echo "Missing required var: $key"
-              missing=1
-            fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            exit 1
-          fi
+      - name: Validate required env
+        shell: bash
+        run: ./scripts/ci/validate_env.sh ci/required-staging.env
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
