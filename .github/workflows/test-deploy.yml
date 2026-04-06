@@ -99,6 +99,7 @@ jobs:
       SECRET_KEY: ${{ secrets.SECRET_KEY }}
       ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
       MONGO_APP_USER: ${{ vars.MONGO_APP_USER || secrets.MONGO_APP_USER }}
