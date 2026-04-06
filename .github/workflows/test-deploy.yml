@@ -107,6 +107,7 @@ jobs:
       MONGO_APP_DB: ${{ vars.MONGO_APP_DB }}
       MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       # Unified Repo Variables
       FLASK_ENV: ${{ vars.FLASK_ENV }}
       LOG_LEVEL: ${{ vars.LOG_LEVEL }}
@@ -140,11 +141,12 @@ jobs:
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: "false"
       TURNSTILE_LOGIN_ENABLED: "false"
+      STAGING_HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
       CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
       CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
       PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
       PYTHON_VERSION: "3.12"
-      HOST_PORT: 5005
+      HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
 
     steps:
       - name: Checkout code
@@ -159,10 +161,10 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.hard_rebuild }}" = "true" ]; then
             echo "Hard rebuild requested: removing volumes and orphans."
-            docker compose -f docker-compose.yml -f docker-compose.ci.yml down -v --remove-orphans || true
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down -v --remove-orphans || true
           else
             echo "Soft reset: stopping containers without volume/orphan cleanup."
-            docker compose -f docker-compose.yml -f docker-compose.ci.yml down || true
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down || true
           fi
 
       - name: Set up Docker Buildx
@@ -172,7 +174,7 @@ jobs:
 
       - name: Validate required env
         shell: bash
-        run: ./scripts/ci/validate_env.sh ci/required-verify.env
+        run: ./scripts/ci/validate_env.sh ci/required-staging.env
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -203,13 +205,13 @@ jobs:
 
       - name: Start containers
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d --wait --wait-timeout 180 --no-build
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml up -d --wait --wait-timeout 180 --no-build
 
       - name: Verify container health (Fail-Fast Gate)
         run: |
-          echo "Waiting for web app to respond on isolated port 5005..."
-          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:5005/
-          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:5005/api/home
+          echo "Waiting for web app to respond on isolated port ${HOST_PORT}..."
+          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${HOST_PORT}/
+          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${HOST_PORT}/api/home
 
       - name: Assert web healthy before seed
         run: |
@@ -283,7 +285,7 @@ jobs:
 
       - name: Capture logs on failure
         if: failure()
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml logs --no-color > docker-compose.log
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml logs --no-color > docker-compose.log
 
       - name: Upload logs on failure
         if: failure()
@@ -294,7 +296,7 @@ jobs:
 
       - name: Stop containers
         if: always()
-        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml down
+        run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml down
 
   # --- 4. DEPLOYMENT: Rollout to Staging ---
   deploy-to-wsl:
@@ -353,6 +355,7 @@ jobs:
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
       TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
+      TURNSTILE_LOGIN_ENABLED: ${{ vars.TURNSTILE_LOGIN_ENABLED }}
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       # Staging Flags
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
