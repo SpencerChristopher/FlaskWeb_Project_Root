@@ -210,8 +210,8 @@ jobs:
       - name: Verify container health (Fail-Fast Gate)
         run: |
           echo "Waiting for web app to respond on isolated port ${HOST_PORT}..."
-          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused http://localhost:${HOST_PORT}/
-          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 http://localhost:${HOST_PORT}/api/home
+          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused "http://localhost:${HOST_PORT}/"
+          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 "http://localhost:${HOST_PORT}/api/home"
 
       - name: Assert web healthy before seed
         run: |
