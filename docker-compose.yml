@@ -110,7 +110,7 @@ services:
       MONGO_TEST_DB: ${MONGO_TEST_DB:?MONGO_TEST_DB required}
     volumes:
       - mongo_data:/data/db
-      - ./docker/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./docker/mongo/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
     healthcheck:
       test:
         [

@@ -105,6 +105,7 @@ jobs:
             -f docker-compose.yml \
             -f docker-compose.ci.yml \
             -f docker-compose.prod.yml \
+            -f docker-compose.pi.yml \
             up -d --wait --wait-timeout 180 --no-build
 
       - name: Run Full Native Test Suite (Unit + Integration + Smoke)
@@ -139,6 +140,7 @@ jobs:
             -f docker-compose.yml \
             -f docker-compose.ci.yml \
             -f docker-compose.prod.yml \
+            -f docker-compose.pi.yml \
             down -v --remove-orphans
           docker image rm ${{ env.IMAGE_TAG }} || true
           echo "Audit complete. Hardware is verified and clean."
