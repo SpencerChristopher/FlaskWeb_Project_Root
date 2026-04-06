@@ -102,10 +102,10 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-      MONGO_APP_USER: ${{ vars.MONGO_APP_USER || secrets.MONGO_APP_USER }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      MONGO_APP_DB: ${{ vars.MONGO_APP_DB || secrets.MONGO_APP_DB }}
-      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB || secrets.MONGO_TEST_DB }}
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       # Unified Repo Variables
       FLASK_ENV: ${{ vars.FLASK_ENV }}
@@ -312,10 +312,10 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-      MONGO_APP_USER: ${{ vars.MONGO_APP_USER || secrets.MONGO_APP_USER }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      MONGO_APP_DB: ${{ vars.MONGO_APP_DB || secrets.MONGO_APP_DB }}
-      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB || secrets.MONGO_TEST_DB }}
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       # Unified Repo Variables
       FLASK_ENV: production
