@@ -35,10 +35,10 @@ jobs:
       ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
       MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
       MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
-      MONGO_APP_USER: ${{ secrets.MONGO_APP_USER }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER }}
       MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
-      MONGO_APP_DB: "audit_db"
-      MONGO_TEST_DB: "audit_test_db"
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB }}
       REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
       DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
@@ -72,6 +72,13 @@ jobs:
       SMTP_USE_TLS: "true"
       SMTP_USE_SSL: "false"
       CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
+      # Turnstile (shared)
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
+      TURNSTILE_LOGIN_ENABLED: ${{ vars.TURNSTILE_LOGIN_ENABLED }}
 
     steps:
       - name: Checkout code
