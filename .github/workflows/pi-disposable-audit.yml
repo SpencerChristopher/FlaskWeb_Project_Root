@@ -110,14 +110,22 @@ jobs:
 
       - name: Inject tests into container
         run: |
-          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web mkdir -p /app/tests
-          docker cp tests/. $(docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps -q web):/app/tests
-          docker cp pytest.ini $(docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps -q web):/app/pytest.ini
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T web mkdir -p /app/tests
+          docker cp tests/. "$(docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" ps -q web)":/app/tests
+          docker cp pytest.ini "$(docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" ps -q web)":/app/pytest.ini
+
+      - name: Seed Database for Audit
+        run: |
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T web \
+            /app/.venv/bin/python scripts/seed_db.py
 
       - name: Run Full Native Test Suite (Unit + Integration + Smoke)
         run: |
           echo "Running exhaustive hardware verification..."
-          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web \
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T \
+            -e TURNSTILE_ENABLED=false \
+            -e TURNSTILE_LOGIN_ENABLED=false \
+            web \
             /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not heavy"
 
       - name: Verify Database Connectivity
