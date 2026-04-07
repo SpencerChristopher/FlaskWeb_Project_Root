@@ -108,6 +108,12 @@ jobs:
             -f docker-compose.pi.yml \
             up -d --wait --wait-timeout 180 --no-build
 
+      - name: Inject tests into container
+        run: |
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web mkdir -p /app/tests
+          docker cp tests/. $(docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps -q web):/app/tests
+          docker cp pytest.ini $(docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps -q web):/app/pytest.ini
+
       - name: Run Full Native Test Suite (Unit + Integration + Smoke)
         run: |
           echo "Running exhaustive hardware verification..."
