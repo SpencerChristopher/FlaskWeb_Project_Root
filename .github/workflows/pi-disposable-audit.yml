@@ -74,11 +74,11 @@ jobs:
       CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
       CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
       PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
-      # Turnstile (shared)
+      # Turnstile (shared) - Disabled for hardware audit to allow automated login/tests
       TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
       TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
-      TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
-      TURNSTILE_LOGIN_ENABLED: ${{ vars.TURNSTILE_LOGIN_ENABLED }}
+      TURNSTILE_ENABLED: "false"
+      TURNSTILE_LOGIN_ENABLED: "false"
 
     steps:
       - name: Checkout code
