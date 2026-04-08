@@ -38,12 +38,12 @@ services:
   # Staging-specific overrides for the Web App (Matching Low-Memory Tuning)
   web:
     environment:
-      FLASK_ENV: production
-      TALISMAN_FORCE_HTTPS: "true"
-      JWT_COOKIE_SECURE: "true"
-      CORS_ORIGINS: https://staging.spencerscooking.uk
-      GUNICORN_WORKERS: 1
-      GUNICORN_THREADS: 1
+      - FLASK_ENV=production
+      - TALISMAN_FORCE_HTTPS=${TALISMAN_FORCE_HTTPS:-true}
+      - JWT_COOKIE_SECURE=true
+      - CORS_ORIGINS=https://staging.spencerscooking.uk
+      - GUNICORN_WORKERS=1
+      - GUNICORN_THREADS=1
     logging:
       driver: "json-file"
       options:
