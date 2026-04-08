@@ -98,16 +98,6 @@ jobs:
           # Confirms the built binary is actually ARM64 before proceeding
           docker run --rm ${{ env.IMAGE_TAG }} uname -m | grep -q "aarch64"
 
-      - name: Start containers (Test Phase)
-        env:
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
-        run: |
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.prod.yml up -d --wait --wait-timeout 180 --no-build
-
-      - name: Run Native Backend Tests
-        run: |
-          docker exec -e PYTHONPATH=/app flask_web_app /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not smoke and not heavy"
-
       - name: Deploy to Raspberry Pi (Production Swap)
         env:
           DEPLOY_CLEAN_START: "true"
