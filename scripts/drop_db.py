@@ -25,7 +25,7 @@ def drop_database():
     root_user = os.environ.get("MONGO_ROOT_USER", "root")
     root_password = os.environ.get("MONGO_ROOT_PASSWORD", "changeme")
     mongo_uri = f"mongodb://{root_user}:{root_password}@{host}:27017/?authSource=admin"
-    print(f"Attempting to connect to MongoDB at: {mongo_uri}")
+    print(f"Attempting to connect to MongoDB at host: {host}")
 
     try:
         client = MongoClient(mongo_uri)

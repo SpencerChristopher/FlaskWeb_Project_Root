@@ -80,7 +80,7 @@ wait_for_mongo_healthy() {
 }
 
 verify_mongo_auth_ping() {
-  docker exec mongodb sh -lc 'mongosh --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand(\"ping\").ok"' | grep -q "1"
+  docker exec mongodb sh -lc 'mongo --quiet --username "$MONGO_INITDB_ROOT_USERNAME" --password "$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval "db.adminCommand(\"ping\").ok"' | grep -q "1"
 }
 
 perform_mongo_auth_recovery() {

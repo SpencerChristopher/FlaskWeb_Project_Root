@@ -1,0 +1,157 @@
+name: Pi Disposable Hardware Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for audit (e.g., hardware verification)'
+        required: false
+        default: 'Manual readiness check'
+
+concurrency:
+  group: pi-disposable-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  native-hardware-audit:
+    name: Full Native Test & Cleanup
+    runs-on: [self-hosted, pi-prod]
+    environment: production
+    timeout-minutes: 45
+    env:
+      DEPLOY_ENV: production
+      IMAGE_TAG: "pi-audit:${{ github.sha }}"
+      COMPOSE_PROJECT_NAME: "pi-audit"
+      # Secrets for interpolation
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+      ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
+      ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      MONGO_ROOT_USER: ${{ secrets.MONGO_ROOT_USER }}
+      MONGO_ROOT_PASSWORD: ${{ secrets.MONGO_ROOT_PASSWORD }}
+      MONGO_APP_USER: ${{ vars.MONGO_APP_USER }}
+      MONGO_APP_PASSWORD: ${{ secrets.MONGO_APP_PASSWORD }}
+      MONGO_APP_DB: ${{ vars.MONGO_APP_DB }}
+      MONGO_TEST_DB: ${{ vars.MONGO_TEST_DB }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+      # Unified Repo Variables
+      FLASK_ENV: production
+      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
+      GUNICORN_WORKERS: 1
+      GUNICORN_THREADS: 1
+      GUNICORN_TIMEOUT: ${{ vars.GUNICORN_TIMEOUT }}
+      JWT_COOKIE_SECURE: ${{ vars.JWT_COOKIE_SECURE }}
+      JWT_COOKIE_CSRF_PROTECT: ${{ vars.JWT_COOKIE_CSRF_PROTECT }}
+      JWT_COOKIE_SAMESITE: ${{ vars.JWT_COOKIE_SAMESITE }}
+      TALISMAN_FORCE_HTTPS: "false"
+      CORS_ORIGINS: "https://${{ secrets.DOMAIN_NAME }}"
+      PROXY_FIX_X_FOR: ${{ vars.PROXY_FIX_X_FOR }}
+      PROXY_FIX_X_PROTO: ${{ vars.PROXY_FIX_X_PROTO }}
+      PROXY_FIX_X_HOST: ${{ vars.PROXY_FIX_X_HOST }}
+      PROXY_FIX_X_PREFIX: ${{ vars.PROXY_FIX_X_PREFIX }}
+      FORWARDED_ALLOW_IPS: ${{ vars.FORWARDED_ALLOW_IPS }}
+      MONGO_SERVER_SELECTION_TIMEOUT_MS: ${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}
+      MONGO_CONNECT_TIMEOUT_MS: ${{ vars.MONGO_CONNECT_TIMEOUT_MS }}
+      MONGO_SOCKET_TIMEOUT_MS: ${{ vars.MONGO_SOCKET_TIMEOUT_MS }}
+      CSP_REPORT_URI: ${{ vars.CSP_REPORT_URI }}
+      CONTACT_MIN_TIME_MS: ${{ vars.CONTACT_MIN_TIME_MS }}
+      CONTACT_HONEYPOT_FIELDS: ${{ vars.CONTACT_HONEYPOT_FIELDS }}
+      # SMTP & Turnstile
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+      SMTP_USE_TLS: "true"
+      SMTP_USE_SSL: "false"
+      CONTACT_TO_EMAIL: ${{ secrets.CONTACT_TO_EMAIL }}
+      CONTACT_FROM_EMAIL: ${{ secrets.CONTACT_FROM_EMAIL }}
+      PASSWORD_SERVICE_FROM_EMAIL: ${{ secrets.PASSWORD_SERVICE_FROM_EMAIL }}
+      # Turnstile (shared) - Disabled for hardware audit to allow automated login/tests
+      TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+      TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+      TURNSTILE_ENABLED: "false"
+      TURNSTILE_LOGIN_ENABLED: "false"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Guard Against Live Production Containers
+        run: |
+          set -euo pipefail
+          if docker ps -a --format '{{.Names}}' | grep -E -q '^(flask_web_app|nginx_proxy|mongodb|redis|cloudflared_tunnel)$'; then
+            echo "Production containers detected. Stop the prod stack before running the audit."
+            exit 1
+          fi
+
+      - name: Preflight Check
+        run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh
+
+      - name: Native ARM64 Build
+        run: docker build -t ${{ env.IMAGE_TAG }} .
+
+      - name: Spin Up Disposable Stack
+        run: |
+          # Uses -p to isolate from any existing production project
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            -f docker-compose.prod.yml \
+            -f docker-compose.pi.yml \
+            up -d --wait --wait-timeout 180 --no-build
+
+      - name: Inject tests into container
+        run: |
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T web mkdir -p /app/tests
+          docker cp tests/. "$(docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" ps -q web)":/app/tests
+          docker cp pytest.ini "$(docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" ps -q web)":/app/pytest.ini
+
+      - name: Seed Database for Audit
+        run: |
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T web \
+            /app/.venv/bin/python scripts/seed_db.py
+
+      - name: Run Full Native Test Suite (Unit + Integration + Smoke)
+        run: |
+          echo "Running exhaustive hardware verification..."
+          docker compose -p "${{ env.COMPOSE_PROJECT_NAME }}" exec -T \
+            -e TURNSTILE_ENABLED=false \
+            -e TURNSTILE_LOGIN_ENABLED=false \
+            web \
+            /app/.venv/bin/pytest /app/tests -m "not e2e and not performance and not heavy"
+
+      - name: Verify Database Connectivity
+        run: |
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} exec -T web \
+            /app/.venv/bin/python scripts/check_db_connection.py
+
+      - name: Verify Tunnel Process Initialization
+        run: |
+          echo "Checking if cloudflared binary starts correctly on this CPU..."
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} logs cloudflared | \
+            grep -E -q "Connected to|Registered tunnel connection" || \
+            (echo "Tunnel process failed to initialize" && exit 1)
+
+      - name: Dump Audit Logs on Failure
+        if: failure()
+        run: |
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} ps
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} logs --tail 200 web nginx mongo redis cloudflared || true
+
+      - name: Comprehensive Teardown (Cleanup Everything)
+        if: always()
+        run: |
+          echo "Cleaning up audit project and purging volumes..."
+          docker compose -p ${{ env.COMPOSE_PROJECT_NAME }} \
+            -f docker-compose.yml \
+            -f docker-compose.ci.yml \
+            -f docker-compose.prod.yml \
+            -f docker-compose.pi.yml \
+            down -v --remove-orphans
+          docker image rm ${{ env.IMAGE_TAG }} || true
+          echo "Audit complete. Hardware is verified and clean."

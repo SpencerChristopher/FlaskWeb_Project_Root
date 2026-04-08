@@ -7,8 +7,8 @@ services:
         reservations:
           memory: 64M
     environment:
-      GUNICORN_WORKERS: 1
-      GUNICORN_THREADS: 1
+      - GUNICORN_WORKERS=1
+      - GUNICORN_THREADS=1
 
   mongo:
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]

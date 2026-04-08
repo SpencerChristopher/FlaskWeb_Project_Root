@@ -16,8 +16,9 @@ def check_db_connection_script():
     # Set up Flask app context (this also loads .env and gets MONGO_URI)
     app_context = get_flask_app_context()
     
-    mongo_uri = os.environ.get('MONGO_URI')
-    print(f"Attempting to connect to MongoDB at: {mongo_uri}")
+    mongo_host = os.environ.get('MONGO_HOST', 'mongo')
+    mongo_db = os.environ.get('MONGO_APP_DB', 'appdb')
+    print(f"Attempting to connect to MongoDB at host: {mongo_host}, database: {mongo_db}")
 
     try:
         # Get the actual database object within the application context

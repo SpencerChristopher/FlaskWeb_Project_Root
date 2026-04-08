@@ -128,13 +128,12 @@ if (-not $SkipCloud -and -not $Offline) {
             "CONTACT_TO_EMAIL", "CONTACT_FROM_EMAIL", "PASSWORD_SERVICE_FROM_EMAIL",
             "TURNSTILE_SITE_KEY", "TURNSTILE_SECRET_KEY"
         )
-        
+
         $requiredEnvSecrets = @(
             "SECRET_KEY", "ADMIN_USERNAME", "ADMIN_PASSWORD",
-            "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_USER", "MONGO_APP_PASSWORD",
+            "MONGO_ROOT_USER", "MONGO_ROOT_PASSWORD", "MONGO_APP_PASSWORD",
             "CLOUDFLARE_TUNNEL_TOKEN", "DOMAIN_NAME"
         )
-
         foreach ($s in $requiredRepoSecrets) {
             if ($s -notin $remoteRepoSecrets) {
                 Write-Host "MISSING REPO SECRET: '$s' not found in GitHub." -ForegroundColor Red
@@ -143,12 +142,13 @@ if (-not $SkipCloud -and -not $Offline) {
         }
 
         foreach ($s in $requiredEnvSecrets) {
-            if ($s -notin $remoteStagingSecrets) {
-                Write-Host "MISSING STAGING SECRET: '$s' not found in GitHub 'staging' environment." -ForegroundColor Red
+            # Check if secret exists in environment OR variable exists in repository/environment
+            if ($s -notin $remoteStagingSecrets -and $s -notin $allVarNames) {
+                Write-Host "MISSING STAGING SECRET/VAR: '$s' not found in GitHub 'staging' environment or repository variables." -ForegroundColor Red
                 exit 1
             }
-            if ($s -notin $remoteProdSecrets) {
-                Write-Host "WARNING: Prod secret '$s' not found in GitHub 'production' environment." -ForegroundColor Yellow
+            if ($s -notin $remoteProdSecrets -and $s -notin $allVarNames) {
+                Write-Host "WARNING: Prod secret/var '$s' not found in GitHub 'production' environment or repository variables." -ForegroundColor Yellow
             }
         }
         Write-Host "GitHub Secrets: VERIFIED (Repo + Environments)" -ForegroundColor Green
@@ -262,7 +262,7 @@ if ($SkipAudit) {
     Write-Host "Skipping validation as requested." -ForegroundColor Yellow
 } else {
     Write-Host "Running pip-audit and bandit..."
-    docker run --rm -v "${PWD}:/app" -w /app python:3.12-slim-bookworm /bin/sh -c "pip install --quiet poetry poetry-plugin-export pip-audit bandit && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt$PipAuditAllowlistArgs && bandit -r src/ -ll && rm constraints.txt"
+    docker run --rm -e PIP_DISABLE_PIP_VERSION_CHECK=1 -v "${PWD}:/app" -w /app python:3.12-slim-bookworm /bin/sh -c "pip install --quiet --root-user-action=ignore poetry==2.0.1 poetry-plugin-export==1.9.0 pip-audit==2.8.0 bandit==1.8.2 && poetry export --format=constraints.txt --output=constraints.txt --without-hashes && pip-audit -r constraints.txt$PipAuditAllowlistArgs && bandit -r src/ -ll && rm constraints.txt"
     
     Write-Host "Running actionlint (All Workflows)..."
     # Resolve file paths explicitly so they are passed to the container correctly

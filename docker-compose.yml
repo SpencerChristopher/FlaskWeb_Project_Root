@@ -7,67 +7,56 @@ services:
         NODE_IMAGE: node:20-slim@sha256:a82f40540f5959e0003fb7b3c0f80490def2927be8bdbee7e3e0ac65cce3be92
     container_name: flask_web_app
     restart: unless-stopped
-    environment: # Explicitly define environment variables
-      # Secrets (injected by CI or local .env)
-      SECRET_KEY: ${SECRET_KEY}
-      ADMIN_USERNAME: ${ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
-
-      # Gunicorn & Performance
+    environment:
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY required}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?ADMIN_USERNAME required}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?ADMIN_PASSWORD required}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      MONGO_ROOT_USER: ${MONGO_ROOT_USER:?MONGO_ROOT_USER required}
+      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD required}
+      MONGO_APP_USER: ${MONGO_APP_USER:?MONGO_APP_USER required}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD:?MONGO_APP_PASSWORD required}
+      MONGO_APP_DB: ${MONGO_APP_DB:?MONGO_APP_DB required}
+      MONGO_TEST_DB: ${MONGO_TEST_DB:?MONGO_TEST_DB required}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      FLASK_ENV: ${FLASK_ENV:?FLASK_ENV required}
+      LOG_LEVEL: ${LOG_LEVEL:?LOG_LEVEL required}
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:?GUNICORN_WORKERS required}
       GUNICORN_THREADS: ${GUNICORN_THREADS:?GUNICORN_THREADS required}
       GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:?GUNICORN_TIMEOUT required}
-      
-      # Database & Cache
-      MONGO_HOST: mongo
-      MONGO_APP_USER: ${MONGO_APP_USER}
-      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
-      MONGO_APP_DB: ${MONGO_APP_DB:?MONGO_APP_DB required}
       MONGO_SERVER_SELECTION_TIMEOUT_MS: ${MONGO_SERVER_SELECTION_TIMEOUT_MS:?MONGO_SERVER_SELECTION_TIMEOUT_MS required}
       MONGO_CONNECT_TIMEOUT_MS: ${MONGO_CONNECT_TIMEOUT_MS:?MONGO_CONNECT_TIMEOUT_MS required}
       MONGO_SOCKET_TIMEOUT_MS: ${MONGO_SOCKET_TIMEOUT_MS:?MONGO_SOCKET_TIMEOUT_MS required}
-      REDIS_HOST: redis
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
-
-      # Auth & Security
-      FLASK_ENV: ${FLASK_ENV:?FLASK_ENV required}
       JWT_COOKIE_SECURE: ${JWT_COOKIE_SECURE:?JWT_COOKIE_SECURE required}
       JWT_COOKIE_CSRF_PROTECT: ${JWT_COOKIE_CSRF_PROTECT:?JWT_COOKIE_CSRF_PROTECT required}
       JWT_COOKIE_SAMESITE: ${JWT_COOKIE_SAMESITE:?JWT_COOKIE_SAMESITE required}
       TALISMAN_FORCE_HTTPS: ${TALISMAN_FORCE_HTTPS:?TALISMAN_FORCE_HTTPS required}
-      CSP_REPORT_URI: ${CSP_REPORT_URI?CSP_REPORT_URI required}
+      CSP_REPORT_URI: ${CSP_REPORT_URI}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS required}
-      
-      # Proxy & Networking
       PROXY_FIX_X_FOR: ${PROXY_FIX_X_FOR:?PROXY_FIX_X_FOR required}
       PROXY_FIX_X_PROTO: ${PROXY_FIX_X_PROTO:?PROXY_FIX_X_PROTO required}
       PROXY_FIX_X_HOST: ${PROXY_FIX_X_HOST:?PROXY_FIX_X_HOST required}
       PROXY_FIX_X_PREFIX: ${PROXY_FIX_X_PREFIX:?PROXY_FIX_X_PREFIX required}
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:?FORWARDED_ALLOW_IPS required}
-
-      # Email (SMTP)
-      SMTP_HOST: ${SMTP_HOST}
+      SMTP_HOST: ${SMTP_HOST:?SMTP_HOST required}
       SMTP_PORT: ${SMTP_PORT:?SMTP_PORT required}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_USER: ${SMTP_USER:?SMTP_USER required}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?SMTP_PASSWORD required}
       SMTP_USE_TLS: ${SMTP_USE_TLS:?SMTP_USE_TLS required}
       SMTP_USE_SSL: ${SMTP_USE_SSL:?SMTP_USE_SSL required}
-      CONTACT_TO_EMAIL: ${CONTACT_TO_EMAIL}
-      CONTACT_FROM_EMAIL: ${CONTACT_FROM_EMAIL}
-      PASSWORD_SERVICE_FROM_EMAIL: ${PASSWORD_SERVICE_FROM_EMAIL}
-
-      # Cloudflare Turnstile
-      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY}
-      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY}
+      CONTACT_TO_EMAIL: ${CONTACT_TO_EMAIL:?CONTACT_TO_EMAIL required}
+      CONTACT_FROM_EMAIL: ${CONTACT_FROM_EMAIL:?CONTACT_FROM_EMAIL required}
+      PASSWORD_SERVICE_FROM_EMAIL: ${PASSWORD_SERVICE_FROM_EMAIL:?PASSWORD_SERVICE_FROM_EMAIL required}
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:?TURNSTILE_SITE_KEY required}
+      TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:?TURNSTILE_SECRET_KEY required}
       TURNSTILE_ENABLED: ${TURNSTILE_ENABLED:?TURNSTILE_ENABLED required}
       TURNSTILE_LOGIN_ENABLED: ${TURNSTILE_LOGIN_ENABLED:?TURNSTILE_LOGIN_ENABLED required}
-
-      # App Specifics
       CONTACT_MIN_TIME_MS: ${CONTACT_MIN_TIME_MS:?CONTACT_MIN_TIME_MS required}
       CONTACT_HONEYPOT_FIELDS: ${CONTACT_HONEYPOT_FIELDS:?CONTACT_HONEYPOT_FIELDS required}
       FLASK_APP: main.py
       DOCKER_CONTAINER: "true"
-      LOG_LEVEL: ${LOG_LEVEL:?LOG_LEVEL required}
+      MONGO_HOST: mongo
+      REDIS_HOST: redis
     deploy:
       resources:
         limits:
@@ -108,7 +97,7 @@ services:
       - web
 
   mongo:
-    image: mongo:8.0.19-noble@sha256:1773d7826e340cd966f439a4e71abea42fd9ca70ddce1ab6b96eb76013c3ca8e
+    image: mongo:4.4.18
     container_name: mongodb
     restart: unless-stopped
     stop_grace_period: 60s
@@ -121,12 +110,12 @@ services:
       MONGO_TEST_DB: ${MONGO_TEST_DB:?MONGO_TEST_DB required}
     volumes:
       - mongo_data:/data/db
-      - ./docker/mongo/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+      - ./docker/mongo/mongo-init.sh:/docker-entrypoint-initdb.d/mongo-init.sh:ro
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
+          "mongo --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval \"db.adminCommand('ping').ok\" | grep 1",
         ]
       interval: 10s
       timeout: 5s
