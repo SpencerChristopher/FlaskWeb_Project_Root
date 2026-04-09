@@ -7,7 +7,12 @@ on:
   workflow_dispatch:
     inputs:
       hard_rebuild:
-        description: "DANGER: Use down -v to purge volumes (Required for version rollbacks)"
+        description: "DANGER: Purge all volumes (database/logs) before deployment"
+        type: boolean
+        required: false
+        default: false
+      reseed_db:
+        description: "Force full database reseed (Warning: May duplicate non-unique content)"
         type: boolean
         required: false
         default: false
@@ -105,7 +110,9 @@ jobs:
           FORCE_PRODUCTION_WIPE: "${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
-        run: ./scripts/deploy.sh
+        run: |
+          chmod +x ./scripts/deploy.sh
+          ./scripts/deploy.sh
 
       - name: "Fail-Fast: Verify Tunnel Connectivity"
         run: |
@@ -125,21 +132,52 @@ jobs:
         run: |
           docker exec flask_web_app /app/.venv/bin/python scripts/check_db_connection.py
 
-      - name: Create Admin User (Final Gate)
+      - name: Detect empty DB (Production)
+        id: prod_db_empty
         run: |
+          db_empty=$(docker exec flask_web_app /app/.venv/bin/python - <<'PY'
+          import os
+          from mongoengine import connect, disconnect
+          from src.models.user import User
+          from src.models.article import Article
+
+          connect(host=os.environ.get("MONGO_URI"))
+          user_count = User.objects.count()
+          article_count = Article.objects.count()
+          disconnect()
+
+          print(f"users={user_count}")
+          print(f"articles={article_count}")
+          # DB is empty if no users OR if specifically articles are missing during a reseed
+          print("true" if user_count == 0 else "false")
+          PY
+          )
+          db_empty="$(echo "$db_empty" | tail -n 1)"
+          echo "db_empty=${db_empty}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Admin User (Conditional)
+        if: ${{ steps.prod_db_empty.outputs.db_empty == 'true' || github.event.inputs.hard_rebuild == 'true' }}
+        run: |
+          echo "Running one-time Admin creation..."
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
             flask_web_app /app/.venv/bin/python scripts/create_admin.py
 
-      - name: Seed Database (Admin Only)
+      - name: Seed Database
+        if: ${{ steps.prod_db_empty.outputs.db_empty == 'true' || github.event.inputs.reseed_db == 'true' || github.event.inputs.hard_rebuild == 'true' }}
         run: |
+          seed_args="--admin-only"
+          if [ "${{ github.event.inputs.reseed_db }}" = "true" ] || [ "${{ steps.prod_db_empty.outputs.db_empty }}" = "true" ]; then
+            seed_args=""
+            echo "Performing full database seed..."
+          fi
           docker exec \
             -e ADMIN_USERNAME="${{ secrets.ADMIN_USERNAME }}" \
             -e ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             -e ADMIN_EMAIL="${{ secrets.ADMIN_EMAIL }}" \
-            flask_web_app /app/.venv/bin/python scripts/seed_db.py --admin-only
+            flask_web_app /app/.venv/bin/python scripts/seed_db.py $seed_args
 
       - name: Capture deploy logs on failure
         if: failure()
