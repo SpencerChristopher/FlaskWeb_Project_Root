@@ -15,9 +15,8 @@ export function escapeHTML(str) {
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#39;",
-        "/": "&#47;",
     };
-    return String(str).replace(/[&<>"'/]/g, (s) => htmlEntities[s]);
+    return String(str).replace(/[&<>"']/g, (s) => htmlEntities[s]);
 }
 
 /**
@@ -38,7 +37,7 @@ export function validateURL(url, allowedProtocols = ["https:", "http:", "mailto:
         }
     }
     console.warn("Security blocked invalid URL protocol:", url);
-    return "javascript:void(0)";
+    return "#";
 }
 
 /**

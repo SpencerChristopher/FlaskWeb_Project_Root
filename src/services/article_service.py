@@ -98,12 +98,12 @@ class ArticleService:
             slug=article.slug,
             is_published=article.is_published,
             publication_date=(
-                article.publication_date.isoformat()
+                article.publication_date.replace(microsecond=0).isoformat()
                 if article.publication_date
                 else None
             ),
             last_updated=(
-                article.last_updated.isoformat() if article.last_updated else None
+                article.last_updated.replace(microsecond=0).isoformat() if article.last_updated else None
             ),
             author_username=article.author.username if article.author else None,
         ).model_dump()
@@ -115,7 +115,7 @@ class ArticleService:
             "summary": article.summary or "",
             "slug": article.slug,
             "publication_date": (
-                article.publication_date.isoformat()
+                article.publication_date.replace(microsecond=0).isoformat()
                 if article.publication_date
                 else None
             ),

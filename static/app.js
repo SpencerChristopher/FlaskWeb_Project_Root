@@ -140,8 +140,11 @@ function updateNavUI() {
         if (auth.hasPermission('content:manage')) {
             mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/admin/articles">Manage Articles</a></li>');
         }
-        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="javascript:void(0)">Logout</a></li>');
-        document.getElementById('logout-btn')?.addEventListener('click', () => auth.logout().then(() => navigate('/home')));
+        mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" id="logout-btn" href="#">Logout</a></li>');
+        document.getElementById('logout-btn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            auth.logout().then(() => navigate('/home'));
+        });
     } else if (consentState.allowsAuth) {
         mainNavList.insertAdjacentHTML('beforeend', '<li class="nav-item"><a class="nav-link auth-link" href="/login">Admin</a></li>');
     }
