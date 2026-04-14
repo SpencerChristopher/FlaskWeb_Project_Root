@@ -123,10 +123,15 @@ def configure_http_security(app: Flask) -> None:
 
     force_https = os.environ.get("TALISMAN_FORCE_HTTPS", "true").lower() == "true"
     
-    # CRITICAL: Always disable HTTPS forcing if we are in a pytest environment.
-    # This prevents local Docker smoke tests from being redirected to port 443.
-    # PYTEST_CURRENT_TEST is set automatically by the pytest runner.
-    if os.environ.get("PYTEST_CURRENT_TEST"):
+    # CRITICAL: Always disable HTTPS forcing if we are in a testing or local container environment.
+    # This prevents local Docker smoke tests and E2E tests from being redirected to port 443.
+    is_testing = (
+        os.environ.get("PYTEST_CURRENT_TEST") or 
+        os.environ.get("TESTING") == "true" or
+        os.environ.get("FLASK_ENV") == "development"
+    )
+    
+    if is_testing:
         force_https = False
 
     if app_env == "production":
