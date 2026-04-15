@@ -93,7 +93,12 @@ export REQUIRE_HTTPS=1
 - **GitHub UI:** Trigger the workflow manually and check the **"STAGING ONLY: Use down -v..."** box.
 - **CLI (Local/WSL):** `docker compose down -v`.
 
-### 2. Missing configuration in local dev
+### 2. Staging deploy finishes but `Verify staging health` cannot reach `localhost:${STAGING_HOST_PORT}`
+**Symptom:** The deploy job logs `Deployment complete.` and `Tunnel connected successfully.`, but the next step fails with `curl: (28) Failed to connect to localhost port ${STAGING_HOST_PORT}`.  
+**Root cause:** Stale self-hosted runner Docker state. The staging runner can keep an old container or host port binding even after the new stack reports healthy internally.  
+**Fix:** Re-run the staging workflow with `hard_rebuild=true` so the runner performs `down -v --remove-orphans` before recreating the stack. Use this as a recovery path when a normal deploy passes container health checks but the host port never becomes reachable.
+
+### 3. Missing configuration in local dev
 **Symptom:** Web app fails to boot with `KeyError` for non-secret variables like `LOG_LEVEL`.  
 **Root cause:** Configuration has moved to GitHub Repository Variables and is missing from your local `.env`.  
 **Fix:** Run the sync script to generate `.env.vars`:
