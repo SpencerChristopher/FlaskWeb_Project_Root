@@ -23,9 +23,9 @@ export const ArticleListView = {
         }
 
         const articlesHtml = this._state.articles.map((a, idx) => ComponentFactory.createCard({
-            title: escapeHTML(a.title),
+            title: a.title,
             badge: "Article",
-            meta: `📅 ${escapeHTML(a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft')}`,
+            meta: `📅 ${a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft'}`,
             body: `<p class="mb-0">${escapeHTML(a.summary)}</p>`,
             link: `/blog/${a.slug}`,
             dataTest: `article-card-${idx}`
@@ -97,9 +97,9 @@ export const ArticleListView = {
                 const newCardsHtml = data.articles.map((a, idx) => {
                     const globalIdx = this._state.articles.length - data.articles.length + idx;
                     return ComponentFactory.createCard({
-                        title: escapeHTML(a.title),
+                        title: a.title,
                         badge: "Article",
-                        meta: `📅 ${escapeHTML(a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft')}`,
+                        meta: `📅 ${a.publication_date ? new Date(a.publication_date).toLocaleDateString() : 'Draft'}`,
                         body: `<p class="mb-0">${escapeHTML(a.summary)}</p>`,
                         link: `/blog/${a.slug}`,
                         dataTest: `article-card-${globalIdx}`

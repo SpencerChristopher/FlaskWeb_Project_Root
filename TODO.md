@@ -43,3 +43,8 @@
    - Requirement: Future migration to "True User Access" (Comments, User-Generated Content).
    - Task: Review Backend Singletons and Frontend Factory/Observer patterns to ensure they scale for multiple resource owners.
    - Task: Solidify the "Comment Service" and "Resource Ownership" patterns before expanding the user base.
+
+14. Observability & Debugging:
+   - [TODO] Enhance API error logging to include request headers and content-length when a 400 Bad Request occurs.
+   - Goal: Quickly identify issues caused by Cloudflare Workers or intermediate proxies stripping request bodies.
+   - Security: Ensure sensitive headers (Authorization, Cookie) are redacted in logs.
