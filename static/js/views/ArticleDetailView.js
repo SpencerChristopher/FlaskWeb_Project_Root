@@ -1,4 +1,13 @@
-import { escapeHTML, sanitizeHTML } from '../utils/SecurityUtils.js';
+import { escapeHTML, renderMarkdown, sanitizeHTML } from '../utils/SecurityUtils.js';
+
+const HTML_CONTENT_PATTERN = /<\/?(p|b|i|em|strong|a|ul|ol|li|br|h1|h2|h3|h4|h5|h6|blockquote|code|pre)\b/i;
+
+function renderArticleContent(content) {
+    if (!content) return "";
+    return HTML_CONTENT_PATTERN.test(content)
+        ? sanitizeHTML(content)
+        : renderMarkdown(content);
+}
 
 export const ArticleDetailView = {
     template(article, auth) {
@@ -23,7 +32,7 @@ export const ArticleDetailView = {
                                         </div>
                                     </header>
                                     <section class="article-content" data-test="article-content">
-                                        ${sanitizeHTML(data.content || "")}
+                                        ${renderArticleContent(data.content || "")}
                                     </section>
                                 </div>
                             </article>
