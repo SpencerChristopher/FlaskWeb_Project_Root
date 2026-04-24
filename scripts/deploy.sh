@@ -101,10 +101,14 @@ ensure_upload_dir() {
   mkdir -p "${upload_path}"
   
   # Ensure the directory is writable by the container's appuser (UID 1000)
-  # On local dev/WSL, we skip chown to avoid sudo prompts, assuming typical user permissions.
-  # On production (Linux/Pi), we apply it if we have permission.
-  if [ "${DEPLOY_ENV}" = "production" ] || [ "$(id -u)" -eq 0 ]; then
-    chown -R 1000:1000 "${upload_path}" || echo "Warning: Could not chown ${upload_path}. Ensure it is writable by UID 1000."
+  # We apply this in all environments to prevent PermissionError when the host user UID differs from 1000.
+  if [ "$(stat -c '%u' "${upload_path}")" != "1000" ]; then
+    echo "Applying UID 1000 ownership to ${upload_path}..."
+    if [ "$(id -u)" -eq 0 ]; then
+      chown -R 1000:1000 "${upload_path}"
+    else
+      sudo chown -R 1000:1000 "${upload_path}"
+    fi
   fi
 }
 
