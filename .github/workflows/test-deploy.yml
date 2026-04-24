@@ -149,6 +149,15 @@ jobs:
       HOST_PORT: ${{ vars.STAGING_HOST_PORT }}
 
     steps:
+      - name: Emergency migration and cleanup
+        run: |
+          if [ -d "./uploads" ]; then
+            echo "Moving existing uploads to persistent storage..."
+            mkdir -p ~/flask_uploads
+            sudo mv ./uploads/* ~/flask_uploads/ || true
+            sudo rm -rf ./uploads
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -366,6 +375,15 @@ jobs:
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
       SEED_IF_EMPTY: ${{ (github.event.inputs.seed_if_empty == 'true') && 'true' || 'false' }}
     steps:
+      - name: Emergency migration and cleanup
+        run: |
+          if [ -d "./uploads" ]; then
+            echo "Moving existing uploads to persistent storage..."
+            mkdir -p ~/flask_uploads
+            sudo mv ./uploads/* ~/flask_uploads/ || true
+            sudo rm -rf ./uploads
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
