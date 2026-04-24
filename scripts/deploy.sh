@@ -110,15 +110,10 @@ ensure_upload_dir() {
   echo "Ensuring upload directory exists: ${upload_path}"
   mkdir -p "${upload_path}"
   
-  # Ensure the directory is writable by the container's appuser (UID 1000)
-  if [ "$(stat -c '%u' "${upload_path}")" != "1000" ]; then
-    echo "Applying UID 1000 ownership to ${upload_path}..."
-    if [ "$(id -u)" -eq 0 ]; then
-      chown -R 1000:1000 "${upload_path}"
-    else
-      sudo chown -R 1000:1000 "${upload_path}"
-    fi
-  fi
+  # Ensure the directory is writable by the container's appuser (UID 1000).
+  # We use chmod 777 to avoid sudo password prompts on self-hosted runners.
+  # This allows the host user (runner) and the container user (UID 1000) to both access the files.
+  chmod 777 "${upload_path}" || echo "Warning: Could not set permissions on ${upload_path}."
 
   # Export the path for Docker Compose
   export UPLOAD_PATH="${upload_path}"
