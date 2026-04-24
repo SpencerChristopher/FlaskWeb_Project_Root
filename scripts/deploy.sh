@@ -96,13 +96,6 @@ ensure_upload_dir() {
   elif [ "${DEPLOY_ENV}" = "staging" ]; then
     # Use a path outside the workspace to survive runner cleanups
     upload_path="${HOME}/flask_uploads"
-    
-    # Migration: If old local uploads exist but new persistent location doesn't, move them.
-    if [ -d "./uploads" ] && [ ! -d "${upload_path}" ]; then
-      echo "Migrating existing uploads from workspace to persistent storage..."
-      mkdir -p "${HOME}" # Ensure home exists
-      sudo mv ./uploads "${upload_path}"
-    fi
   else
     upload_path="./uploads"
   fi
