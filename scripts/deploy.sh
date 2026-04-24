@@ -93,6 +93,16 @@ ensure_upload_dir() {
   local upload_path
   if [ "${DEPLOY_ENV}" = "production" ]; then
     upload_path="/mnt/usb-storage/uploads"
+  elif [ "${DEPLOY_ENV}" = "staging" ]; then
+    # Use a path outside the workspace to survive runner cleanups
+    upload_path="${HOME}/flask_uploads"
+    
+    # Migration: If old local uploads exist but new persistent location doesn't, move them.
+    if [ -d "./uploads" ] && [ ! -d "${upload_path}" ]; then
+      echo "Migrating existing uploads from workspace to persistent storage..."
+      mkdir -p "${HOME}" # Ensure home exists
+      sudo mv ./uploads "${upload_path}"
+    fi
   else
     upload_path="./uploads"
   fi
@@ -101,7 +111,6 @@ ensure_upload_dir() {
   mkdir -p "${upload_path}"
   
   # Ensure the directory is writable by the container's appuser (UID 1000)
-  # We apply this in all environments to prevent PermissionError when the host user UID differs from 1000.
   if [ "$(stat -c '%u' "${upload_path}")" != "1000" ]; then
     echo "Applying UID 1000 ownership to ${upload_path}..."
     if [ "$(id -u)" -eq 0 ]; then
@@ -110,6 +119,9 @@ ensure_upload_dir() {
       sudo chown -R 1000:1000 "${upload_path}"
     fi
   fi
+
+  # Export the path for Docker Compose
+  export UPLOAD_PATH="${upload_path}"
 }
 
 # Ensure image tag is provided by CI/CD
