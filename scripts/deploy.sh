@@ -89,11 +89,32 @@ perform_mongo_auth_recovery() {
   return 1
 }
 
+ensure_upload_dir() {
+  local upload_path
+  if [ "${DEPLOY_ENV}" = "production" ]; then
+    upload_path="/mnt/usb-storage/uploads"
+  else
+    upload_path="./uploads"
+  fi
+
+  echo "Ensuring upload directory exists: ${upload_path}"
+  mkdir -p "${upload_path}"
+  
+  # Ensure the directory is writable by the container's appuser (UID 1000)
+  # On local dev/WSL, we skip chown to avoid sudo prompts, assuming typical user permissions.
+  # On production (Linux/Pi), we apply it if we have permission.
+  if [ "${DEPLOY_ENV}" = "production" ] || [ "$(id -u)" -eq 0 ]; then
+    chown -R 1000:1000 "${upload_path}" || echo "Warning: Could not chown ${upload_path}. Ensure it is writable by UID 1000."
+  fi
+}
+
 # Ensure image tag is provided by CI/CD
 if [ -z "${IMAGE_TAG:-}" ]; then
   echo "IMAGE_TAG is not set."
   exit 1
 fi
+
+ensure_upload_dir
 
 if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
   if [ "${DEPLOY_RESET_VOLUMES:-false}" = "true" ]; then

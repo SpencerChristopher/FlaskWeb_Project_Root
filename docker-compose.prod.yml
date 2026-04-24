@@ -53,6 +53,8 @@ services:
       - CORS_ORIGINS=https://spencerscooking.uk,https://prod.spencerscooking.uk
       - GUNICORN_WORKERS=1
       - GUNICORN_THREADS=1
+    volumes:
+      - /mnt/usb-storage/uploads:/app/static/uploads
     logging:
       driver: "json-file"
       options:
