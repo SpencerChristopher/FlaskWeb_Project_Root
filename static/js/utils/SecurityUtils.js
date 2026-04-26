@@ -105,8 +105,8 @@ export function renderMarkdown(text) {
         }
 
         if (!trimmed) {
-            closeList();
-            html.push("<br>");
+            // Skip empty lines to prevent double spacing between blocks.
+            // Paragraphs are already wrapped in <p> which have default margins.
             continue;
         }
 

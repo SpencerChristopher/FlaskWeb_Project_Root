@@ -371,10 +371,22 @@ body {
   line-height: 1.6;
 }
 
+@media (max-width: 768px) {
+  .bio, .description, .article-content {
+    text-align: left;
+    line-height: 1.5;
+  }
+  .section-title {
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+  }
+}
+
 .section-title {
   font-size: clamp(1.4rem, 2.4vw, 1.8rem);
   margin: 0;
 }
+
+.text-dark { color: var(--text) !important; }
 
 .feature {
   display: inline-flex;
@@ -383,6 +395,7 @@ body {
   padding: 8px 14px;
   border-radius: 12px;
   font-weight: 700;
+  color: var(--text); /* Default to dark text for contrast on sage/lavender */
 }
 
 .bio {
@@ -555,5 +568,8 @@ body {
 
   .nav-toggle[aria-expanded="true"] + .nav-list {
     display: flex;
+  }
+}
+lex;
   }
 }
