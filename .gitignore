@@ -123,6 +123,7 @@ tests/*.log
 /certs
 # Local uploads
 static/uploads/
+/uploads/
 # Temporary commit message file
 commit_message.txt
 

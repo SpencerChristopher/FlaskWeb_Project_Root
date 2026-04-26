@@ -80,6 +80,8 @@ services:
       start_period: 35s
     expose:
       - "8000"
+    volumes:
+      - ${UPLOAD_PATH:-./uploads}:/app/static/uploads
 
   nginx:
     image: nginx:stable-alpine-slim@sha256:c9d648d0547ebfe3cbd197c73f5a8b5a8bdf4e215c76d290f93952e1a7154891

@@ -203,6 +203,11 @@ jobs:
           env | grep MONGO || echo "No MONGO variables found in env."
           echo "IMAGE_TAG: ${{ env.IMAGE_TAG }}"
 
+      - name: Ensure upload directory exists
+        run: |
+          mkdir -p ./uploads
+          sudo chown -R 1000:1000 ./uploads
+
       - name: Start containers
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml up -d --wait --wait-timeout 180 --no-build

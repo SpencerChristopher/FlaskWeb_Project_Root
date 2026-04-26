@@ -89,11 +89,36 @@ perform_mongo_auth_recovery() {
   return 1
 }
 
+ensure_upload_dir() {
+  local upload_path
+  if [ "${DEPLOY_ENV}" = "production" ]; then
+    upload_path="/mnt/usb-storage/uploads"
+  elif [ "${DEPLOY_ENV}" = "staging" ]; then
+    # Use a path outside the workspace to survive runner cleanups
+    upload_path="${HOME}/flask_uploads"
+  else
+    upload_path="./uploads"
+  fi
+
+  echo "Ensuring upload directory exists: ${upload_path}"
+  mkdir -p "${upload_path}"
+  
+  # Ensure the directory is writable by the container's appuser (UID 1000).
+  # We use chmod 777 to avoid sudo password prompts on self-hosted runners.
+  # This allows the host user (runner) and the container user (UID 1000) to both access the files.
+  chmod 777 "${upload_path}" || echo "Warning: Could not set permissions on ${upload_path}."
+
+  # Export the path for Docker Compose
+  export UPLOAD_PATH="${upload_path}"
+}
+
 # Ensure image tag is provided by CI/CD
 if [ -z "${IMAGE_TAG:-}" ]; then
   echo "IMAGE_TAG is not set."
   exit 1
 fi
+
+ensure_upload_dir
 
 if [ "${DEPLOY_CLEAN_START:-false}" = "true" ]; then
   if [ "${DEPLOY_RESET_VOLUMES:-false}" = "true" ]; then

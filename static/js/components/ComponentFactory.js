@@ -26,9 +26,9 @@ export const ComponentFactory = {
                 <div class="card-body p-4 p-md-5">
                     <header class="mb-3">
                         ${safeBadge ? `<div class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill mb-3 small fw-bold text-uppercase">${safeBadge}</div>` : ""}
-                        <h3 class="fw-bolder mb-2" style="color: var(--text);">
+                        <h2 class="fw-bolder mb-2" style="color: var(--text);">
                             ${safeLink && safeLink !== "#" ? `<a href="${safeLink}" class="text-decoration-none text-inherit stretched-link">${safeTitle}</a>` : safeTitle}
-                        </h3>
+                        </h2>
                         ${safeSubtitle ? `<div class="text-primary fw-bold mb-2 fs-5">${safeSubtitle}</div>` : ""}
                         ${safeMeta ? `<div class="text-muted small fw-bold text-uppercase">${safeMeta}</div>` : ""}
                     </header>
@@ -58,13 +58,14 @@ export const ComponentFactory = {
     /**
      * Creates a standard page section with header.
      */
-    createSection: ({ id, title, tagline, content, featureLabel = "" }) => {
+    createSection: ({ id, title, tagline, content, featureLabel = "", isPrimary = false }) => {
+        const headingTag = isPrimary ? "h1" : "h2";
         return `
             <section id="${escapeHTML(id)}" class="py-5" data-test="${escapeHTML(id)}">
                 <div class="container px-5">
                     <header class="mb-5 text-center">
-                        ${featureLabel ? `<div class="feature bg-primary text-white rounded-3 mb-3">${escapeHTML(featureLabel)}</div>` : ""}
-                        <h2 class="section-title fw-bolder">${escapeHTML(title)}</h2>
+                        ${featureLabel ? `<div class="feature bg-primary rounded-3 mb-3">${escapeHTML(featureLabel)}</div>` : ""}
+                        <${headingTag} class="section-title fw-bolder">${escapeHTML(title)}</${headingTag}>
                         ${tagline ? `<p class="lead fw-normal text-muted mb-0">${escapeHTML(tagline)}</p>` : ""}
                     </header>
                     ${content}

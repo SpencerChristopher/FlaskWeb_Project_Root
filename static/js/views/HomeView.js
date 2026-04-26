@@ -93,7 +93,7 @@ export const HomeView = {
                                         ${roleTitle ? `<p class="role-title mb-4">${escapeHTML(roleTitle)}</p>` : ""}
                                         
                                                                                 
-                                        <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement" style="line-height: 1.6; max-width: 800px; text-align: justify;">
+                                        <div class="fs-5 fw-light text-muted mb-4 bio" data-test="profile-statement">
                                             ${escapeHTML(data.statement || "")}
                                         </div>
 

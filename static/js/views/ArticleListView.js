@@ -34,6 +34,7 @@ export const ArticleListView = {
         return ComponentFactory.createSection({
             id: "view-articles",
             featureLabel: "Blog",
+            isPrimary: true,
             title: "Technical Writing",
             tagline: "Insights on software engineering and architecture",
             content: `
