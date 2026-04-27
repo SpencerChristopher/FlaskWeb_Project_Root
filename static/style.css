@@ -369,6 +369,13 @@ body {
 .bio, .description, .article-content {
   text-align: justify;
   line-height: 1.6;
+  hyphens: auto;
+  word-break: break-word;
+}
+
+/* Ensure markdown paragraphs don't add double margins in cards/bios */
+.markdown p:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 768px) {

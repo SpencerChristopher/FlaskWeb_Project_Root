@@ -76,8 +76,7 @@ def test_article_lifecycle_admin(page: Page, base_url: str):
 
     # 5. Verify on Public Blog
     page.goto(f"{base_url}/blog")
-    expect(page.locator(f"h3:has-text('{title}')")).to_be_visible()
-
+    expect(page.locator(f"h2:has-text('{title}')")).to_be_visible()
     # 6. Delete Article
     page.goto(f"{base_url}/admin/articles")
     page.wait_for_selector(f"tr:has-text('{title}')")

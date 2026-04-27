@@ -104,8 +104,10 @@ ensure_upload_dir() {
   mkdir -p "${upload_path}"
   
   # Ensure the directory is writable by the container's appuser (UID 1000).
-  # We use chmod 777 to avoid sudo password prompts on self-hosted runners.
-  # This allows the host user (runner) and the container user (UID 1000) to both access the files.
+  # RATIONALE: We use chmod 777 to resolve the "Permission Paradox" between the host 
+  # runner user (webapp) and the container user (UID 1000) without requiring 
+  # interactive sudo password prompts. This ensures user-uploaded media persists 
+  # across deployments and survives GitHub Runner workspace cleanups.
   chmod 777 "${upload_path}" || echo "Warning: Could not set permissions on ${upload_path}."
 
   # Export the path for Docker Compose
