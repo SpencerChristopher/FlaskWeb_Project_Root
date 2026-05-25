@@ -108,6 +108,7 @@ jobs:
           DEPLOY_CLEAN_START: "true"
           DEPLOY_RESET_VOLUMES: "${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}"
           FORCE_PRODUCTION_WIPE: "${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}"
+          DEPLOY_REMOVE_ORPHANS: "true"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "false"
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |

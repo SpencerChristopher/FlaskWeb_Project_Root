@@ -17,6 +17,11 @@ on:
         type: boolean
         required: false
         default: false
+      clean_start:
+        description: "STAGING ONLY: Perform non-destructive clean restart (down --remove-orphans before up)"
+        type: boolean
+        required: false
+        default: true
       reseed_db:
         description: "Force database reseed (even if no relevant files changed)"
         type: boolean
@@ -362,6 +367,7 @@ jobs:
       TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED }}
       TURNSTILE_LOGIN_ENABLED: ${{ vars.TURNSTILE_LOGIN_ENABLED }}
       CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+      DEPLOY_REMOVE_ORPHANS: "true"
       # Staging Flags
       CI_SEED_ENABLED: ${{ (github.event.inputs.reseed_db == 'true' || github.event.inputs.heavy_seed == 'true') && 'true' || 'false' }}
       SEED_IF_EMPTY: ${{ (github.event.inputs.seed_if_empty == 'true') && 'true' || 'false' }}
@@ -394,10 +400,10 @@ jobs:
 
       - name: Deploy to WSL
         env:
-          # Only perform clean start if manually requested via hard_rebuild input
-          DEPLOY_CLEAN_START: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          # Only perform clean start if manually requested via inputs OR default is true
+          DEPLOY_CLEAN_START: ${{ (github.event.inputs.clean_start == 'true' || github.event.inputs.hard_rebuild == 'true') && 'true' || 'false' }}
           DEPLOY_RESET_VOLUMES: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
-          DEPLOY_REMOVE_ORPHANS: ${{ github.event.inputs.hard_rebuild == 'true' && 'true' || 'false' }}
+          DEPLOY_REMOVE_ORPHANS: "true"
           DEPLOY_BACKUP_BEFORE_RESET: "true"
           DEPLOY_REQUIRE_BACKUP: "true"
           DEPLOY_AUTO_RECOVER_MONGO_AUTH: "true"

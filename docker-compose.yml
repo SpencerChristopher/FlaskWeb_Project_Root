@@ -82,6 +82,10 @@ services:
       - "8000"
     volumes:
       - ${UPLOAD_PATH:-./uploads}:/app/static/uploads
+    networks:
+      app-network:
+        aliases:
+          - web
 
   nginx:
     image: nginx:stable-alpine-slim@sha256:c9d648d0547ebfe3cbd197c73f5a8b5a8bdf4e215c76d290f93952e1a7154891
@@ -97,6 +101,8 @@ services:
           memory: 64M
     depends_on:
       - web
+    networks:
+      - app-network
 
   mongo:
     image: mongo:4.4.18
@@ -127,6 +133,8 @@ services:
       resources:
         limits:
           memory: 512M
+    networks:
+      - app-network
 
   redis:
     image: "redis:7.4-alpine@sha256:8b81dd37ff027bec4e516d41acfbe9fe2460070dc6d4a4570a2ac5b9d59df065"
@@ -144,6 +152,12 @@ services:
       resources:
         limits:
           memory: 128M
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
 
 volumes:
   mongo_data:
