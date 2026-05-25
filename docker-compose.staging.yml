@@ -9,6 +9,8 @@ services:
     depends_on:
       nginx:
         condition: service_started
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -29,6 +31,8 @@ services:
     depends_on:
       web:
         condition: service_started
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -44,6 +48,8 @@ services:
       - CORS_ORIGINS=https://staging.spencerscooking.uk
       - GUNICORN_WORKERS=1
       - GUNICORN_THREADS=1
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -60,6 +66,8 @@ services:
   nginx:
     ports:
       - "${STAGING_HOST_PORT:?STAGING_HOST_PORT required}:80"
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -75,6 +83,8 @@ services:
   # Staging-specific overrides for MongoDB (Matching Low-Memory Tuning)
   mongo:
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -89,6 +99,8 @@ services:
 
   # Staging-specific overrides for Redis
   redis:
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -100,3 +112,7 @@ services:
           memory: 32M
         reservations:
           memory: 16M
+
+networks:
+  app-network:
+    external: true

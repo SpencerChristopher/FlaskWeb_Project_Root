@@ -82,7 +82,7 @@ def test_catch_all_blog_returns_spa_shell(client):
     assert b"<!DOCTYPE html>" in response.data
 
 
-@pytest.mark.parametrize("path", ["/login", "/about"])
+@pytest.mark.parametrize("path", ["/login", "/about", "/blog", "/more"])
 def test_additional_spa_entry_points_return_shell(client, path):
     """Common frontend entry points should keep using the SPA shell."""
     response = client.get(path)
