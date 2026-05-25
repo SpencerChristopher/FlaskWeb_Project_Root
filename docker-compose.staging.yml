@@ -115,4 +115,4 @@ services:
 
 networks:
   app-network:
-    external: true
+    name: flaskweb_project_root_app-network
