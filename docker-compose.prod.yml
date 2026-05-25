@@ -11,7 +11,7 @@ services:
       nginx:
         condition: service_started
     networks:
-      - default
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -32,6 +32,8 @@ services:
       - "80:80"
     environment:
       - NGINX_HOST=${DOMAIN_NAME:?DOMAIN_NAME required}
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -55,6 +57,8 @@ services:
       - GUNICORN_THREADS=1
     volumes:
       - /mnt/usb-storage/uploads:/app/static/uploads
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -71,6 +75,8 @@ services:
   mongo:
     # Cap WiredTiger cache to protect Pi RAM (Mirroring Staging Tuning)
     command: ["mongod", "--wiredTigerCacheSizeGB", "0.25"]
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -85,6 +91,8 @@ services:
 
   # Production-specific overrides for Redis
   redis:
+    networks:
+      - app-network
     logging:
       driver: "json-file"
       options:
@@ -98,5 +106,5 @@ services:
           memory: 16M
 
 networks:
-  default:
-    name: flask_network
+  app-network:
+    name: flaskweb_project_root_app-network

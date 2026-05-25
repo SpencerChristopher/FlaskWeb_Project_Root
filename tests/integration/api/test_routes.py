@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 
 def test_home_api_returns_json(client):
     """Verifies the main public API endpoint (/api/home) is working."""
@@ -78,3 +80,21 @@ def test_catch_all_blog_returns_spa_shell(client):
     response = client.get("/blog/my-test-article")
     assert response.status_code == 200
     assert b"<!DOCTYPE html>" in response.data
+
+
+@pytest.mark.parametrize("path", ["/login", "/about", "/blog", "/more"])
+def test_additional_spa_entry_points_return_shell(client, path):
+    """Common frontend entry points should keep using the SPA shell."""
+    response = client.get(path)
+    assert response.status_code == 200
+    assert b"<!DOCTYPE html>" in response.data
+    assert b'id="main-content"' in response.data
+
+
+@pytest.mark.parametrize("path", ["/.env", "/.git/config", "/sitemap.xml", "/api"])
+def test_sensitive_or_missing_metadata_paths_return_404(client, path):
+    """Probe paths must not fall through to the SPA shell."""
+    response = client.get(path)
+    assert response.status_code == 404
+    assert response.content_type == "application/json"
+    assert b'id="main-content"' not in response.data

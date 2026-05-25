@@ -62,6 +62,7 @@ Comprehensive documentation for developing and verifying the system is available
 
 *   **[Testing Strategy](docs/TESTING.md)**: How to run unit, integration, and E2E tests in both local and container environments.
 *   **[Deployment & CI/CD](docs/DEPLOYMENT.md)**: Details on the automated pipeline, environment injection, and production architecture.
+*   **[CAR: Cyber Assurance Record](docs/CAR.md)**: Living defense-in-depth and resilience record for security-relevant issues.
 *   **[API Contract](docs/api-contract.yml)**: OpenAPI specification for the backend service.
 
 ### Quick Test Execution
