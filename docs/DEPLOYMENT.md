@@ -13,13 +13,14 @@ This document covers the current deployment flow, CI/CD, runner expectations, an
 **Source of Configuration Values**
 Configuration values are sourced in a hierarchical manner:
 
-1.  **GitHub Secrets:** Used for all sensitive information (e.g., `SECRET_KEY`, `MONGO_ROOT_PASSWORD`). These are injected directly into the CI/CD environment.
-2.  **GitHub Repository Variables:** The "Single Source of Truth" for all non-secret configuration (e.g., `LOG_LEVEL`, `CORS_ORIGINS`, `GUNICORN_TIMEOUT`).
-3.  **GitHub Environment Variables:** Provide environment-specific overrides (e.g., `FLASK_ENV: production` for Staging/Prod).
-4.  **Local Sync (`scripts/sync_vars.ps1`):** A PowerShell script that developers use to pull the latest GitHub configuration into a local `.env.vars` file for Docker Compose parity.
-5.  **`docker-compose.yml`:** The primary source for service definitions. It maps secrets and repository variables into the container and enforces **Resource Limits** (e.g., 512MB for Mongo).
-6.  **`docker-compose.prod.yml` & `docker-compose.staging.yml`:** Provide environment-specific tuning (e.g., capping MongoDB's WiredTiger cache to 256MB for the Raspberry Pi).
-7.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used to pull the exact commit image.
+1.  **GitHub Secrets:** Used for sensitive values (e.g., `SECRET_KEY`, `MONGO_ROOT_PASSWORD`, `DOMAIN_NAME`, `CLOUDFLARE_TUNNEL_TOKEN`).
+2.  **GitHub Repository Variables:** Used for shared non-secret configuration (e.g., `LOG_LEVEL`, `CORS_ORIGINS`, `GUNICORN_TIMEOUT`).
+3.  **GitHub Environment / Workflow Inputs:** Used for environment-specific toggles and deploy-time decisions.
+4.  **`setup-env` composite action:** Hydrates the job environment from a single manifest-driven entry point and validates against the matching required-env file for that job.
+5.  **Local Sync (`scripts/sync_vars.ps1`):** A PowerShell script that developers use to pull the latest GitHub configuration into a local `.env.vars` file for Docker Compose parity.
+6.  **`docker-compose.yml`:** The primary source for service definitions. It maps secrets and repository variables into the container and enforces **Resource Limits** (e.g., 512MB for Mongo).
+7.  **`docker-compose.prod.yml` & `docker-compose.staging.yml`:** Provide environment-specific tuning (e.g., capping MongoDB's WiredTiger cache to 256MB for the Raspberry Pi).
+8.  **`IMAGE_TAG` (CI/CD Only):** Set by the workflow to `ghcr.io/<owner>/<repo>:<GITHUB_SHA>` and used to pull the exact commit image.
 
 ## Manual Overrides (Workflow Dispatch)
 When manually triggering the workflow from GitHub, the following levers are available:
@@ -38,7 +39,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 
 ### 1. Security & Linting (Static Analysis)
 *   **Runner:** `ubuntu-latest` (GitHub-hosted)
-*   **Tasks:** Runs `pip-audit` for dependency vulnerabilities and `actionlint` for workflow syntax validation. This job fails fast if there are security or configuration issues.
+*   **Tasks:** Runs `pip-audit` for dependency vulnerabilities and `actionlint` for workflow syntax validation. This job also uses the `setup-env` canary with `ci/required-canary.env` to catch environment hydration issues early.
 
 ### 2. Check ARM64 Wheels (Compatibility)
 *   **Runner:** `ubuntu-latest` (GitHub-hosted)
@@ -59,6 +60,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
 *   **Runner:** `wsl-staging` (Self-hosted)
 *   **Trigger:** Only runs if *both* `Check ARM64 Wheels` and `Verify Functional (amd64)` succeed.
 *   **Tasks:** Executes `scripts/deploy.sh` to update the staging environment with the newly verified image.
+*   **Environment hydration:** Uses `setup-env` with `ci/required-staging.env` so the staging deploy validates the required variable set before deployment steps continue.
 
 ## Staging Deployment (WSL Runner)
 **Triggered by:** Automatic on push to `dev`/`main`, or manual workflow dispatch when `deploy_to_staging` or seed flags are set.
@@ -75,6 +77,7 @@ To ensure both reliability and speed, the pipeline is split into four modular jo
     *   Waits for MongoDB service to be healthy and verifies authenticated MongoDB ping.
 5.  **Verify Staging Health:** Runs `curl -f` check against `http://localhost:${STAGING_HOST_PORT}/` to ensure the application stack is responsive.
 6.  **Create Admin & Seed DB:** Runs only when explicitly requested via workflow inputs (`reseed_db`, `heavy_seed`, or `seed_if_empty`).
+7.  **Diagnostics on failure:** Writes compose state and recent `flask_web_app` / `nginx_proxy` logs into the job summary when the deploy path fails.
 
 ### Runner data refresh (manual only)
 Staging data is treated as stable. If you need to reseed for testing, use a manual workflow dispatch:
@@ -83,11 +86,19 @@ gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f reseed_db
 gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f heavy_seed=true
 ```
 
+### Turnstile toggle for staging e2e
+To run staging e2e tests with Turnstile disabled, update the staging GitHub Environment value for `TURNSTILE_ENABLED` to `false`, then rerun the staging deploy:
+```bash
+gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true
+```
+The deployment hydrates the new value at runtime, so the disable/enable toggle only takes effect after the staging redeploy completes. Restore the value after the test run.
+
 ## Docker & Application Configuration
 *   **Image Source:** `web` service in `docker-compose.yml` is `build: .` (for local dev). For CI/Staging, `docker-compose.ci.yml` overrides this to `image: ${IMAGE_TAG}` and disables build (pulled from `ghcr.io`). `mongo` and `redis` use their respective official Docker Hub images.
 *   **Configurable Gunicorn Workers:** The `web` service's `Dockerfile` uses `${GUNICORN_WORKERS}` to set the number of Gunicorn worker processes. `docker-compose.yml` now requires explicit values (no fallbacks) so missing config fails fast.
 *   **Gunicorn Hardening:** Gunicorn is configured with `--limit-request-line 4094`, `--limit-request-fields 100`, and `--max-requests 1000`. `--preload` is enabled to force atomic app factory loading, ensuring the container fails immediately if the application cannot bootstrap. `FORWARDED_ALLOW_IPS` is used to restrict which IPs the WSGI server trusts for proxy headers.
 *   **Flask App Env:** `FLASK_ENV` is set to `development` for CI/test and `production` for staging/deployment.
+*   **Manifest-driven env hydration:** Workflow jobs now use the `setup-env` composite action plus a required-env manifest (`ci/required-canary.env`, `ci/required-verify.env`, `ci/required-staging.env`, `ci/required-prod.env`) to validate job configuration before deploy logic runs.
 *   **Talisman/HTTPS:** `TALISMAN_FORCE_HTTPS` is configured (default `true` for deployment).
 *   **ProxyFix:** `PROXY_FIX_X_FOR`, `PROXY_FIX_X_PROTO`, etc., are configured to handle reverse proxy headers.
 *   **Service Health Checks:** `mongo`, `redis`, and the `web` (Flask) services all have `healthcheck` definitions in `docker-compose.yml`. MongoDB healthcheck uses authenticated root credentials.

@@ -94,6 +94,8 @@ Use for real-world smoke/e2e against `https://staging.spencerscooking.uk` while 
     4. Set `REQUIRE_HTTPS=1` to enforce HTTPS cookie/redirect checks.
     5. Staging data is treated as stable. Do not reseed unless explicitly required.
 
+To run e2e with Turnstile disabled on staging, update the staging GitHub Environment value for `TURNSTILE_ENABLED=false`, then rerun the staging deploy. The updated value is hydrated during the deploy, so the toggle only takes effect after the redeploy succeeds.
+
 If you need to refresh staging data, use a manual workflow dispatch:
 ```bash
 gh workflow run test-deploy.yml --ref dev -f deploy_to_staging=true -f reseed_db=true
@@ -117,6 +119,7 @@ The preflight script has been enhanced to catch CI-specific failures locally:
 *   `.\scripts\preflight_ci.ps1 -SmokeTest`: Triggers a targeted functional check that verifies the `web -> nginx` network bridge, catching the "NameResolutionError" locally.
 *   `.\scripts\preflight_ci.ps1 -RunAct`: (Optional) Runs the entire GitHub Actions workflow locally using `act`.
     *   **Note:** The GitHub Actions workflow intentionally skips `smoke`, `performance/heavy`, and `e2e` markers; run those manually (see Staging section).
+*   The preflight run also validates the workflow env-hydration wiring by linting the `setup-env` action and the manifest-driven required-env paths used by staging, verification, and production jobs.
 
 ### D. `pip-audit` allowlist
 
@@ -130,6 +133,16 @@ Staging seeding is **manual only**. On push, the workflow deploys but will not s
 *   `reseed_db=true` (force reseed)
 *   `heavy_seed=true` (force heavy seed)
 *   `seed_if_empty=true` (allow auto-seed only if DB is empty)
+
+### F. Manifest-driven env hydration
+
+The CI workflows now hydrate configuration through `.github/actions/setup-env` and validate each job against the matching manifest in `ci/`:
+*   `ci/required-canary.env` for the static-analysis canary
+*   `ci/required-verify.env` for amd64 verification
+*   `ci/required-staging.env` for staging deploys
+*   `ci/required-prod.env` for production deploys
+
+If a required value is missing, the job fails during env hydration rather than later in deploy steps.
 
 ---
 
