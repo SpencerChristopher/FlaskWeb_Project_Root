@@ -38,6 +38,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
         with:
+          required_file: ci/required-prod.env
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -60,10 +61,6 @@ jobs:
           TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           TURNSTILE_ENABLED: ${{ secrets.TURNSTILE_ENABLED || 'true' }}
-
-      - name: Validate required env
-        shell: bash
-        run: ./scripts/ci/validate_env.sh ci/required-prod.env
 
       - name: Preflight Check (Pi Readiness)
         run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh

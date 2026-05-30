@@ -57,6 +57,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
         with:
+          required_file: ci/required-canary.env
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -122,6 +123,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
         with:
+          required_file: ci/required-verify.env
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -159,10 +161,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         with:
           driver: docker-container
-
-      - name: Validate required env
-        shell: bash
-        run: ./scripts/ci/validate_env.sh ci/required-staging.env
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -311,6 +309,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-env
         with:
+          required_file: ci/required-staging.env
           SECRET_KEY: ${{ secrets.SECRET_KEY }}
           ADMIN_USERNAME: ${{ secrets.ADMIN_USERNAME }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -346,10 +345,6 @@ jobs:
 
       - name: Make deploy script executable
         run: chmod +x ./scripts/deploy.sh
-
-      - name: Validate required env
-        shell: bash
-        run: ./scripts/ci/validate_env.sh ci/required-staging.env
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3

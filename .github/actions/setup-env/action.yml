@@ -1,6 +1,9 @@
 name: "Environment Setup & Hydration"
 description: "Centralizes environment variable mapping and provides source observability"
 inputs:
+  required_file:
+    description: "Path to the required env manifest for validation"
+    required: true
   # SECRETS (Must be passed as inputs to maintain masking)
   SECRET_KEY: { required: true }
   ADMIN_USERNAME: { required: true }
@@ -39,26 +42,17 @@ runs:
         echo "| Variable | Source | Status |" >> $GITHUB_STEP_SUMMARY
         echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
 
-        HAS_ERRORS=0
-
         # Function to hydrate and log (without values)
         hydrate() {
           local key=$1
           local val=$2
           local source=$3
-          local required=${4:-true}
           
           if [ -n "$val" ]; then
             echo "$key=$val" >> $GITHUB_ENV
             echo "| $key | $source | LOADED |" >> $GITHUB_STEP_SUMMARY
           else
-            if [ "$required" = "true" ]; then
-              echo "| $key | $source | **REQUIRED MISSING** |" >> $GITHUB_STEP_SUMMARY
-              echo "::error::Required environment variable $key is missing from $source"
-              HAS_ERRORS=1
-            else
-              echo "| $key | $source | OPTIONAL MISSING |" >> $GITHUB_STEP_SUMMARY
-            fi
+            echo "| $key | $source | OPTIONAL MISSING |" >> $GITHUB_STEP_SUMMARY
           fi
         }
 
@@ -73,8 +67,8 @@ runs:
         hydrate "REDIS_PASSWORD" "${{ inputs.REDIS_PASSWORD }}" "Secret"
         
         # Optional/Conditional Secrets
-        hydrate "CLOUDFLARE_TUNNEL_TOKEN" "${{ inputs.CLOUDFLARE_TUNNEL_TOKEN }}" "Secret" "false"
-        hydrate "DOMAIN_NAME" "${{ inputs.DOMAIN_NAME }}" "Secret" "false"
+        hydrate "CLOUDFLARE_TUNNEL_TOKEN" "${{ inputs.CLOUDFLARE_TUNNEL_TOKEN }}" "Secret"
+        hydrate "DOMAIN_NAME" "${{ inputs.DOMAIN_NAME }}" "Secret"
         hydrate "SMTP_HOST" "${{ inputs.SMTP_HOST }}" "Secret"
         hydrate "SMTP_PORT" "${{ inputs.SMTP_PORT }}" "Secret"
         hydrate "SMTP_USER" "${{ inputs.SMTP_USER }}" "Secret"
@@ -89,9 +83,9 @@ runs:
         hydrate "TURNSTILE_ENABLED" "${{ inputs.TURNSTILE_ENABLED }}" "Secret"
         
         # Staging specific bypasses
-        hydrate "CF_ACCESS_CLIENT_ID" "${{ inputs.CF_ACCESS_CLIENT_ID }}" "Secret" "false"
-        hydrate "CF_ACCESS_CLIENT_SECRET" "${{ inputs.CF_ACCESS_CLIENT_SECRET }}" "Secret" "false"
-        hydrate "CF_ACCESS_JWT" "${{ inputs.CF_ACCESS_JWT }}" "Secret" "false"
+        hydrate "CF_ACCESS_CLIENT_ID" "${{ inputs.CF_ACCESS_CLIENT_ID }}" "Secret"
+        hydrate "CF_ACCESS_CLIENT_SECRET" "${{ inputs.CF_ACCESS_CLIENT_SECRET }}" "Secret"
+        hydrate "CF_ACCESS_JWT" "${{ inputs.CF_ACCESS_JWT }}" "Secret"
 
         # 2. VARIABLES (From vars context)
         hydrate "FLASK_ENV" "${{ vars.FLASK_ENV }}" "Variable"
@@ -115,20 +109,21 @@ runs:
         hydrate "MONGO_SERVER_SELECTION_TIMEOUT_MS" "${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}" "Variable"
         hydrate "MONGO_CONNECT_TIMEOUT_MS" "${{ vars.MONGO_CONNECT_TIMEOUT_MS }}" "Variable"
         hydrate "MONGO_SOCKET_TIMEOUT_MS" "${{ vars.MONGO_SOCKET_TIMEOUT_MS }}" "Variable"
-        hydrate "CSP_REPORT_URI" "${{ vars.CSP_REPORT_URI }}" "Variable" "false"
+        hydrate "CSP_REPORT_URI" "${{ vars.CSP_REPORT_URI }}" "Variable"
         hydrate "STAGING_HOST_PORT" "${{ vars.STAGING_HOST_PORT }}" "Variable"
         hydrate "CONTACT_MIN_TIME_MS" "${{ vars.CONTACT_MIN_TIME_MS }}" "Variable"
         hydrate "CONTACT_HONEYPOT_FIELDS" "${{ vars.CONTACT_HONEYPOT_FIELDS }}" "Variable"
         hydrate "TURNSTILE_LOGIN_ENABLED" "${{ vars.TURNSTILE_LOGIN_ENABLED }}" "Variable"
 
         # Optional External APIs
-        hydrate "KAGGLE_API_KEY" "${{ vars.KAGGLE_API_KEY }}" "Variable" "false"
-        hydrate "LINKEDIN_API_TOKEN" "${{ vars.LINKEDIN_API_TOKEN }}" "Variable" "false"
-        hydrate "LEETCODE_SESSION" "${{ vars.LEETCODE_SESSION }}" "Variable" "false"
-        hydrate "HTB_TOKEN" "${{ vars.HTB_TOKEN }}" "Variable" "false"
+        hydrate "KAGGLE_API_KEY" "${{ vars.KAGGLE_API_KEY }}" "Variable"
+        hydrate "LINKEDIN_API_TOKEN" "${{ vars.LINKEDIN_API_TOKEN }}" "Variable"
+        hydrate "LEETCODE_SESSION" "${{ vars.LEETCODE_SESSION }}" "Variable"
+        hydrate "HTB_TOKEN" "${{ vars.HTB_TOKEN }}" "Variable"
 
-        if [ "$HAS_ERRORS" -eq 1 ]; then
-          echo "### Environment validation failed" >> $GITHUB_STEP_SUMMARY
-          echo "Critical environment variables are missing. Deployment aborted." >> $GITHUB_STEP_SUMMARY
-          exit 1
-        fi
+        echo "### Environment Validation" >> $GITHUB_STEP_SUMMARY
+        echo "| Manifest | Result |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| ${{ inputs.required_file }} | RUNNING |" >> $GITHUB_STEP_SUMMARY
+        ./scripts/ci/validate_env.sh "${{ inputs.required_file }}"
+        echo "| ${{ inputs.required_file }} | PASSED |" >> $GITHUB_STEP_SUMMARY
