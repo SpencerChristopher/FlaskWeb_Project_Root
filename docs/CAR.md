@@ -188,11 +188,38 @@ docker compose --env-file .env --env-file .env.vars exec -T web /app/.venv/bin/p
 - security-sensitive route behavior is part of normal verification
 - future incidents can point to a documented corrective-action record
 
+## Solution 5: CI/CD Observability and Host Audit
+
+### Objective
+
+Increase visibility into deployment health and host-level environment drift (e.g., Raspberry Pi state).
+
+### Control
+
+Standardized health verification using the `health-check` composite action and pre-deployment host state snapshots.
+
+### Why this matters
+
+A "brittle" deployment where failures are opaque increases recovery time and hides underlying infrastructure issues (e.g., full SD cards or network isolation).
+
+### CRA Alignment
+
+- improves **incident detection** via structured timing (Time-to-Healthy)
+- supports **operator information** with clear "State Snapshots" of the production host
+- ensures **traceability of deployment failures**
+
+### Evidence
+
+- `health-check` action: `.github/actions/health-check/action.yml`
+- "Pre-deployment Pi State" diagnostic step in `production-deploy.yml`
+- TTH (Time-to-Healthy) metrics in Job Summaries
+
 ## Recommended Rollout Order
 
 1. Ship **Solution 1** first to remove the immediate incorrect `200` behavior.
 2. Ship **Solution 2** next so nginx and Cloudflare reject high-confidence probe traffic earlier.
-3. Keep **Solution 3** in place permanently so the control survives refactors and deployment drift.
+3. Apply **Solution 5** to stabilize the pipeline diagnostics and provide the evidence needed for long-term CRA compliance.
+4. Keep **Solution 3** in place permanently so the control survives refactors and deployment drift.
 
 ## Living Record
 
@@ -201,6 +228,8 @@ docker compose --env-file .env --env-file .env.vars exec -T web /app/.venv/bin/p
 | 2026-05-22 | Local bug reproduction for SPA catch-all on `/.env`, `/.git/config`, `/sitemap.xml` | Confirmed | [issue_prod.md](../issue_prod.md) |
 | 2026-05-22 | Regression test `test_sensitive_or_missing_metadata_paths_return_404` added | Confirmed | `tests/integration/api/test_routes.py` |
 | 2026-05-22 | Non-E2E baseline excluding the new regression test | Passing | `160 passed, 6 skipped, 30 deselected` |
+| 2026-05-26 | Integrated `health-check` action for standardized observability | Completed | `.github/actions/health-check/` |
+| 2026-05-30 | Implemented Pre-deployment Pi State Snapshot for host audit | Completed | `production-deploy.yml` |
 
 ## Review Cadence
 
