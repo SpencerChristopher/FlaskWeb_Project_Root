@@ -230,25 +230,6 @@ jobs:
           endpoint: "/api/home"
           service_name: "staging-api-home"
 
-      - name: Capture staging diagnostics on failure
-        if: failure()
-        run: |
-          {
-            echo "### Staging failure diagnostics"
-            echo ""
-            echo "#### Compose status"
-            docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml ps
-            echo ""
-            echo "#### flask_web_app health"
-            docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app
-            echo ""
-            echo "#### Recent web logs"
-            docker logs --tail 100 flask_web_app || true
-            echo ""
-            echo "#### Recent nginx logs"
-            docker logs --tail 100 nginx_proxy || true
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Detect empty DB (CI)
         id: ci_db_empty
         run: |
@@ -544,6 +525,25 @@ jobs:
         run: |
           curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/blog
           curl -f --retry 8 --retry-delay 3 http://localhost:${{ vars.STAGING_HOST_PORT }}/api/auth/status
+
+      - name: Capture staging diagnostics on failure
+        if: failure()
+        run: |
+          {
+            echo "### Staging failure diagnostics"
+            echo ""
+            echo "#### Compose status"
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml ps || true
+            echo ""
+            echo "#### flask_web_app health"
+            docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app || true
+            echo ""
+            echo "#### Recent web logs"
+            docker logs --tail 100 flask_web_app || true
+            echo ""
+            echo "#### Recent nginx logs"
+            docker logs --tail 100 nginx_proxy || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Capture deploy logs on failure
         if: failure()
