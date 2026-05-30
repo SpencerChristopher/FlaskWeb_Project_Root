@@ -1,0 +1,134 @@
+name: "Environment Setup & Hydration"
+description: "Centralizes environment variable mapping and provides source observability"
+inputs:
+  # SECRETS (Must be passed as inputs to maintain masking)
+  SECRET_KEY: { required: true }
+  ADMIN_USERNAME: { required: true }
+  ADMIN_PASSWORD: { required: true }
+  ADMIN_EMAIL: { required: true }
+  MONGO_ROOT_USER: { required: true }
+  MONGO_ROOT_PASSWORD: { required: true }
+  MONGO_APP_PASSWORD: { required: true }
+  REDIS_PASSWORD: { required: true }
+  CLOUDFLARE_TUNNEL_TOKEN: { required: false }
+  DOMAIN_NAME: { required: false }
+  SMTP_HOST: { required: false }
+  SMTP_PORT: { required: false }
+  SMTP_USER: { required: false }
+  SMTP_PASSWORD: { required: false }
+  SMTP_USE_TLS: { required: false }
+  SMTP_USE_SSL: { required: false }
+  CONTACT_TO_EMAIL: { required: false }
+  CONTACT_FROM_EMAIL: { required: false }
+  PASSWORD_SERVICE_FROM_EMAIL: { required: false }
+  TURNSTILE_SITE_KEY: { required: false }
+  TURNSTILE_SECRET_KEY: { required: false }
+  TURNSTILE_ENABLED: { required: false }
+  # STAGING SPECIFIC
+  CF_ACCESS_CLIENT_ID: { required: false }
+  CF_ACCESS_CLIENT_SECRET: { required: false }
+  CF_ACCESS_JWT: { required: false }
+
+runs:
+  using: "composite"
+  steps:
+    - name: Hydrate Environment
+      shell: bash
+      run: |
+        echo "### Environment Hydration Report" >> $GITHUB_STEP_SUMMARY
+        echo "| Variable | Source | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- | --- |" >> $GITHUB_STEP_SUMMARY
+
+        HAS_ERRORS=0
+
+        # Function to hydrate and log (without values)
+        hydrate() {
+          local key=$1
+          local val=$2
+          local source=$3
+          local required=${4:-true}
+          
+          if [ -n "$val" ]; then
+            echo "$key=$val" >> $GITHUB_ENV
+            echo "| $key | $source | LOADED |" >> $GITHUB_STEP_SUMMARY
+          else
+            if [ "$required" = "true" ]; then
+              echo "| $key | $source | **REQUIRED MISSING** |" >> $GITHUB_STEP_SUMMARY
+              echo "::error::Required environment variable $key is missing from $source"
+              HAS_ERRORS=1
+            else
+              echo "| $key | $source | OPTIONAL MISSING |" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+        }
+
+        # 1. SECRETS (From Inputs)
+        hydrate "SECRET_KEY" "${{ inputs.SECRET_KEY }}" "Secret"
+        hydrate "ADMIN_USERNAME" "${{ inputs.ADMIN_USERNAME }}" "Secret"
+        hydrate "ADMIN_PASSWORD" "${{ inputs.ADMIN_PASSWORD }}" "Secret"
+        hydrate "ADMIN_EMAIL" "${{ inputs.ADMIN_EMAIL }}" "Secret"
+        hydrate "MONGO_ROOT_USER" "${{ inputs.MONGO_ROOT_USER }}" "Secret"
+        hydrate "MONGO_ROOT_PASSWORD" "${{ inputs.MONGO_ROOT_PASSWORD }}" "Secret"
+        hydrate "MONGO_APP_PASSWORD" "${{ inputs.MONGO_APP_PASSWORD }}" "Secret"
+        hydrate "REDIS_PASSWORD" "${{ inputs.REDIS_PASSWORD }}" "Secret"
+        
+        # Optional/Conditional Secrets
+        hydrate "CLOUDFLARE_TUNNEL_TOKEN" "${{ inputs.CLOUDFLARE_TUNNEL_TOKEN }}" "Secret" "false"
+        hydrate "DOMAIN_NAME" "${{ inputs.DOMAIN_NAME }}" "Secret" "false"
+        hydrate "SMTP_HOST" "${{ inputs.SMTP_HOST }}" "Secret"
+        hydrate "SMTP_PORT" "${{ inputs.SMTP_PORT }}" "Secret"
+        hydrate "SMTP_USER" "${{ inputs.SMTP_USER }}" "Secret"
+        hydrate "SMTP_PASSWORD" "${{ inputs.SMTP_PASSWORD }}" "Secret"
+        hydrate "SMTP_USE_TLS" "${{ inputs.SMTP_USE_TLS }}" "Secret"
+        hydrate "SMTP_USE_SSL" "${{ inputs.SMTP_USE_SSL }}" "Secret"
+        hydrate "CONTACT_TO_EMAIL" "${{ inputs.CONTACT_TO_EMAIL }}" "Secret"
+        hydrate "CONTACT_FROM_EMAIL" "${{ inputs.CONTACT_FROM_EMAIL }}" "Secret"
+        hydrate "PASSWORD_SERVICE_FROM_EMAIL" "${{ inputs.PASSWORD_SERVICE_FROM_EMAIL }}" "Secret"
+        hydrate "TURNSTILE_SITE_KEY" "${{ inputs.TURNSTILE_SITE_KEY }}" "Secret"
+        hydrate "TURNSTILE_SECRET_KEY" "${{ inputs.TURNSTILE_SECRET_KEY }}" "Secret"
+        hydrate "TURNSTILE_ENABLED" "${{ inputs.TURNSTILE_ENABLED }}" "Secret"
+        
+        # Staging specific bypasses
+        hydrate "CF_ACCESS_CLIENT_ID" "${{ inputs.CF_ACCESS_CLIENT_ID }}" "Secret" "false"
+        hydrate "CF_ACCESS_CLIENT_SECRET" "${{ inputs.CF_ACCESS_CLIENT_SECRET }}" "Secret" "false"
+        hydrate "CF_ACCESS_JWT" "${{ inputs.CF_ACCESS_JWT }}" "Secret" "false"
+
+        # 2. VARIABLES (From vars context)
+        hydrate "FLASK_ENV" "${{ vars.FLASK_ENV }}" "Variable"
+        hydrate "LOG_LEVEL" "${{ vars.LOG_LEVEL }}" "Variable"
+        hydrate "GUNICORN_WORKERS" "${{ vars.GUNICORN_WORKERS }}" "Variable"
+        hydrate "GUNICORN_THREADS" "${{ vars.GUNICORN_THREADS }}" "Variable"
+        hydrate "GUNICORN_TIMEOUT" "${{ vars.GUNICORN_TIMEOUT }}" "Variable"
+        hydrate "JWT_COOKIE_SECURE" "${{ vars.JWT_COOKIE_SECURE }}" "Variable"
+        hydrate "JWT_COOKIE_CSRF_PROTECT" "${{ vars.JWT_COOKIE_CSRF_PROTECT }}" "Variable"
+        hydrate "JWT_COOKIE_SAMESITE" "${{ vars.JWT_COOKIE_SAMESITE }}" "Variable"
+        hydrate "TALISMAN_FORCE_HTTPS" "${{ vars.TALISMAN_FORCE_HTTPS }}" "Variable"
+        hydrate "CORS_ORIGINS" "${{ vars.CORS_ORIGINS }}" "Variable"
+        hydrate "PROXY_FIX_X_FOR" "${{ vars.PROXY_FIX_X_FOR }}" "Variable"
+        hydrate "PROXY_FIX_X_PROTO" "${{ vars.PROXY_FIX_X_PROTO }}" "Variable"
+        hydrate "PROXY_FIX_X_HOST" "${{ vars.PROXY_FIX_X_HOST }}" "Variable"
+        hydrate "PROXY_FIX_X_PREFIX" "${{ vars.PROXY_FIX_X_PREFIX }}" "Variable"
+        hydrate "FORWARDED_ALLOW_IPS" "${{ vars.FORWARDED_ALLOW_IPS }}" "Variable"
+        hydrate "MONGO_APP_USER" "${{ vars.MONGO_APP_USER }}" "Variable"
+        hydrate "MONGO_APP_DB" "${{ vars.MONGO_APP_DB }}" "Variable"
+        hydrate "MONGO_TEST_DB" "${{ vars.MONGO_TEST_DB }}" "Variable"
+        hydrate "MONGO_SERVER_SELECTION_TIMEOUT_MS" "${{ vars.MONGO_SERVER_SELECTION_TIMEOUT_MS }}" "Variable"
+        hydrate "MONGO_CONNECT_TIMEOUT_MS" "${{ vars.MONGO_CONNECT_TIMEOUT_MS }}" "Variable"
+        hydrate "MONGO_SOCKET_TIMEOUT_MS" "${{ vars.MONGO_SOCKET_TIMEOUT_MS }}" "Variable"
+        hydrate "CSP_REPORT_URI" "${{ vars.CSP_REPORT_URI }}" "Variable" "false"
+        hydrate "STAGING_HOST_PORT" "${{ vars.STAGING_HOST_PORT }}" "Variable"
+        hydrate "CONTACT_MIN_TIME_MS" "${{ vars.CONTACT_MIN_TIME_MS }}" "Variable"
+        hydrate "CONTACT_HONEYPOT_FIELDS" "${{ vars.CONTACT_HONEYPOT_FIELDS }}" "Variable"
+        hydrate "TURNSTILE_LOGIN_ENABLED" "${{ vars.TURNSTILE_LOGIN_ENABLED }}" "Variable"
+
+        # Optional External APIs
+        hydrate "KAGGLE_API_KEY" "${{ vars.KAGGLE_API_KEY }}" "Variable" "false"
+        hydrate "LINKEDIN_API_TOKEN" "${{ vars.LINKEDIN_API_TOKEN }}" "Variable" "false"
+        hydrate "LEETCODE_SESSION" "${{ vars.LEETCODE_SESSION }}" "Variable" "false"
+        hydrate "HTB_TOKEN" "${{ vars.HTB_TOKEN }}" "Variable" "false"
+
+        if [ "$HAS_ERRORS" -eq 1 ]; then
+          echo "### Environment validation failed" >> $GITHUB_STEP_SUMMARY
+          echo "Critical environment variables are missing. Deployment aborted." >> $GITHUB_STEP_SUMMARY
+          exit 1
+        fi

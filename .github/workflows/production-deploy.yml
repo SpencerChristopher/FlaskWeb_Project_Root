@@ -94,6 +94,24 @@ jobs:
       - name: Preflight Check (Pi Readiness)
         run: chmod +x scripts/preflight_pi.sh && ./scripts/preflight_pi.sh
 
+      - name: "Debug: Pre-deployment Pi State"
+        run: |
+          {
+            echo "### Pre-deployment State Snapshot"
+            echo "#### Containers"
+            echo '```'
+            docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            echo '```'
+            echo "#### Networks"
+            echo '```'
+            docker network ls
+            echo '```'
+            echo "#### Disk Usage"
+            echo '```'
+            df -h /
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Native ARM64 Docker Build
         run: |
           docker build -t ${{ env.IMAGE_TAG }} .

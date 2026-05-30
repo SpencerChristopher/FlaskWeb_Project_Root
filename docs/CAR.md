@@ -188,11 +188,70 @@ docker compose --env-file .env --env-file .env.vars exec -T web /app/.venv/bin/p
 - security-sensitive route behavior is part of normal verification
 - future incidents can point to a documented corrective-action record
 
+## Solution 4: Configuration Management Integrity
+
+### Objective
+
+Prevent "Silent Failures" and "Configuration Drift" where security-critical variables (e.g., JWT settings, Turnstile toggles) are lost or masked during deployment.
+
+### Control
+
+Centralized Environment Hydration via a single composite action (`setup-env`) with explicit source attribution and fail-fast validation.
+
+### Why this matters (The Risk)
+
+Prior ad-hoc mapping in multiple YAML files led to "mapping bloat" and "variable masking," where staging-specific security overrides could be ignored or erased without triggering a CI failure. This created a risk of deploying an insecure or broken configuration.
+
+### CRA Alignment
+
+- ensures the product is **secure by default** by enforcing required configuration keys
+- supports **transparency** via the Environment Hydration Report in Job Summaries
+- reduces **foreseeable risk** of human error during YAML synchronization
+
+### Evidence
+
+- `setup-env` action: `.github/actions/setup-env/action.yml`
+- Environment Hydration Report in GitHub Action Job Summaries
+- Redundant `env:` blocks removed from `test-deploy.yml` and `production-deploy.yml`
+
+### Acceptance criteria
+
+- all environment variables are hydrated through a single source of truth
+- missing required variables trigger immediate pipeline failure
+- source of each variable (Repository vs. Environment) is visible in logs without exposing values
+
+## Solution 5: CI/CD Observability and Host Audit
+
+### Objective
+
+Increase visibility into deployment health and host-level environment drift (e.g., Raspberry Pi state).
+
+### Control
+
+Standardized health verification using the `health-check` composite action and pre-deployment host state snapshots.
+
+### Why this matters
+
+A "brittle" deployment where failures are opaque increases recovery time and hides underlying infrastructure issues (e.g., full SD cards or network isolation).
+
+### CRA Alignment
+
+- improves **incident detection** via structured timing (Time-to-Healthy)
+- supports **operator information** with clear "State Snapshots" of the production host
+- ensures **traceability** of deployment failures
+
+### Evidence
+
+- `health-check` action: `.github/actions/health-check/action.yml`
+- "Pre-deployment Pi State" diagnostic step in `production-deploy.yml`
+- TTH (Time-to-Healthy) metrics in Job Summaries
+
 ## Recommended Rollout Order
 
 1. Ship **Solution 1** first to remove the immediate incorrect `200` behavior.
 2. Ship **Solution 2** next so nginx and Cloudflare reject high-confidence probe traffic earlier.
-3. Keep **Solution 3** in place permanently so the control survives refactors and deployment drift.
+3. Apply **Solution 4 and 5** to stabilize the pipeline and provide the evidence needed for long-term CRA compliance.
+4. Keep **Solution 3** in place permanently so the control survives refactors and deployment drift.
 
 ## Living Record
 
@@ -201,6 +260,9 @@ docker compose --env-file .env --env-file .env.vars exec -T web /app/.venv/bin/p
 | 2026-05-22 | Local bug reproduction for SPA catch-all on `/.env`, `/.git/config`, `/sitemap.xml` | Confirmed | [issue_prod.md](../issue_prod.md) |
 | 2026-05-22 | Regression test `test_sensitive_or_missing_metadata_paths_return_404` added | Confirmed | `tests/integration/api/test_routes.py` |
 | 2026-05-22 | Non-E2E baseline excluding the new regression test | Passing | `160 passed, 6 skipped, 30 deselected` |
+| 2026-05-26 | Integrated `health-check` action for standardized observability | Completed | `.github/actions/health-check/` |
+| 2026-05-26 | Implemented Pre-deployment Pi State Snapshot for host audit | Active | `production-deploy.yml` |
+| 2026-05-30 | Implemented `setup-env` action for Configuration Management Integrity | In Progress | [Issue #21](https://github.com/SpencerChristopher/FlaskWeb_Project_Root/issues/21) |
 
 ## Review Cadence
 
