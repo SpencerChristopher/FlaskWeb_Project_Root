@@ -217,22 +217,37 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml up -d --wait --wait-timeout 180 --no-build
 
-      - name: Verify container health (Fail-Fast Gate)
-        run: |
-          echo "Waiting for web app to respond on isolated port ${HOST_PORT}..."
-          curl -f -H "X-Forwarded-Proto: https" --retry 12 --retry-delay 5 --retry-connrefused "http://localhost:${HOST_PORT}/"
-          curl -f -H "X-Forwarded-Proto: https" --retry 8 --retry-delay 3 "http://localhost:${HOST_PORT}/api/home"
+      - name: Verify staging root health (Fail-Fast)
+        uses: ./.github/actions/health-check
+        with:
+          host_port: ${{ env.HOST_PORT }}
+          service_name: "staging-root"
 
-      - name: Assert web healthy before seed
+      - name: Verify staging API health (Fail-Fast)
+        uses: ./.github/actions/health-check
+        with:
+          host_port: ${{ env.HOST_PORT }}
+          endpoint: "/api/home"
+          service_name: "staging-api-home"
+
+      - name: Capture staging diagnostics on failure
+        if: failure()
         run: |
-          health_status="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app)"
-          echo "flask_web_app health status: ${health_status}"
-          docker compose -f docker-compose.yml -f docker-compose.ci.yml ps
-          if [ "${health_status}" != "healthy" ]; then
-            echo "flask_web_app did not reach healthy state."
-            docker logs --tail 200 flask_web_app || true
-            exit 1
-          fi
+          {
+            echo "### Staging failure diagnostics"
+            echo ""
+            echo "#### Compose status"
+            docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.staging.yml ps
+            echo ""
+            echo "#### flask_web_app health"
+            docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' flask_web_app
+            echo ""
+            echo "#### Recent web logs"
+            docker logs --tail 100 flask_web_app || true
+            echo ""
+            echo "#### Recent nginx logs"
+            docker logs --tail 100 nginx_proxy || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Detect empty DB (CI)
         id: ci_db_empty

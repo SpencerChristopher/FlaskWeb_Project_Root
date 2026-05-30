@@ -115,6 +115,12 @@ jobs:
           chmod +x ./scripts/deploy.sh
           ./scripts/deploy.sh
 
+      - name: Verify service health (Fail-Fast)
+        uses: ./.github/actions/health-check
+        with:
+          host_port: 80
+          service_name: "flask_web_app"
+
       - name: "Fail-Fast: Verify Tunnel Connectivity"
         run: |
           echo "Waiting for cloudflared to connect..."

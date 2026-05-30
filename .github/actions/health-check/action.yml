@@ -1,0 +1,79 @@
+name: "Service Health Check"
+description: "Verifies service reachability and provides timing metrics"
+inputs:
+  host_port:
+    description: "The port on localhost to check"
+    required: true
+  endpoint:
+    description: "The endpoint to check (e.g. /api/home)"
+    required: false
+    default: "/"
+  connect_timeout:
+    description: "Connection timeout in seconds"
+    required: false
+    default: "5"
+  max_time:
+    description: "Maximum curl runtime per attempt in seconds"
+    required: false
+    default: "10"
+  max_attempts:
+    description: "Maximum retry attempts"
+    required: false
+    default: "12"
+  delay:
+    description: "Delay between attempts in seconds"
+    required: false
+    default: "5"
+  service_name:
+    description: "Name of the service for logging"
+    required: false
+    default: "web-app"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run Health Check
+      shell: bash
+      run: |
+        echo "### Health Check Summary: ${{ inputs.service_name }}" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "| --- | --- |" >> $GITHUB_STEP_SUMMARY
+        echo "| Port | ${{ inputs.host_port }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Endpoint | ${{ inputs.endpoint }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Connect Timeout | ${{ inputs.connect_timeout }}s |" >> $GITHUB_STEP_SUMMARY
+        echo "| Max Time | ${{ inputs.max_time }}s |" >> $GITHUB_STEP_SUMMARY
+
+        start_time=$(date +%s)
+        success="false"
+        last_status="000"
+
+        for i in $(seq 1 ${{ inputs.max_attempts }}); do
+          echo "Attempt $i: Checking http://localhost:${{ inputs.host_port }}${{ inputs.endpoint }}..."
+          status_code="$(curl -sS -o /dev/null -w "%{http_code}" \
+            --connect-timeout "${{ inputs.connect_timeout }}" \
+            --max-time "${{ inputs.max_time }}" \
+            -H "X-Forwarded-Proto: https" \
+            "http://localhost:${{ inputs.host_port }}${{ inputs.endpoint }}" || true)"
+          status_code="${status_code:-000}"
+          last_status="$status_code"
+          if [ "$status_code" = "200" ]; then
+            end_time=$(date +%s)
+            duration=$((end_time - start_time))
+            success="true"
+            echo "| Status | SUCCESS: Healthy |" >> $GITHUB_STEP_SUMMARY
+            echo "| Last Status | ${status_code} |" >> $GITHUB_STEP_SUMMARY
+            echo "| Time to Healthy | ${duration}s |" >> $GITHUB_STEP_SUMMARY
+            echo "| Attempts | $i |" >> $GITHUB_STEP_SUMMARY
+            break
+          fi
+          echo "Attempt $i failed with HTTP ${status_code}."
+          sleep ${{ inputs.delay }}
+        done
+
+        if [ "$success" = "false" ]; then
+          echo "| Status | FAILURE: Timed Out |" >> $GITHUB_STEP_SUMMARY
+          echo "| Last Status | ${last_status} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Attempts | ${{ inputs.max_attempts }} |" >> $GITHUB_STEP_SUMMARY
+          echo "Error: Service ${{ inputs.service_name }} did not respond within timeout."
+          exit 1
+        fi
